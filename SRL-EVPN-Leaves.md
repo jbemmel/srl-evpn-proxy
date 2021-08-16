@@ -39,8 +39,14 @@ Leaf1:
     admin-state enable
     subinterface 0 {
         admin-state enable
-        ipv4 { address 1.1.1.${/system!!!}/32 { } }
-        ipv6 { address 2001::1:1:1:${/system!!!}/128 { } }
+        ipv4 { 
+          address 1.1.1.${/system!!!}/32
+          exit
+        }
+        ipv6 { 
+          address 2001::1:1:1:${/system!!!}/128
+          exit
+        }
     }
 /delete network-instance default
 /network-instance default
