@@ -75,7 +75,7 @@ interface ethernet-1/1.0 { }
 commit stay
 ```
 
-BGP EVPN, with static neighbor peering on the interface
+BGP IPv4 (for loopbacks) + EVPN, with static neighbor peering on the interface
 ```
 /routing-policy
 policy accept-all {
@@ -91,7 +91,7 @@ protocols bgp {
         group leaves {
             admin-state enable
             peer-as 65000
-            ipv4-unicast { admin-state disable }
+            ipv4-unicast { admin-state enable }
             ipv6-unicast { admin-state disable }
             evpn { admin-state enable }
         }
@@ -153,7 +153,6 @@ subinterface 1 {
 /network-instance mac-vrf-evi10
     type mac-vrf
     admin-state enable
-    interface ethernet-1/1.1 { }
     interface irb0.1 { }
     vxlan-interface vxlan0.1 { }
     protocols {
