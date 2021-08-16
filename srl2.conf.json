@@ -1161,6 +1161,9 @@
               {
                 "ip-prefix": "10.10.10.2/24",
                 "primary": [null]
+              },
+              {
+                "ip-prefix": "10.10.10.12/24"
               }
             ]
           },
@@ -1441,6 +1444,9 @@
       "interface": [
         {
           "name": "ethernet-1/1.0"
+        },
+        {
+          "name": "system0.0"
         }
       ],
       "protocols": {
@@ -1453,7 +1459,16 @@
             {
               "group-name": "leaves",
               "admin-state": "enable",
-              "peer-as": 65000
+              "peer-as": 65000,
+              "ipv4-unicast": {
+                "admin-state": "enable"
+              },
+              "ipv6-unicast": {
+                "admin-state": "disable"
+              },
+              "evpn": {
+                "admin-state": "enable"
+              }
             }
           ],
           "neighbor": [
@@ -1481,9 +1496,6 @@
       "type": "srl_nokia-network-instance:mac-vrf",
       "admin-state": "enable",
       "interface": [
-        {
-          "name": "ethernet-1/1.1"
-        },
         {
           "name": "irb0.1"
         }
