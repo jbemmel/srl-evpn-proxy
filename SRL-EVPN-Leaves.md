@@ -24,8 +24,14 @@ Leaf1:
     subinterface 0 {
         type routed
         admin-state enable
-        ipv4 { address 192.168.0.${/system!!!|int(_) - 1}/31 { } }
-        ipv6 { address 2001::192:168:0:${/system!!!|int(_) - 1}/127 { } }
+        ipv4 { 
+          address 192.168.0.${/system!!!|int(_) - 1}/31
+          exit
+        }
+        ipv6 { 
+          address 2001::192:168:0:${/system!!!|int(_) - 1}/127
+          exit
+        }
     }
 /delete interface lo0
 /interface lo0
