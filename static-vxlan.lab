@@ -21,5 +21,8 @@ topology:
       startup-config: srl2.conf.json
 
   links:
-    - endpoints: ["cumulus:swp12", "srl1:e1-1"]
-    - endpoints: ["srl1:e1-2", "srl2:e1-1"]
+    # Start with EVPN VXLAN between SRL nodes
+    - endpoints: ["srl1:e1-1", "srl2:e1-1"]
+
+    # Add static VXLAN to Cumulus, advertised by srl2 (with modified next hop)
+    - endpoints: ["cumulus:swp12", "srl1:e1-2"]

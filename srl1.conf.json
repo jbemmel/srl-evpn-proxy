@@ -1078,16 +1078,45 @@
     {
       "name": "ethernet-1/1",
       "admin-state": "enable",
+      "srl_nokia-interfaces-vlans:vlan-tagging": true,
       "subinterface": [
         {
           "index": 0,
+          "type": "srl_nokia-interfaces:routed",
+          "description": "Basic L3 underlay connection to Leaf2",
           "admin-state": "enable",
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "10.0.0.0/31"
+                "ip-prefix": "192.168.0.0/31"
               }
             ]
+          },
+          "ipv6": {
+            "address": [
+              {
+                "ip-prefix": "2001::192:168:0:0/127"
+              }
+            ]
+          },
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "single-tagged": {
+                "vlan-id": 1
+              }
+            }
+          }
+        },
+        {
+          "index": 1,
+          "type": "srl_nokia-interfaces:bridged",
+          "admin-state": "enable",
+          "srl_nokia-interfaces-vlans:vlan": {
+            "encap": {
+              "single-tagged": {
+                "vlan-id": 10
+              }
+            }
           }
         }
       ]
@@ -1121,12 +1150,51 @@
       "admin-state": "enable"
     },
     {
+      "name": "irb0",
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 1,
+          "admin-state": "enable",
+          "ipv4": {
+            "address": [
+              {
+                "ip-prefix": "10.10.10.1/24",
+                "primary": [null]
+              },
+              {
+                "ip-prefix": "10.10.10.11/24"
+              }
+            ]
+          },
+          "ipv6": {
+            
+          }
+        }
+      ]
+    },
+    {
       "name": "lo0",
+      "description": "Loopback",
       "admin-state": "enable",
       "subinterface": [
         {
           "index": 0,
-          "admin-state": "enable"
+          "admin-state": "enable",
+          "ipv4": {
+            "address": [
+              {
+                "ip-prefix": "1.1.1.1/32"
+              }
+            ]
+          },
+          "ipv6": {
+            "address": [
+              {
+                "ip-prefix": "2001::1:1:1:1/128"
+              }
+            ]
+          }
         }
       ]
     },
@@ -1149,9 +1217,27 @@
           }
         }
       ]
+    },
+    {
+      "name": "system0",
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0,
+          "admin-state": "enable",
+          "ipv4": {
+            "address": [
+              {
+                "ip-prefix": "1.1.1.1/32"
+              }
+            ]
+          }
+        }
+      ]
     }
   ],
   "srl_nokia-system:system": {
+    "_annotate": "1",
     "srl_nokia-aaa:aaa": {
       "authentication": {
         "authentication-method": [
@@ -1358,11 +1444,78 @@
       "interface": [
         {
           "name": "ethernet-1/1.0"
-        },
+        }
+      ],
+      "protocols": {
+        "srl_nokia-bgp:bgp": {
+          "admin-state": "enable",
+          "autonomous-system": 65000,
+          "export-policy": "accept-all",
+          "router-id": "1.1.1.1",
+          "group": [
+            {
+              "group-name": "leaves",
+              "admin-state": "enable",
+              "peer-as": 65000
+            }
+          ],
+          "neighbor": [
+            {
+              "peer-address": "192.168.0.1",
+              "admin-state": "enable",
+              "peer-group": "leaves"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "ip-vrf",
+      "type": "srl_nokia-network-instance:ip-vrf",
+      "admin-state": "enable",
+      "interface": [
         {
-          "name": "lo0.0"
+          "name": "irb0.1"
         }
       ]
+    },
+    {
+      "name": "mac-vrf-evi10",
+      "type": "srl_nokia-network-instance:mac-vrf",
+      "admin-state": "enable",
+      "interface": [
+        {
+          "name": "ethernet-1/1.1"
+        },
+        {
+          "name": "irb0.1"
+        }
+      ],
+      "vxlan-interface": [
+        {
+          "name": "vxlan0.1"
+        }
+      ],
+      "protocols": {
+        "bgp-evpn": {
+          "srl_nokia-bgp-evpn:bgp-instance": [
+            {
+              "id": 1,
+              "admin-state": "enable",
+              "vxlan-interface": "vxlan0.1",
+              "evi": 10,
+              "ecmp": 8
+            }
+          ]
+        },
+        "srl_nokia-bgp-vpn:bgp-vpn": {
+          "bgp-instance": [
+            {
+              "id": 1
+            }
+          ]
+        }
+      }
     },
     {
       "name": "mgmt",
@@ -1383,6 +1536,18 @@
       }
     }
   ],
+  "srl_nokia-routing-policy:routing-policy": {
+    "policy": [
+      {
+        "name": "accept-all",
+        "default-action": {
+          "accept": {
+            
+          }
+        }
+      }
+    ]
+  },
   "srl_nokia-tunnel-interfaces:tunnel-interface": [
     {
       "name": "vxlan0",
@@ -1392,6 +1557,16 @@
           "type": "srl_nokia-interfaces:bridged",
           "ingress": {
             "vni": 10000
+          },
+          "egress": {
+            "source-ip": "use-system-ipv4-address"
+          }
+        },
+        {
+          "index": 1,
+          "type": "srl_nokia-interfaces:bridged",
+          "ingress": {
+            "vni": 10
           },
           "egress": {
             "source-ip": "use-system-ipv4-address"
