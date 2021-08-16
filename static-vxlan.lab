@@ -7,10 +7,18 @@ topology:
       image: networkop/cx:4.3.0
       binds:
         - cumulus_interfaces:/etc/network/interfaces.d/host-mounts
-    srl:
+    srl1:
       kind: srl
-      image: ghcr.io/nokia/srlinux:latest
-      startup-config: srl.conf.json
+      # image: ghcr.io/nokia/srlinux:latest
+      image: srl/custombase:latest
+      startup-config: srl1.conf.json
+    srl2:
+      kind: srl
+      # image: ghcr.io/nokia/srlinux:latest
+      image: srl/custombase:latest
+      startup-config: srl2.conf.json
 
   links:
-    - endpoints: ["cumulus:swp12", "srl:e1-1"]
+    - endpoints: ["cumulus:swp12", "srl1:e1-1"]
+    - endpoints: ["cumulus:swp13", "srl2:e1-1"]
+    - endpoints: ["srl1:e1-2", "srl2:e1-2"]
