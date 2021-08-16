@@ -27,7 +27,7 @@ Underlay:
         vlan {
             encap {
                 single-tagged {
-                  vlan-id 0
+                  vlan-id 1
                 }
             }
         }
@@ -40,6 +40,17 @@ Underlay:
           address 2001::192:168:0:${/system!!!|int(_) - 1}/127
           exit
         }
+    }
+    subinterface 1 {
+      type bridged
+      vlan {
+            encap {
+                single-tagged {
+                  vlan-id 10
+                }
+            }
+      }
+      admin-state enable
     }
 /delete interface lo0
 /interface lo0
