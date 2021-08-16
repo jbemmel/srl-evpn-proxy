@@ -19,10 +19,18 @@ Underlay:
 ```
 /delete interface ethernet-1/1
 /interface ethernet-1/1
-    description "Basic underlay connection to Leaf${/system!!!| 1 if _=='2' else 2 }"
     admin-state enable
+    vlan-tagging true
     subinterface 0 {
+        description "Basic L3 underlay connection to Leaf${/system!!!| 1 if _=='2' else 2 }"
         type routed
+        vlan {
+            encap {
+                single-tagged {
+                  vlan-id 0
+                }
+            }
+        }
         admin-state enable
         ipv4 { 
           address 192.168.0.${/system!!!|int(_) - 1}/31
@@ -86,7 +94,7 @@ Check BGP peering:
 /show network-instance default protocols bgp neighbor
 ```
 
-VXLAN:
+VXLAN system interface:
 ```
 /interface system0
 admin-state enable
@@ -100,5 +108,8 @@ subinterface 0 {
 /network-instance default
 interface system0.0 { }
 commit stay
+```
+
+Basic L2 Ethernet VPN service:
 ```
 
