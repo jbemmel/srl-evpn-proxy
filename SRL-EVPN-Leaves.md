@@ -123,4 +123,49 @@ commit stay
 
 Basic L2 Ethernet VPN service:
 ```
+/tunnel-interface vxlan0
+vxlan-interface 1 {
+        type bridged
+        ingress {
+            vni 10
+        }
+        egress {
+            source-ip use-system-ipv4-address
+        }
+    }
+ 
+/interface irb0
+admin-state enable
+subinterface 1 {
+    admin-state enable
+    ipv4 {
+        address 10.10.10.${/system!!!}/24
+           primary
+           exit
+    }
+    ipv6 {
+    }
+}
 
+/network-instance mac-vrf-evi10
+    type mac-vrf
+    admin-state enable
+    interface ethernet-1/1.1 { }
+    interface irb0.1 { }
+    vxlan-interface vxlan0.1 { }
+    protocols {
+        bgp-evpn {
+            bgp-instance 1 {
+                admin-state enable
+                vxlan-interface vxlan0.1
+                evi 10
+                ecmp 8
+            }
+        }
+        bgp-vpn {
+          bgp-instance 1 {
+            }
+        }
+    }
+commit stay
+```
