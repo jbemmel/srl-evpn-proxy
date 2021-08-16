@@ -99,5 +99,6 @@ subinterface 0 {
 }
 /network-instance default
 interface system0.0 { }
+commit stay
 ```
 
