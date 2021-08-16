@@ -74,7 +74,7 @@ protocols bgp {
             admin-state enable
             peer-as 65000
         }
-        neighbor 192.168.0.${/system!!!| 1 if _=='2' else 2 } {
+        neighbor 192.168.0.${/system!!!| 1 if _=='1' else 0 } {
           admin-state enable
           peer-group leaves
         }
