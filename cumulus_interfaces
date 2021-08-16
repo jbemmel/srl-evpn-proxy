@@ -8,11 +8,6 @@ iface swp12
     address 10.0.0.1/31
     post-up ip route add 1.1.1.11/32 via 10.0.0.0
 
-auto swp13
-iface swp13 
-    address 10.0.0.3/31
-    post-up ip route add 1.1.1.12/32 via 10.0.0.2
-
 auto bridge
 iface bridge
     bridge-ports vni-10
@@ -27,5 +22,4 @@ iface vni-10
     vxlan-id 10
     vxlan-local-tunnelip 1.1.1.1
     vxlan-remoteip 1.1.1.11 # srl1 on swp12
-    vxlan-remoteip 1.1.1.12 # srl2 on swp13
     bridge-learning on

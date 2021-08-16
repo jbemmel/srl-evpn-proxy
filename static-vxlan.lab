@@ -8,6 +8,7 @@ topology:
       binds:
         - cumulus_interfaces:/etc/network/interfaces.d/host-mounts
         - cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+
     srl1:
       kind: srl
       # image: ghcr.io/nokia/srlinux:latest
@@ -21,5 +22,4 @@ topology:
 
   links:
     - endpoints: ["cumulus:swp12", "srl1:e1-1"]
-    - endpoints: ["cumulus:swp13", "srl2:e1-1"]
-    - endpoints: ["srl1:e1-2", "srl2:e1-2"]
+    - endpoints: ["srl1:e1-2", "srl2:e1-1"]
