@@ -108,7 +108,7 @@ Check BGP peering:
 /show network-instance default protocols bgp neighbor
 ```
 
-VXLAN system interface:
+VXLAN system interface, added to default network-instance:
 ```
 /interface system0
 admin-state enable
