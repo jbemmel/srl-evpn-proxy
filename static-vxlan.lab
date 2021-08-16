@@ -1,0 +1,16 @@
+name: static-vxlan-lab
+
+topology:
+  nodes:
+    cumulus:
+      kind: cvx
+      image: networkop/cx:4.3.0
+      binds:
+        - cumulus_interfaces:/etc/network/interfaces.d/host-mounts
+    srl:
+      kind: srl
+      image: ghcr.io/nokia/srlinux:latest
+      startup-config: srl.conf.json
+
+  links:
+    - endpoints: ["cumulus:swp12", "srl:e1-1"]
