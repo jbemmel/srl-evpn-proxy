@@ -1,3 +1,8 @@
+# The loopback network interface
+auto lo
+iface lo inet loopback
+    address 1.1.1.1/32
+
 auto swp12
 iface swp12 
     address 10.0.0.1/31
@@ -5,3 +10,20 @@ iface swp12
 auto swp13
 iface swp13 
     address 10.0.0.3/31
+
+auto bridge
+iface bridge
+    bridge-ports vni-10
+    bridge-vids 10
+    bridge-vlan-aware yes
+
+auto vni-10
+iface vni-10
+    bridge-access 10
+    mstpctl-bpduguard yes
+    mstpctl-portbpdufilter yes
+    vxlan-id 10
+    vxlan-local-tunnelip 1.1.1.1
+    vxlan-remoteip 1.1.1.11 # srl1 on swp12
+    vxlan-remoteip 1.1.1.12 # srl2 on swp13
+    bridge-learning on
