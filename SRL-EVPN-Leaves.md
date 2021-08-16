@@ -1,4 +1,4 @@
-# Basic underlay configuration for a pair of leaves with iBGP EVPN
+# Basic L2 VXLAN configuration for a pair of leaves with iBGP EVPN
 
 The snippets below can be used to configure a pair of SR Linux nodes with basic underlay connectivity and BGP EVPN between 2 leaves:
 
@@ -15,7 +15,7 @@ enter candidate
 commit stay
 ```
 
-Leaf1:
+Underlay:
 ```
 /delete interface ethernet-1/1
 /interface ethernet-1/1
@@ -52,7 +52,6 @@ Leaf1:
 /network-instance default
 type default
 admin-state enable
-interface lo0.0 { }
 interface ethernet-1/1.0 { }
 commit stay
 ```
@@ -79,10 +78,26 @@ protocols bgp {
           peer-group leaves
         }
     }
-commit now
+commit stay
 ```
 
 Check BGP peering:
 ```
 /show network-instance default protocols bgp neighbor
 ```
+
+VXLAN:
+```
+/interface system0
+admin-state enable
+subinterface 0 {
+  admin-state enable
+  ipv4 { 
+    address 1.1.1.${/system!!!}/32
+    exit
+  }
+}
+/network-instance default
+interface system0.0 { }
+```
+
