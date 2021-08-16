@@ -75,7 +75,7 @@ interface ethernet-1/1.0 { }
 commit stay
 ```
 
-Using BGP as IGP, with static neighbor peering on the interface (ipv4):
+BGP EVPN, with static neighbor peering on the interface
 ```
 /routing-policy
 policy accept-all {
@@ -91,6 +91,9 @@ protocols bgp {
         group leaves {
             admin-state enable
             peer-as 65000
+            ipv4-unicast { admin-state disable }
+            ipv6-unicast { admin-state disable }
+            evpn { admin-state enable }
         }
         neighbor 192.168.0.${/system!!!| 1 if _=='1' else 0 } {
           admin-state enable
