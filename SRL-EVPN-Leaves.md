@@ -167,5 +167,10 @@ subinterface 1 {
             }
         }
     }
+
+/network-instance ip-vrf
+type ip-vrf
+admin-state enable
+interface irb0.1 { }
 commit stay
 ```
