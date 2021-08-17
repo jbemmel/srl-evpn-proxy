@@ -49,4 +49,4 @@ topology:
     - endpoints: ["srl2:e1-3", "h4:eth1"]
 
     # A bridge between the static world and the dynamic world
-    - endpoints: ["cumulus1:e1-2", "srl1:e1-2"]
+    - endpoints: ["cumulus2:e1-2", "srl1:e1-2"]
