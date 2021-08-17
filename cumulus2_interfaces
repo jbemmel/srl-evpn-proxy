@@ -1,15 +1,6 @@
 auto lo
 iface lo inet loopback
   address 1.1.1.2/32
-  vxlan-local-tunnelip 1.1.1.2
-
-auto mgmt
-iface mgmt
-    vrf-table auto
-
-auto eth0
-iface eth0
-    vrf mgmt
 
 auto swp1 # To Cumulus1
 iface swp1
@@ -39,5 +30,6 @@ iface vni-10
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     vxlan-id 10
+    vxlan-local-tunnelip 1.1.1.2
     vxlan-remoteip 1.1.1.1 # Cumulus1
     bridge-learning on
