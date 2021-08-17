@@ -1,28 +1,52 @@
 name: static-vxlan-lab
 
 topology:
-  nodes:
-    cumulus:
-      kind: cvx
-      image: networkop/cx:4.3.0
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      image: srl/custombase:latest
+    cvx:
+      image: networkop/cx:4.4.0
       binds:
-        - cumulus_interfaces:/etc/network/interfaces.d/host-mounts
         - cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+    linux:
+      image: networkop/host:ifreload
+      cmd: 2 # wait for 2 interfaces to be connected: eth0 + eth1
 
+  nodes:
+    cumulus1:
+      kind: cvx
+      binds:
+        - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
+    cumulus2:
+      kind: cvx
+      binds:
+        - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
     srl1:
       kind: srl
-      # image: ghcr.io/nokia/srlinux:latest
-      image: srl/custombase:latest
       startup-config: srl1.conf.json
     srl2:
       kind: srl
-      # image: ghcr.io/nokia/srlinux:latest
-      image: srl/custombase:latest
       startup-config: srl2.conf.json
 
+    h1: { kind: linux, binds: [ h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, binds: [ h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, binds: [ h3_interfaces:/etc/network/interfaces ] }
+    h4: { kind: linux, binds: [ h4_interfaces:/etc/network/interfaces ] }
+    
   links:
-    # Start with EVPN VXLAN between SRL nodes
+    # Static L2 VXLAN between Cumulus nodes
+    - endpoints: ["cumulus1:swp1", "cumulus2:swp1"]
+  
+    # EVPN VXLAN between SRL nodes
     - endpoints: ["srl1:e1-1", "srl2:e1-1"]
 
-    # Add static VXLAN to Cumulus, advertised by srl2 (with modified next hop)
-    - endpoints: ["cumulus:swp12", "srl1:e1-2"]
+    # A host connected to each switch
+    - endpoints: ["cumulus1:swp3", "h1:eth1"]
+    - endpoints: ["cumulus2:swp3", "h2:eth1"]
+    - endpoints: ["srl1:e1-3", "h3:eth1"]
+    - endpoints: ["srl2:e1-3", "h4:eth1"]
+    
+    # A bridge between the old world and the new world
+    - endpoints: ["cumulus1:swp2", "srl1:e1-2"]
