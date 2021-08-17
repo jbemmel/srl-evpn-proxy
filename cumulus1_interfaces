@@ -1,6 +1,7 @@
 auto lo
 iface lo inet loopback
   address 1.1.1.1/32
+  vxlan-local-tunnelip 1.1.1.1
 
 # To Cumulus2
 auto e1-1
@@ -15,8 +16,8 @@ iface e1-2
 auto e1-3 # To H1
 iface e1-3
     mstpctl-portbpdufilter yes
-    # Native VLAN 1 untagged
-    # bridge-access 1
+    # Native VLAN 1 untagged?
+    bridge-access 10
 
 # Shared bridge: Underlay untagged to VXLAN traffic on VLAN/VNI 10
 auto bridge
@@ -34,7 +35,7 @@ iface vni-10
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     vxlan-id 10
-    vxlan-local-tunnelip 1.1.1.1
+    # vxlan-local-tunnelip 1.1.1.1
     # Cumulus 2
     vxlan-remoteip 1.1.1.2
     # bridge-learning on # Cumulus complains about conflict with EVPN?
