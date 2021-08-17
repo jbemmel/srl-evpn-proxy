@@ -5,7 +5,8 @@ topology:
     srl:
       # Need IXR D2 or D3 for EVPN/VXLAN support
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
-      image: srl/custombase:latest
+      # image: srl/custombase:latest
+      image: srl/evpn-proxy-agent:latest
     cvx:
       image: networkop/cx:4.4.0
       binds:
