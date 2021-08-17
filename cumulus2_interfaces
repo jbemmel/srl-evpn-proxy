@@ -13,6 +13,7 @@ iface e1-2
 
 auto e1-3 # To H2
 iface e1-3
+    mstpctl-portbpdufilter yes
     # Native VLAN 1 untagged
     # bridge-access 1
 
@@ -35,4 +36,4 @@ iface vni-10
     vxlan-local-tunnelip 1.1.1.2
     # Cumulus1
     vxlan-remoteip 1.1.1.1
-    bridge-learning on
+    # bridge-learning on # Cumulus complains about conflict with EVPN?
