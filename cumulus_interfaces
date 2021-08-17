@@ -10,7 +10,7 @@ iface swp12
 # Shared bridge: Underlay native VLAN 1 untagged for VXLAN traffic
 auto bridge
 iface bridge
-    bridge-ports swp12
+    bridge-ports swp12 vni-10
     bridge-pvid 1
     bridge-vids 1 10
     bridge-vlan-aware yes
