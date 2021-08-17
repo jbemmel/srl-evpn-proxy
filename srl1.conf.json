@@ -1078,7 +1078,7 @@
     {
       "name": "ethernet-1/1",
       "admin-state": "enable",
-      "srl_nokia-interfaces-vlans:vlan-tagging": true,
+      "srl_nokia-interfaces-vlans:vlan-tagging": false,
       "subinterface": [
         {
           "index": 0,
@@ -1098,32 +1098,29 @@
                 "ip-prefix": "2001::192:168:0:0/127"
               }
             ]
-          },
-          "srl_nokia-interfaces-vlans:vlan": {
-            "encap": {
-              "single-tagged": {
-                "vlan-id": 1
-              }
-            }
-          }
-        },
-        {
-          "index": 1,
-          "type": "srl_nokia-interfaces:bridged",
-          "admin-state": "enable",
-          "srl_nokia-interfaces-vlans:vlan": {
-            "encap": {
-              "single-tagged": {
-                "vlan-id": 10
-              }
-            }
           }
         }
       ]
     },
     {
       "name": "ethernet-1/2",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "srl_nokia-interfaces-vlans:vlan-tagging": false,
+      "subinterface": [
+        {
+          "index": 0,
+          "type": "srl_nokia-interfaces:routed",
+          "description": "To Cumulus",
+          "admin-state": "enable",
+          "ipv4": {
+            "address": [
+              {
+                "ip-prefix": "10.0.0.0/31"
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "ethernet-1/3",

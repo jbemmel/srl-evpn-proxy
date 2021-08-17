@@ -4,18 +4,22 @@ iface lo inet loopback
     address 1.1.1.2/32
 
 auto swp12
-iface swp12 
+iface swp12
+  bridge-access 1 # Native VLAN 1 untagged
 
-# Underlay VLAN 1 for VXLAN traffic
+# Underlay native VLAN 1 untagged for VXLAN traffic
 auto bridge
 iface bridge
     bridge-ports swp12
+    bridge-pvid 1
     bridge-vids 1
     bridge-vlan-aware yes
 
-auto bridge.1
-iface bridge.1
+auto vlan1
+iface vlan1
     address 10.0.0.1/31
+    vlan-id 1
+    vlan-raw-device bridge
     post-up ip route add 1.1.1.1/32 via 10.0.0.0
 
 # Overlay VRF
