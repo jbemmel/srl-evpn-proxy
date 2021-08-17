@@ -1479,6 +1479,34 @@
             }
           ]
         }
+      },
+      "srl_nokia-static-routes:static-routes": {
+        "route": [
+          {
+            "prefix": "1.1.1.0/30",
+            "admin-state": "enable",
+            "next-hop-group": "cumulus2"
+          },
+          {
+            "prefix": "1.1.1.2/32",
+            "admin-state": "enable",
+            "next-hop-group": "cumulus2"
+          }
+        ]
+      },
+      "srl_nokia-next-hop-groups:next-hop-groups": {
+        "group": [
+          {
+            "name": "cumulus2",
+            "nexthop": [
+              {
+                "index": 0,
+                "ip-address": "192.168.0.2",
+                "admin-state": "enable"
+              }
+            ]
+          }
+        ]
       }
     },
     {
