@@ -1,16 +1,31 @@
-# The loopback network interface
+# The loopback network interface, mirrored by SRL2
 auto lo
 iface lo inet loopback
-    address 1.1.1.1/32
+    address 1.1.1.2/32
 
 auto swp12
 iface swp12 
-    address 10.0.0.1/31
-    post-up ip route add 1.1.1.11/32 via 10.0.0.0
 
+# Underlay VLAN 1 for VXLAN traffic
 auto bridge
 iface bridge
-    bridge-ports vni-10
+    bridge-ports swp12
+    bridge-vids 1
+    bridge-vlan-aware yes
+
+auto bridge.1
+iface bridge.1
+    address 10.0.0.1/31
+    post-up ip route add 1.1.1.1/32 via 10.0.0.0
+
+# Overlay VRF
+auto ipvrf
+iface ipvrf
+    vrf-table auto
+
+auto obridge
+iface obridge
+    bridge-ports vni-10 # L2 VNI
     bridge-vids 10
     bridge-vlan-aware yes
 
@@ -20,6 +35,15 @@ iface vni-10
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     vxlan-id 10
-    vxlan-local-tunnelip 1.1.1.1
-    vxlan-remoteip 1.1.1.11 # srl1 on swp12
+    vxlan-local-tunnelip 1.1.1.2
+    vxlan-remoteip 1.1.1.1 # srl1 on swp12
     bridge-learning on
+
+#Tenant SVIs - optional anycast GW
+auto vlan10
+iface vlan10
+    address 10.10.10.2/24 # Same as irb0.1 interface SRL2
+    # address-virtual 44:39:39:ff:00:13 10.1.3.1/24
+    vlan-id 10
+    vlan-raw-device bridge
+    vrf ipvrf
