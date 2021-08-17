@@ -2,25 +2,27 @@ auto lo
 iface lo inet loopback
   address 1.1.1.2/32
 
-auto swp1 # To Cumulus1
-iface swp1
+auto e1-1 # To Cumulus1
+iface e1-1
     address 192.168.0.1/31
     post-up ip route add 1.1.1.1/32 via 192.168.0.0
 
-auto swp2 # Not connected
-iface swp2
-    address 192.168.0.3/31
+auto e1-2 # Not connected
+iface e1-2
+    # address 192.168.0.3/31
 
-auto swp3 # To H1
-iface swp3
-    bridge-access 1 # Native VLAN 1 untagged
+auto e1-3 # To H2
+iface e1-3
+    # Native VLAN 1 untagged
+    # bridge-access 1
 
 # Shared bridge: Underlay native VLAN 1 untagged for VXLAN traffic
 auto bridge
 iface bridge
-  bridge-ports swp3 vni-10
-  bridge-pvid 1
+  bridge-ports e1-3 vni-10
   bridge-vids 1 10
+  # Primary VLAN Identifer (PVID), default setting, inherited
+  bridge-pvid 1
   bridge-vlan-aware yes
 
 # Use VLAN 10 for VXLAN overlay
@@ -31,5 +33,6 @@ iface vni-10
     mstpctl-portbpdufilter yes
     vxlan-id 10
     vxlan-local-tunnelip 1.1.1.2
-    vxlan-remoteip 1.1.1.1 # Cumulus1
+    # Cumulus1
+    vxlan-remoteip 1.1.1.1
     bridge-learning on
