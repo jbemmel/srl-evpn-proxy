@@ -7,12 +7,12 @@ auto swp12
 iface swp12
   bridge-access 1 # Native VLAN 1 untagged
 
-# Underlay native VLAN 1 untagged for VXLAN traffic
+# Shared bridge: Underlay native VLAN 1 untagged for VXLAN traffic
 auto bridge
 iface bridge
     bridge-ports swp12
     bridge-pvid 1
-    bridge-vids 1
+    bridge-vids 1 10
     bridge-vlan-aware yes
 
 auto vlan1
@@ -27,12 +27,7 @@ auto ipvrf
 iface ipvrf
     vrf-table auto
 
-auto obridge
-iface obridge
-    bridge-ports vni-10 # L2 VNI
-    bridge-vids 10
-    bridge-vlan-aware yes
-
+# Use VLAN 10 for overlay
 auto vni-10
 iface vni-10
     bridge-access 10
