@@ -1,0 +1,6 @@
+auto lo
+iface lo inet loopback
+
+auto eth1
+iface eth1
+    address 10.0.0.104/24

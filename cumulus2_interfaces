@@ -1,0 +1,22 @@
+auto lo
+iface lo inet loopback
+
+auto mgmt
+iface mgmt
+    vrf-table auto
+    
+auto eth0
+iface eth0 
+    vrf mgmt
+
+auto swp1 # To Cumulus1
+iface swp1 
+    address 192.168.0.1/31
+
+auto swp2 # To SRL2? currently not connected
+iface swp2 
+    address 192.168.0.3/31
+
+auto swp3 # To H2, TODO make L2
+iface swp3 
+    address 10.0.0.2/24
