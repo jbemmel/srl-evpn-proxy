@@ -1115,7 +1115,7 @@
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "10.0.0.0/31"
+                "ip-prefix": "192.168.0.3/31"
               }
             ]
           }
@@ -1124,7 +1124,14 @@
     },
     {
       "name": "ethernet-1/3",
-      "admin-state": "enable"
+      "admin-state": "enable",
+      "subinterface": [
+        {
+          "index": 0,
+          "type": "srl_nokia-interfaces:bridged",
+          "admin-state": "enable"
+        }
+      ]
     },
     {
       "name": "ethernet-1/4",
@@ -1178,14 +1185,7 @@
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "1.1.1.1/32"
-              }
-            ]
-          },
-          "ipv6": {
-            "address": [
-              {
-                "ip-prefix": "2001::1:1:1:1/128"
+                "ip-prefix": "1.1.1.4/32"
               }
             ]
           }
@@ -1222,7 +1222,7 @@
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "1.1.1.1/32"
+                "ip-prefix": "1.1.1.5/32"
               }
             ]
           }
@@ -1443,6 +1443,9 @@
           "name": "ethernet-1/2.0"
         },
         {
+          "name": "lo0.0"
+        },
+        {
           "name": "system0.0"
         }
       ],
@@ -1493,6 +1496,9 @@
       "type": "srl_nokia-network-instance:mac-vrf",
       "admin-state": "enable",
       "interface": [
+        {
+          "name": "ethernet-1/3.0"
+        },
         {
           "name": "irb0.1"
         }
