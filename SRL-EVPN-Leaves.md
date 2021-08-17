@@ -20,17 +20,10 @@ Underlay:
 /delete interface ethernet-1/1
 /interface ethernet-1/1
     admin-state enable
-    vlan-tagging true
+    vlan-tagging false
     subinterface 0 {
         description "Basic L3 underlay connection to Leaf${/system!!!| 1 if _=='2' else 2 }"
         type routed
-        vlan {
-            encap {
-                single-tagged {
-                  vlan-id 1
-                }
-            }
-        }
         admin-state enable
         ipv4 { 
           address 192.168.0.${/system!!!|int(_) - 1}/31
@@ -41,17 +34,7 @@ Underlay:
           exit
         }
     }
-    subinterface 1 {
-      type bridged
-      vlan {
-            encap {
-                single-tagged {
-                  vlan-id 10
-                }
-            }
-      }
-      admin-state enable
-    }
+
 /delete interface lo0
 /interface lo0
     description "Loopback"
@@ -165,8 +148,7 @@ subinterface 1 {
             }
         }
         bgp-vpn {
-          bgp-instance 1 {
-            }
+          bgp-instance 1 { }
         }
     }
 
