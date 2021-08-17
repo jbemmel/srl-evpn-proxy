@@ -26,6 +26,8 @@ topology:
     srl1:
       kind: srl
       startup-config: srl1.conf.json
+
+    # SRL2 acts as an EVPN proxy for cumulus2, using the same VXLAN loopback IP
     srl2:
       kind: srl
       startup-config: srl2.conf.json
@@ -33,7 +35,7 @@ topology:
     h1: { kind: linux, binds: [ h1_interfaces:/etc/network/interfaces ] }
     h2: { kind: linux, binds: [ h2_interfaces:/etc/network/interfaces ] }
     h3: { kind: linux, binds: [ h3_interfaces:/etc/network/interfaces ] }
-    h4: { kind: linux, binds: [ h4_interfaces:/etc/network/interfaces ] }
+    # h4: { kind: linux, binds: [ h4_interfaces:/etc/network/interfaces ] }
 
   links:
     # Static L2 VXLAN between Cumulus nodes
@@ -46,7 +48,7 @@ topology:
     - endpoints: ["cumulus1:e1-3", "h1:eth1"]
     - endpoints: ["cumulus2:e1-3", "h2:eth1"]
     - endpoints: ["srl1:e1-3", "h3:eth1"]
-    - endpoints: ["srl2:e1-3", "h4:eth1"]
+    # - endpoints: ["srl2:e1-3", "h4:eth1"]
 
     # A bridge between the static world and the dynamic world
     - endpoints: ["cumulus2:e1-2", "srl1:e1-2"]
