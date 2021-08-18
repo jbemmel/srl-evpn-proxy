@@ -11,7 +11,7 @@ import sys
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler(sys.stderr))
 
-from ryu.services.protocols.bgp.bgpspeaker import BGPSpeaker, EVPN_MULTICAST_ETAG_ROUTE
+from ryu.services.protocols.bgp.bgpspeaker import BGPSpeaker, EVPN_MULTICAST_ETAG_ROUTE, RF_L2_EVPN
 
 def dump_remote_best_path_change(event):
     print( 'the best path changed:', event.remote_as, event.prefix, event.nexthop, event.is_withdraw )
@@ -25,21 +25,33 @@ if __name__ == "__main__":
                          best_path_change_handler=dump_remote_best_path_change,
                          peer_down_handler=detect_peer_down)
 
+    speaker.vrf_add(route_dist='65000:10',
+                    import_rts=['65000:10'],
+                    export_rts=['65000:10'],
+                    route_family=RF_L2_EVPN)
+
+    speaker.evpn_prefix_add(
+        route_type=EVPN_MULTICAST_ETAG_ROUTE,
+        route_dist='65000:10',
+        esi=0,
+        ethernet_tag_id=0,
+        # mac_addr=mac_addr,
+        # ip_addr=ip_addr,
+        next_hop='1.1.1.2', # on behalf of Cumulus
+    )
+
     speaker.neighbor_add('127.0.0.1', 65000) # iBGP with SRL
     count = 1
     while True:
         eventlet.sleep(30)
-        prefix = '10.20.' + str(count) + '.0/24'
-        print( "add a new prefix", prefix )
-        speaker.prefix_add(prefix)
 
         speaker.evpn_prefix_add(
                 route_type=EVPN_MULTICAST_ETAG_ROUTE,
                 route_dist='65000:10',
                 esi=0,
                 ethernet_tag_id=0,
-                # mac_addr=mac_addr,
-                # ip_addr=ip_addr,
+                mac_addr=f'00:11:22:33:44:0{count}',
+                ip_addr=f'10.0.0.{count}/32',
                 next_hop='1.1.1.2', # on behalf of Cumulus
         )
 
