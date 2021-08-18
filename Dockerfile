@@ -3,14 +3,8 @@ FROM srl/custombase:$SR_LINUX_RELEASE
 
 RUN sudo pip3 install ryu
 
-# Install FRR stable, enable BGP daemon
-# frr-stable or frr-8 or frr-7
-#    sudo sed -i 's|el8/frr8|el8/frr8.freeze|g' /etc/yum.repos.d/frr-8.repo && \
-RUN curl https://rpm.frrouting.org/repo/frr-8-repo-1-0.el8.noarch.rpm -o /tmp/repo.rpm && \
-    sudo yum install -y /tmp/repo.rpm && \
-    sudo yum install -y frr frr-pythontools && \
-    sudo chmod 644 /etc/frr/daemons && \
-    rm -f /tmp/repo.rpm && sudo yum clean all -y
+# Install eBPF perf tools?
+# RUN sudo yum install -y perf bpftool
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT

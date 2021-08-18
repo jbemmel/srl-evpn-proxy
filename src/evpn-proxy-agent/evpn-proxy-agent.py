@@ -20,8 +20,8 @@ def detect_peer_down(remote_ip, remote_as):
     print( f'Peer down: {remote_ip} {remote_as}' )
 
 if __name__ == "__main__":
-    # TODO need to create socket on localhost on a non-default port, not port 179
-    speaker = BGPSpeaker(as_number=65000, router_id='10.0.0.1',
+    # need to create socket on localhost on a non-default port, not port 179
+    speaker = BGPSpeaker(bgp_server_port=1179, as_number=65000, router_id='10.0.0.1',
                          best_path_change_handler=dump_remote_best_path_change,
                          peer_down_handler=detect_peer_down)
 
