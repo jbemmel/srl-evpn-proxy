@@ -7,6 +7,8 @@ topology:
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # image: srl/custombase:latest
       image: srl/evpn-proxy-agent:latest
+      binds:
+        - /lib/modules:/lib/modules:ro # Only works on CentOS 8 system
     cvx:
       image: networkop/cx:4.4.0
       binds:
