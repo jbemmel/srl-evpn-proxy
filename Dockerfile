@@ -3,7 +3,7 @@ FROM srl/custombase:$SR_LINUX_RELEASE
 
 # Install BGP library and eBPF packages
 RUN sudo pip3 install ryu
-RUN sudo yum install -y python3-bcc
+RUN sudo yum install -y python3-bcc kmod
 
 # Install eBPF perf tools?
 # RUN sudo yum install -y perf bpftool
