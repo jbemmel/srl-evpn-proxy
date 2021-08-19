@@ -35,7 +35,8 @@ iface vni-10
     bridge-access 10
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
-    vxlan-id 10
+    # 0xaabbcc = 11189196
+    vxlan-id 11189196
     # vxlan-local-tunnelip 1.1.1.1
     # Cumulus 2
     vxlan-remoteip 1.1.1.2
