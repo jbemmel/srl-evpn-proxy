@@ -1543,7 +1543,7 @@
               "id": 1,
               "admin-state": "enable",
               "vxlan-interface": "vxlan0.0",
-              "evi": 11189196,
+              "evi": 57069,
               "ecmp": 8
             }
           ]
