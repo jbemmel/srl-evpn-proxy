@@ -9,6 +9,7 @@ topology:
       image: srl/evpn-proxy-agent:latest
       binds:
         - /lib/modules:/lib/modules:ro # Only works on CentOS 8 system
+        - /usr/src/kernels:/usr/src/kernels # Only works on CentOS 8 system
     cvx:
       image: networkop/cx:4.4.0
       binds:
