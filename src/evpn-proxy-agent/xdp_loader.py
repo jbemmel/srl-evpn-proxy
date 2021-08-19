@@ -9,7 +9,7 @@ bpf.attach_xdp(device, fn, 0)
 
 # Wait for KeyboardInterrupt
 try:
-  b.trace_print()
+  bpf.trace_print()
 except KeyboardInterrupt:
   pass
 
