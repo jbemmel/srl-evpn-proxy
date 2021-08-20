@@ -38,6 +38,11 @@ struct arphdr
 	__be32 ar_tip;		            /* target IP address		*/
 } __packed;
 
+// Helper to read a 6-byte MAC address
+static u64 read_mac( unsigned char[] m ) {
+  return m[0]|(m[1]<<8)|(m[2]<<16)|(m[3]<<24)|(m[4]<<32)|(m[5]<<40);
+}
+
 // Event sent to userspace.
 struct vxlan_arp_event_t {
     u32 vnid; // VXLAN VNID
@@ -130,7 +135,7 @@ int arpnd_filter(struct xdp_md *ctx) {
                        // filter for only request packets
                        if (arp->ar_op == __constant_htons(1)) {
                           process_arp( ctx, htonl(vxlan->key), htonl(ip->saddr),
-                                       (arp->ar_sha), htonl(arp->ar_sip) );
+                                       read_mac(arp->ar_sha), htonl(arp->ar_sip) );
                        }
                     }
                  }
