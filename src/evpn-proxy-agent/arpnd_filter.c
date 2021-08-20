@@ -39,8 +39,9 @@ struct arphdr
 } __packed;
 
 // Helper to read a 6-byte MAC address
-static u64 read_mac( unsigned char[] m ) {
-  return m[0]|(m[1]<<8)|(m[2]<<16)|(m[3]<<24)|(m[4]<<32)|(m[5]<<40);
+static u64 read_mac( unsigned char m[] ) {
+  #define U(m) ((u64)m)
+  return m[0]|(m[1]<<8)|(m[2]<<16)|(m[3]<<24)|(U(m[4])<<32)|(U(m[5])<<40);
 }
 
 // Event sent to userspace.
