@@ -1,0 +1,27 @@
+name: srl-ebpf-ubuntu-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # image: srl/custombase:latest
+      image: srl/evpn-proxy-agent:latest
+      binds:
+        - /lib/modules:/lib/modules:ro
+        - /usr/src:/usr/src
+        - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+  nodes:
+    srl1:
+      kind: srl
+      startup-config: srl1.conf.json
+
+    # SRL2 acts as an EVPN proxy for cumulus2, using the same VXLAN loopback IP
+    srl2:
+      kind: srl
+      startup-config: srl2.conf.json
+
+  links:
+
+    # EVPN VXLAN between SRL nodes
+    - endpoints: ["srl1:e1-1", "srl2:e1-1"]

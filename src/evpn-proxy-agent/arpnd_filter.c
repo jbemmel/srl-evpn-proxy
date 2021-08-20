@@ -10,7 +10,7 @@
 // #define KBUILD_MODNAME "filter"
 
 #include <linux/bpf.h>
-#include <bpf_helpers.h>
+// #include <bpf_helpers.h>
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/in.h>
@@ -51,9 +51,9 @@ struct bpf_map_def SEC("maps") vnid_2_mactable = { // outer_map
 };
 */
 
-void process_arp( struct xdp_md *ctx, u32 vnid, u32 vtep_ip, u64 src_mac, u32 src_ip ) {
-  bpf_trace_printk( "process_arp VNID=%u VTEP=%x MAC=%llx IP=%x\n",
-    vnid, vtep_ip, src_mac, src_ip );
+static void process_arp( struct xdp_md *ctx, u32 vnid, u32 vtep_ip, u64 src_mac, u32 src_ip ) {
+  bpf_trace_printk( "process_arp VNID=%u VTEP=%x", vnid, vtep_ip );
+  bpf_trace_printk( " MAC=%llx IP=%x\n", src_mac, src_ip );
 
   /* TODO:
      1. Lookup MAC table for VNID
@@ -105,13 +105,13 @@ int arpnd_filter(struct xdp_md *ctx) {
 
                     struct arp_t *arp = (void*) inner + sizeof(*inner);
                     if ((void*)arp + sizeof(*arp) <= data_end) {
-                       bpf_trace_printk("Inner ARP op=%u src-mac=%llx src-ip=%x\n",
-                         arp->oper, be64toh(arp->sha), htonl(arp->spa) );
+                       bpf_trace_printk("Inner ARP op=%u 4-byte-src-mac=%x src-ip=%x\n",
+                         arp->oper, (arp->sha), htonl(arp->spa) );
 
                        // filter for only request packets
                        if (arp->oper == 1) {
                           process_arp( ctx, htonl(vxlan->key), htonl(ip->saddr),
-                                       be64toh(arp->sha), htonl(arp->spa) );
+                                       (arp->sha), htonl(arp->spa) );
                        }
                     }
                  }

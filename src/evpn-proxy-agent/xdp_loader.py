@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+#
+# To run: ip netns exec srbase-default python3 ./xdp_loader.py
+#
+
 from bcc import BPF
 
 device = "e1-1.0" # Spine facing interface in srbase-default
@@ -23,11 +27,11 @@ while 1:
     except ValueError:
         continue
 
-# Wait for KeyboardInterrupt
-try:
+# Wait for KeyboardInterrupt? Cannot access /sys/kernel/debug/tracing/trace_pipe inside SRL netns
+#try:
   # BPF.trace_print() performs a blocking read on the kernel's trace buffer file (/sys/kernel/debug/tracing/trace_pipe)
-  bpf.trace_print()
-except KeyboardInterrupt:
-  pass
+#  bpf.trace_print()
+#except KeyboardInterrupt:
+#  pass
 
 bpf.remove_xdp(device, 0)
