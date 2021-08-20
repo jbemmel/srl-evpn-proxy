@@ -15,7 +15,7 @@ def print_arp_event(cpu, data, size):
 # loop with callback to print_event
 bpf["events"].open_perf_buffer(print_arp_event)
 while 1:
-    b.perf_buffer_poll()
+    bpf.perf_buffer_poll()
 
     try:
         (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
