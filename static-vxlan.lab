@@ -10,6 +10,8 @@ topology:
       binds:
         - /lib/modules:/lib/modules:ro # Only works on CentOS 8 system
         # - /usr/src/kernels:/usr/src/kernels
+        # Need to set bind propagation: https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation
+        # To 'rshared' - else it's not available in srbase-default?
         # - /sys/kernel/debug:/sys/kernel/debug
     cvx:
       image: networkop/cx:4.4.0
