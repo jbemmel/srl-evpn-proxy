@@ -120,6 +120,10 @@ int arpnd_filter(struct xdp_md *ctx) {
         } else {
            bpf_trace_printk("udp TOO SHORT?\n");
         }
+      } else if (ip->protocol == IPPROTO_ICMP)) {
+         // for debugging on Ubuntu
+         bpf_trace_printk("ICMP debug message\n");
+         process_arp( ctx, 12345678, 0x01020304, 0x001122334455, 0x08080808 );
       }
     }
   }

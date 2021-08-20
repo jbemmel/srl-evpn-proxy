@@ -6,7 +6,9 @@
 
 from bcc import BPF
 
-device = "e1-1.0" # Spine facing interface in srbase-default
+# device = "e1-1.0" # Spine facing interface in srbase-default
+device = "mgmt0.0" # for debugging with ping
+
 bpf = BPF(src_file="arpnd_filter.c")
 fn = bpf.load_func("arpnd_filter", BPF.XDP)
 bpf.attach_xdp(device, fn, 0)
