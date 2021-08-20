@@ -53,7 +53,7 @@ struct bpf_map_def SEC("maps") vnid_2_mactable = { // outer_map
 
 static void process_arp( struct xdp_md *ctx, u32 vnid, u32 vtep_ip, u64 src_mac, u32 src_ip ) {
   bpf_trace_printk( "process_arp VNID=%u VTEP=%x", vnid, vtep_ip );
-  bpf_trace_printk( " MAC=%llx IP=%x\n", src_mac, src_ip );
+  bpf_trace_printk( " 4-bytes MAC=%x IP=%x\n", src_mac, src_ip );
 
   /* TODO:
      1. Lookup MAC table for VNID
@@ -105,8 +105,9 @@ int arpnd_filter(struct xdp_md *ctx) {
 
                     struct arp_t *arp = (void*) inner + sizeof(*inner);
                     if ((void*)arp + sizeof(*arp) <= data_end) {
-                       bpf_trace_printk("Inner ARP op=%u 4-byte-src-mac=%x src-ip=%x\n",
-                         arp->oper, (arp->sha), htonl(arp->spa) );
+                       // Causes invalid op
+                       // bpf_trace_printk("Inner ARP op=%u 4-byte-src-mac=%x src-ip=%x\n",
+                       // arp->oper, (arp->sha), htonl(arp->spa) );
 
                        // filter for only request packets
                        if (arp->oper == 1) {
@@ -120,7 +121,7 @@ int arpnd_filter(struct xdp_md *ctx) {
         } else {
            bpf_trace_printk("udp TOO SHORT?\n");
         }
-      } else if (ip->protocol == IPPROTO_ICMP)) {
+      } else if (ip->protocol == IPPROTO_ICMP) {
          // for debugging on Ubuntu
          bpf_trace_printk("ICMP debug message\n");
          process_arp( ctx, 12345678, 0x01020304, 0x001122334455, 0x08080808 );
