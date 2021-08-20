@@ -20,6 +20,24 @@
 // Based on monitor.c
 #include <bcc/proto.h>
 
+// From linux/if_arp.h, XDP programs need fixed offsets
+struct arphdr
+{
+	__be16		ar_hrd;		/* format of hardware address	*/
+	__be16		ar_pro;		/* format of protocol address	*/
+	unsigned char	ar_hln;		/* length of hardware address	*/
+	unsigned char	ar_pln;		/* length of protocol address	*/
+	__be16		ar_op;		/* ARP opcode (command)		*/
+
+	 /*
+	  *	 Ethernet looks like this : This bit is variable sized however...
+	  */
+	unsigned char		ar_sha[6];	  /* sender hardware address	*/
+	__be32 ar_sip;		            /* sender IP address		*/
+	unsigned char		ar_tha[6];	  /* target hardware address	*/
+	__be32 ar_tip;		            /* target IP address		*/
+} __packed;
+
 // Event sent to userspace.
 struct vxlan_arp_event_t {
     u32 vnid; // VXLAN VNID
@@ -53,7 +71,7 @@ struct bpf_map_def SEC("maps") vnid_2_mactable = { // outer_map
 
 static void process_arp( struct xdp_md *ctx, u32 vnid, u32 vtep_ip, u64 src_mac, u32 src_ip ) {
   bpf_trace_printk( "process_arp VNID=%u VTEP=%x", vnid, vtep_ip );
-  bpf_trace_printk( " 4-bytes MAC=%x IP=%x\n", src_mac, src_ip );
+  bpf_trace_printk( " MAC=%llx IP=%x\n", src_mac, src_ip );
 
   /* TODO:
      1. Lookup MAC table for VNID
@@ -103,16 +121,16 @@ int arpnd_filter(struct xdp_md *ctx) {
                       return XDP_PASS;
                     }
 
-                    struct arp_t *arp = (void*) inner + sizeof(*inner);
+                    struct arphdr *arp = (void*) inner + sizeof(*inner);
                     if ((void*)arp + sizeof(*arp) <= data_end) {
                        // Causes invalid op
                        // bpf_trace_printk("Inner ARP op=%u 4-byte-src-mac=%x src-ip=%x\n",
                        // arp->oper, (arp->sha), htonl(arp->spa) );
 
                        // filter for only request packets
-                       if (arp->oper == 1) {
+                       if (arp->ar_op == __constant_htons(1)) {
                           process_arp( ctx, htonl(vxlan->key), htonl(ip->saddr),
-                                       (arp->sha), htonl(arp->spa) );
+                                       (arp->ar_sha), htonl(arp->ar_sip) );
                        }
                     }
                  }

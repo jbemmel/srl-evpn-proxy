@@ -16,7 +16,7 @@ bpf.attach_xdp(device, fn, 0)
 # process ARP events from XDP kernel program
 def print_arp_event(cpu, data, size):
     arp_event = bpf["events"].event(data)
-    print( f"Userspace got ARP event: {arp_event}" )
+    print( f"Userspace got ARP event: VNID={arp_event.vnid} VTEP={arp_event.vtep:08x} MAC={arp_event.src_mac:016x} IP={arp_event.src_ip:08x}" )
 
 # loop with callback to print_event
 bpf["events"].open_perf_buffer(print_arp_event)
