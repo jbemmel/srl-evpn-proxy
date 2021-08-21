@@ -12,9 +12,6 @@ module srl-evpn-proxy-agent {
     import srl_nokia-network-instance {
         prefix srl_nokia-netinst;
     }
-    import srl_nokia-bgp-evpn {
-        prefix srl_nokia-bgp-evpn;
-    }
     import srl_nokia-interfaces {
         prefix srl_nokia-if;
     }
@@ -33,9 +30,9 @@ module srl-evpn-proxy-agent {
     grouping evpn-proxy-top {
         description "Configure EVPN Proxy";
 
-        container experimental-evpn-proxy {
-            presence "Configure EVPN proxy";
-            must "../../../srl_nokia-netinst:type = 'srl_nokia-netinst:default'" {
+        container experimental-bgp-evpn-proxy {
+            presence "Configure BGP EVPN proxy";
+            must "../../srl_nokia-netinst:type = 'srl_nokia-netinst:default'" {
               error-message "EVPN proxy must be configured in the default network instance";
             }
 
@@ -48,7 +45,7 @@ module srl-evpn-proxy-agent {
         }
     }
 
-    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-bgp-evpn:bgp-evpn" {
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
         uses evpn-proxy-top;
     }
 
