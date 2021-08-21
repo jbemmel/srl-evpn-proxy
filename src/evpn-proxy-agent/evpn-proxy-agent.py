@@ -11,7 +11,6 @@ import os
 import re
 import ipaddress
 import json
-import signal
 import traceback
 import subprocess
 # from concurrent.futures import ThreadPoolExecutor
@@ -30,10 +29,24 @@ import telemetry_service_pb2_grpc
 
 from logging.handlers import RotatingFileHandler
 
+#
+# BGP imports
+#
+import eventlet
+import signal
+from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
+                                                  EVPN_MULTICAST_ETAG_ROUTE,
+                                                  EVPN_MAC_IP_ADV_ROUTE,
+                                                  RF_L2_EVPN,
+                                                  PMSI_TYPE_INGRESS_REP)
+
+# BGPSpeaker needs sockets patched
+eventlet.monkey_patch()
+
 ############################################################
 ## Agent will start with this name
 ############################################################
-agent_name='srl_frr_agent'
+agent_name='evpn_proxy_agent'
 
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
@@ -74,6 +87,17 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
+#
+# Runs BGP EVPN as a separate thread
+#
+from threading import Thread
+class BGPEVPNThread(Thread):
+   def __init__(self):
+       Thread.__init__(self)
+
+   def run(self):
+
+
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
 ## At present processing config from js_path containing agent_name
@@ -82,36 +106,23 @@ def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
-        # Tested on main thread
-        # ConfigurePeerIPMAC( "e1-1.0", "1.2.3.4", "00:11:22:33:44:55" )
-
-        net_inst = obj.config.key.keys[0] # e.g. "default"
-        if obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.proxy":
+        # net_inst = obj.config.key.keys[0] # always "default"
+        if obj.config.key.js_path == ".network_instance.protocols.experimental_bgp_evpn_proxy":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
-            # Could define NETNS here: "NETNS" : f'srbase-{net_inst}'
-            params = { "network_instance" : net_inst }
-            interfaces = []
+            state.params = {}
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
                 # TODO if this is the last namespace, unregister?
                 # response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
                 # logging.info( f'Handle_Config: Unregister response:: {response}' )
                 # state = State() # Reset state, works?
-                params[ "admin_state" ] = "disable" # Only stop service for this namespace
-                state.network_instances.pop( net_inst, None )
+                state.params[ "admin_state" ] = "disable" # Only stop service for this namespace
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
-                enabled_daemons = []
                 if 'admin_state' in data:
-                    params[ "admin_state" ] = data['admin_state'][12:]
-
-                if net_inst in state.network_instances:
-                    ni = state.network_instances[ net_inst ]
-                    ni.update( params )
-                else:
-                    state.network_instances[ net_inst ] = { **params }
+                    state.params[ "admin_state" ] = data['admin_state'][12:]
 
             # TODO if enabled, start separate thread for BGP EVPN interactions
             return True
@@ -144,9 +155,6 @@ def Run():
     response = stub.AgentRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
     logging.info(f"Registration response : {response.status}")
 
-    # TestAddLinkLocal_Nexthop_Group('link_local','169.254.0.1')
-    # TestAddLinkLocal_Nexthop_Group('regular','69.254.0.1')
-
     request=sdk_service_pb2.NotificationRegisterRequest(op=sdk_service_pb2.NotificationRegisterRequest.Create)
     create_subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
     stream_id = create_subscription_response.stream_id
@@ -168,10 +176,6 @@ def Run():
                     logging.info('TO DO -commit.end config')
                 else:
                     Handle_Notification(obj, state)
-
-                    # Program router_id only when changed
-                    # if state.router_id != old_router_id:
-                    #   gnmic(path='/network-instance[name=default]/protocols/bgp/router-id',value=state.router_id)
                     logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
@@ -195,7 +199,7 @@ def Run():
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister fib_agent".format(signum))
+    logging.info("Caught signal :: {}\n will unregister EVPN proxy agent".format(signum))
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
         logging.error('try: Unregister response:: {}'.format(response))
@@ -206,7 +210,7 @@ def Exit_Gracefully(signum, frame):
 
 ##################################################################################################
 ## Main from where the Agent starts
-## Log file is written to: /var/log/srlinux/stdout/<dutName>_fibagent.log
+## Log file is written to: /var/log/srlinux/stdout/evpn_proxy_agent.log
 ## Signals handled for graceful exit: SIGTERM
 ##################################################################################################
 if __name__ == '__main__':
@@ -222,6 +226,6 @@ if __name__ == '__main__':
       datefmt='%H:%M:%S', level=logging.INFO)
     logging.info("START TIME :: {}".format(datetime.datetime.now()))
     if Run():
-        logging.info('Agent unregistered and agent routes withdrawed from dut')
+        logging.info('Agent unregistered and BGP shutdown')
     else:
         logging.info('Should not happen')

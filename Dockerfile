@@ -12,6 +12,10 @@ RUN sudo yum install -y python3-bcc kmod xz
 # Issue is that these addresses do not get installed as next hop in the RT
 # RUN sudo sed -i.orig "s/'169.254.'/'169.254.1.'/g" /opt/srlinux/models/srl_nokia/models/interfaces/srl_nokia-if-ip.yang
 
+# Patch Ryu to support multiple VTEP endpoints per BGP speaker
+COPY ryu_enhancements/vrf.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/info_base/
+COPY ryu_enhancements/bgpspeaker.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
+
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/srlinux/agents/

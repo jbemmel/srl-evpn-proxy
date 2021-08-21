@@ -35,8 +35,9 @@ if __name__ == "__main__":
     # need to create socket on localhost on a non-default port, not port 179
     # Need to connect from loopback IP, not 127.0.0.x
     # Router ID is used as tunnel endpoint in BGP UPDATEs
+    # XXX does this block advertising on behalf of multiple VTEPs?
     speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
-                         as_number=AS, router_id=VTEP_LOOPBACK,
+                         as_number=AS, router_id=LOCAL_LOOPBACK,
                          best_path_change_handler=dump_remote_best_path_change,
                          peer_down_handler=detect_peer_down)
 
@@ -54,7 +55,10 @@ if __name__ == "__main__":
         vni=VNI,
         gw_ip_addr=VTEP_LOOPBACK,
         next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
-        pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP
+        pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+
+        # Added via patch
+        tunnel_endpoint_ip='1.2.3.4'
     )
 
     print( "Adding SRL neighbor..." )
