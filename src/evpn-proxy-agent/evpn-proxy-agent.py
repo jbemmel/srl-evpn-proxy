@@ -87,4 +87,7 @@ if __name__ == "__main__":
 
     # The process main thread does nothing but waiting for signals
     print( "Pausing for interrupts..." )
-    signal.pause()
+    # This doesn't work, need to call eventlet
+    # signal.pause()
+    while True:
+        eventlet.sleep(30) # every 30s wake up
