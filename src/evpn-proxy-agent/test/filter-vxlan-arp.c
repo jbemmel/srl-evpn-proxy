@@ -140,7 +140,10 @@ int udp_filter(struct __sk_buff *skb) {
 
 	struct udp_t *udp = cursor_advance(cursor, sizeof(*udp));
 
-  if (udp->dport != 4789) return KEEP; // debug
+  if (udp->dport != 4789) {
+		bpf_trace_printk("udp_filter not UDP port 4789: %u\n", udp->dport );
+		return DROP; // debug
+	}
 
 	// Calculate payload offset and length
 	u32 vxlan_offset = ETH_HLEN + ip_header_length + sizeof(*udp);

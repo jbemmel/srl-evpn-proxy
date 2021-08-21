@@ -20,7 +20,7 @@ import sys
 import socket
 import os
 
-from ryu.lib.packet import vxlan, arp
+from ryu.lib.packet import packet, vxlan, ethernet, arp
 
 #args
 def usage():
@@ -93,68 +93,18 @@ while 1:
   #convert packet into bytearray
   packet_bytearray = bytearray(packet_str)
 
-  #ethernet header length
-  ETH_HLEN = 14
-
-  #IP HEADER
-  #https://tools.ietf.org/html/rfc791
-  # 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-  # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  # |Version|  IHL  |Type of Service|          Total Length         |
-  # +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  #
-  #IHL : Internet Header Length is the length of the internet header
-  #value to multiply * 4 byte
-  #e.g. IHL = 5 ; IP Header Length = 5 * 4 byte = 20 byte
-  #
-  #Total length: This 16-bit field defines the entire packet size,
-  #including header and data, in bytes.
-
-  #calculate packet total length
-  total_length = packet_bytearray[ETH_HLEN + 2]               #load MSB
-  total_length = total_length << 8                            #shift MSB
-  total_length = total_length + packet_bytearray[ETH_HLEN+3]  #add LSB
-
-  #calculate ip header length
-  ip_header_length = packet_bytearray[ETH_HLEN]               #load Byte
-  ip_header_length = ip_header_length & 0x0F                  #mask bits 0..3
-  ip_header_length = ip_header_length << 2                    #shift to obtain length
-
-  print( f"Got IP packet len={total_length}" ) # Also ICMP during testing
-
-# UDP HEADER
-# https://www.rfc-editor.org/rfc/rfc768.txt
-#                  0      7 8     15 16    23 24    31
-#                 +--------+--------+--------+--------+
-#                 |     Source      |   Destination   |
-#                 |      Port       |      Port       |
-#                 +--------+--------+--------+--------+
-#                 |                 |                 |
-#                 |     Length      |    Checksum     |
-#                 +--------+--------+--------+--------+
-#                 |
-#                 |          data octets ...
-#                 +---------------- ...
-#
-#                      User Datagram Header Format
-  udp_header_length = 8
-  u = ETH_HLEN + ip_header_length
-  src_port = (packet_bytearray[u+0] << 8) + packet_bytearray[u+1]
-  dst_port = (packet_bytearray[u+2] << 8) + packet_bytearray[u+3]
-  print( f"UDP? src={src_port} dst={dst_port}\n" )
-
-  #calculate VXLAN offset
-  vxlan_offset = ETH_HLEN + ip_header_length + udp_header_length
-
   try:
-    parsed_pkt, next_proto_cls, rest_buf = vxlan.vxlan.parser(packet_bytearray[vxlan_offset:])
-    print( f"VXLAN VNI:{parsed_pkt.vni}" )
-    parsed_arp = arp.arp.parser( rest_buf )
-    print( f"SRC MAC:{parsed_arp.src_mac} SRC IP:{parsed_arp.src_ip}" )
+    pkt = packet.Packet( packet_bytearray )
+    for p in pkt:
+        print( p.protocol_name, p )
+        if p.protocol_name == 'vlan':
+            print( f'vlan id = {p.vid}' )
+        elif p.protocol_name == 'vxlan':
+            print( f'vni = {p.vni}' )
 
-    # print VXLAN packet bytes
-    for i in range (vxlan_offset,len(packet_bytearray)-1):
-      print("%0x" % (packet_bytearray[i]), end = "")
-    print("")
   except AssertionError as e:
-    print( "Not a valid VXLAN packet" )
+    print( f"Not a valid VXLAN packet? {e}" )
+
+  # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
+  # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
+  # print( f'trace_fields: {msg}' )
