@@ -103,8 +103,8 @@ class BGPEVPNThread(Thread):
      VNI = 10
 
      def best_path_change_handler(event):
-         logging.info( 'The best path changed:',
-           event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+         logging.info( f'The best path changed: {event.path}' )
+           # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
 
      def peer_down_handler(remote_ip, remote_as):
          logging.warning( f'Peer down: {remote_ip} {remote_as}' )
