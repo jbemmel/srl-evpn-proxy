@@ -17,7 +17,7 @@ The Python userspace program then uses BGP EVPN to advertise a route (type 2 for
 It participates in the EVPN fabric and only advertises routes for VTEPs that are not sending EVPN routes themselves.
 
 ```Python
-Rx packet event( dst_vtep_IP, src_vtep_IP, VXLAN_VNI, arp_src_mac, arp_dst_mac, arp_src_ip, arp_dst_ip ) {
+Rx packet event( dst_vtep_IP, src_vtep_IP, VXLAN_VNI, arp_is_req, arp_src_mac, arp_dst_mac, arp_src_ip, arp_dst_ip ) {
 For an enabled L2 VNI:
 
 ```
@@ -26,6 +26,8 @@ For an enabled L2 VNI:
 I looked into attaching to the loopback TCP connection between the datapath (sr_xdp_lc_1) and the ARP/ND manager process (sr_arp_nd_mgr); there are 3 connections, and one of them received a packet containing the ARP request from a host. However, as neither the VTEP IP nor the VXLAN VNID are available in this message, there appears to be no easy way to associate the source MAC from these ARP packets with the correct service.
 
 I tried attaching an XDP program to e1-2 (with BPF_PERF_OUTPUT events to communicate with userspace containing the VNID, VTEP IP(v4), source MAC and source IP), but Linux returns a permission denied error
+
+One could use TC ingress/egress filters to distinguish various cases; the raw socket receives both incoming and outgoing VXLAN packets. It may be possible to check the sk_buff struct for a flag.
 
 As an optimization, I considered using a "map of maps" (BPF_MAP_TYPE_HASH_OF_MAPS) to lookup the LRU MAC table for the given VNID. If the MAC is found, the packet is dropped.
 However, ARP packets are rare enough to not represent a large burden on the CPU, and a simple VXLAN ARP filter is easier to program.
