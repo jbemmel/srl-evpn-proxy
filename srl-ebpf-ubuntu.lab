@@ -7,6 +7,8 @@ topology:
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # image: srl/custombase:latest
       image: srl/evpn-proxy-agent:latest
+      agents: 
+        - srl-evpn-proxy-agent.yml
       binds:
         - /lib/modules:/lib/modules:ro
         - /usr/src:/usr/src
