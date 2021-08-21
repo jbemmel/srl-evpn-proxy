@@ -13,7 +13,7 @@
 #define DROP 0  // drop the packet
 #define KEEP -1 // keep the packet and send it to userspace returning -1
 
-// From linux/if_arp.h, XDP programs need fixed offsets
+// From linux/if_arp.h, just used for size calculation
 struct arphdr
 {
 	__be16		ar_hrd;		/* format of hardware address	*/
@@ -42,7 +42,7 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 
 	bpf_trace_printk("arpnd_filter got a packet\n");
 
-	// Since Linux 4.7 direct access is allowed
+	// XXX does not work - direct access not allowed
   void *data = (void *)(long)skb->data;
   void *data_end = (void *)(long)skb->data_end;
 
@@ -107,11 +107,8 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 #define IP_UDP 	 17
 #define ETH_HLEN 14
 
-/*eBPF program.
-  Filter IP and TCP packets, having payload not empty
-  and containing "HTTP", "GET", "POST" ... as first bytes of payload
-  if the program is loaded as PROG_TYPE_SOCKET_FILTER
-  and attached to a socket
+/* eBPF program - working VXLAN ARP filter
+
   return  0 -> DROP the packet
   return -1 -> KEEP the packet and return it to user space (userspace can read it from the socket_fd )
 */
@@ -120,8 +117,8 @@ int udp_filter(struct __sk_buff *skb) {
 	u8 *cursor = 0;
 
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
-	//filter IP packets (ethernet type = 0x0800)
-	if (!(ethernet->type == 0x0800)) return DROP;
+	//filter IPv4 packets (ethernet type = 0x0800)
+	if (ethernet->type != 0x0800) return DROP;
 
 	struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
 	//filter UDP packets (ip next protocol = 0x11)
@@ -146,11 +143,28 @@ int udp_filter(struct __sk_buff *skb) {
 	}
 
 	// Calculate payload offset and length
-	u32 vxlan_offset = ETH_HLEN + ip_header_length + sizeof(*udp);
+	// u32 vxlan_offset = ETH_HLEN + ip_header_length + sizeof(*udp);
 	u32 vxlan_length = ip->tlen - ip_header_length - sizeof(*udp);
+	if (vxlan_length < (ETH_HLEN+sizeof(struct arphdr))) return DROP;
 
-	if(vxlan_length < sizeof(struct arphdr)) return DROP;
+  // skip VXLAN header
+  _ = cursor_advance(cursor, sizeof(struct vxlan_t));
+	struct ethernet_t *inner = cursor_advance(cursor, sizeof(*inner));
+
+	// filter ARP packets (ethernet type = 0x0806)
+	if (inner->type != 0x0806) return DROP;
 
 	//keep the packet and send it to userspace returning -1
 	return KEEP;
+}
+
+/**
+ * Could make things even simpler using the __sk_buff data? see
+ * https://github.com/torvalds/linux/blob/master/include/uapi/linux/bpf.h#L5146
+ *
+ * Nope, does _not_ work: direct access to these fields is denied
+ */
+int vxlan_filter(struct __sk_buff *skb) {
+  return skb->protocol == IPPROTO_UDP &&
+	  (skb->local_port == 4789 || skb->remote_port == __constant_htons(4789)) ? KEEP : DROP;
 }

@@ -32,7 +32,7 @@ if __name__ == "__main__":
     VNI = 10
 
     # need to create socket on localhost on a non-default port, not port 179
-    # Need to connect from loopback IP
+    # Need to connect from loopback IP, not 127.0.0.x
     # Router ID is used as tunnel endpoint in BGP UPDATEs
     speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                          as_number=AS, router_id=VTEP_LOOPBACK,
@@ -58,7 +58,8 @@ if __name__ == "__main__":
 
     print( "Adding SRL neighbor..." )
     # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-    speaker.neighbor_add(LOCAL_LOOPBACK, AS, enable_ipv4=False, enable_evpn=True, connect_mode='active') # iBGP with SRL
+    speaker.neighbor_add(LOCAL_LOOPBACK, remote_as=AS, local_as=AS, enable_ipv4=False,
+      enable_evpn=True, connect_mode='active') # iBGP with SRL
 
     print( "Adding new EVPN RT2 route..." )
     speaker.evpn_prefix_add(
