@@ -19,7 +19,8 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   PMSI_TYPE_INGRESS_REP)
 
 def dump_remote_best_path_change(event):
-    print( 'the best path changed:', event.remote_as, event.prefix, event.nexthop, event.is_withdraw )
+    print( 'the best path changed:',
+     event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
 
 def detect_peer_down(remote_ip, remote_as):
     print( f'Peer down: {remote_ip} {remote_as}' )

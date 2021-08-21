@@ -2,7 +2,7 @@ ARG SR_LINUX_RELEASE
 FROM srl/custombase:$SR_LINUX_RELEASE
 
 # Install BGP library and eBPF packages
-RUN sudo pip3 install ryu
+RUN sudo pip3 install ryu netns
 RUN sudo yum install -y python3-bcc kmod xz
 
 # Install eBPF perf tools?

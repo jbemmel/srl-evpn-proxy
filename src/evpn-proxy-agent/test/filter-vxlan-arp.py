@@ -19,6 +19,7 @@ from sys import argv
 import sys
 import socket
 import os
+import netns
 
 from ryu.lib.packet import packet, vxlan, ethernet, arp
 
@@ -72,39 +73,40 @@ function_arp_filter = bpf.load_func("udp_filter", BPF.SOCKET_FILTER)
 
 #create raw socket, bind it to interface
 #attach bpf program to socket created
-BPF.attach_raw_socket(function_arp_filter, interface)
+with netns.NetNS(nsname='srbase'):
+  BPF.attach_raw_socket(function_arp_filter, interface)
 
-#get file descriptor of the socket previously created inside BPF.attach_raw_socket
-socket_fd = function_arp_filter.sock
+  #get file descriptor of the socket previously created inside BPF.attach_raw_socket
+  socket_fd = function_arp_filter.sock
 
-#create python socket object, from the file descriptor
-sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
-#set it as blocking socket
-sock.setblocking(True)
+  #create python socket object, from the file descriptor
+  sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+  #set it as blocking socket
+  sock.setblocking(True)
 
-while 1:
-  #retrieve raw packet from socket
-  packet_str = os.read(socket_fd,2048)
+  while 1:
+    #retrieve raw packet from socket
+    packet_str = os.read(socket_fd,2048)
 
-  #DEBUG - print raw packet in hex format
-  #packet_hex = toHex(packet_str)
-  #print ("%s" % packet_hex)
+    #DEBUG - print raw packet in hex format
+    #packet_hex = toHex(packet_str)
+    #print ("%s" % packet_hex)
 
-  #convert packet into bytearray
-  packet_bytearray = bytearray(packet_str)
+    #convert packet into bytearray
+    packet_bytearray = bytearray(packet_str)
 
-  try:
-    pkt = packet.Packet( packet_bytearray )
-    for p in pkt:
-        print( p.protocol_name, p )
-        if p.protocol_name == 'vlan':
-            print( f'vlan id = {p.vid}' )
-        elif p.protocol_name == 'vxlan':
-            print( f'vni = {p.vni}' )
+    try:
+      pkt = packet.Packet( packet_bytearray )
+      for p in pkt:
+          print( p.protocol_name, p )
+          if p.protocol_name == 'vlan':
+              print( f'vlan id = {p.vid}' )
+          elif p.protocol_name == 'vxlan':
+              print( f'vni = {p.vni}' )
 
-  except AssertionError as e:
-    print( f"Not a valid VXLAN packet? {e}" )
+    except AssertionError as e:
+      print( f"Not a valid VXLAN packet? {e}" )
 
-  # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
-  # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
-  # print( f'trace_fields: {msg}' )
+    # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
+    # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
+    # print( f'trace_fields: {msg}' )
