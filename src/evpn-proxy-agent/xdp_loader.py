@@ -6,6 +6,9 @@
 
 from bcc import BPF
 
+#
+# XXX issue with permissions, cannot attach to e1-1 interface and e1-1-0 does not receive VXLAN
+#
 # device = "e1-1.0" # Spine facing interface in srbase-default
 device = "mgmt0.0" # for debugging with ping
 

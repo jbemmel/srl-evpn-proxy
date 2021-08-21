@@ -5,8 +5,8 @@ import sflow
 
 # Basic Listener
 
-UDP_IP = "127.0.0.1"
-UDP_PORT = 6343
+UDP_IP = "1.1.1.4"
+UDP_PORT = 6344
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
