@@ -96,7 +96,53 @@ class BGPEVPNThread(Thread):
        Thread.__init__(self)
 
    def run(self):
+     LOCAL_LOOPBACK = '1.1.1.4' # TODO remove hardcoded values
+     VTEP_LOOPBACK = '1.1.1.2'
+     AS = 65000
+     VNI = 10
 
+     def best_path_change_handler(event):
+         logging.info( 'The best path changed:',
+           event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+
+     def peer_down_handler(remote_ip, remote_as):
+         logging.warning( f'Peer down: {remote_ip} {remote_as}' )
+
+     # need to create socket on localhost on a non-default port, not port 179
+     # Need to connect from loopback IP, not 127.0.0.x
+     # Router ID is used as tunnel endpoint in BGP UPDATEs
+     # => Code updated to allow any tunnel endpoint IP
+     speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
+                               as_number=AS, router_id=LOCAL_LOOPBACK,
+                               best_path_change_handler=best_path_change_handler,
+                               peer_down_handler=peer_down_handler)
+     rd = f'{AS}:{VNI}'
+     speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
+
+     speaker.evpn_prefix_add(
+         route_type=EVPN_MULTICAST_ETAG_ROUTE,
+         route_dist=rd,
+         # esi=0, # should be ignored
+         ethernet_tag_id=0,
+         # mac_addr='00:11:22:33:44:55', # not relevant?
+         ip_addr=VTEP_LOOPBACK, # origin
+         tunnel_type='vxlan',
+         vni=VNI,
+         gw_ip_addr=VTEP_LOOPBACK,
+         next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
+         pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+
+         # Added via patch
+         tunnel_endpoint_ip='1.2.3.4'
+     )
+
+     logging.info( "Connecting as local SRL neighbor..." )
+     # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
+     speaker.neighbor_add(LOCAL_LOOPBACK, remote_as=AS, local_as=AS, enable_ipv4=False,
+       enable_evpn=True, connect_mode='active') # iBGP with SRL
+
+     while True:
+         eventlet.sleep(30) # every 30s wake up
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
