@@ -111,13 +111,15 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 
   return  0 -> DROP the packet
   return -1 -> KEEP the packet and return it to user space (userspace can read it from the socket_fd )
+
+	TODO VXLAN ARP packets have specific sizes - could filter on that too
 */
 int udp_filter(struct __sk_buff *skb) {
   bpf_trace_printk("udp_filter got a packet\n");
 	u8 *cursor = 0;
 
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
-	//filter IPv4 packets (ethernet type = 0x0800)
+	// filter IPv4 packets (ethernet type = 0x0800), TODO support VLANs
 	if (ethernet->type != 0x0800) return DROP;
 
 	struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));

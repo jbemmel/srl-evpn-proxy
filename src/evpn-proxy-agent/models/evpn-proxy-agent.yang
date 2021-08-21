@@ -1,0 +1,55 @@
+module evpn-proxy-agent {
+
+    yang-version "1";
+
+    namespace "urn:srl_nokia_demo/evpn-proxy";
+
+    prefix "srl_nokia_demo-evpn-proxy";
+
+    import srl_nokia-common {
+        prefix srl_nokia-comm;
+    }
+    import srl_nokia-network-instance {
+        prefix srl_nokia-netinst;
+    }
+    import srl_nokia-bgp-evpn {
+        prefix srl_nokia-bgp-evpn;
+    }
+    import srl_nokia-interfaces {
+        prefix srl_nokia-if;
+    }
+    import srl_nokia-if-ip {
+        prefix srl_nokia-if-ip;
+    }
+    import srl_nokia-extensions {
+        prefix srl_nokia-ext;
+    }
+
+    revision "2021-08-21" {
+        description "Initial revision";
+        reference "TBD";
+    }
+
+    grouping evpn-proxy-top {
+        description "Configure EVPN Proxy";
+
+        container experimental-evpn-proxy {
+            presence "Configure EVPN proxy";
+            must "../../../srl_nokia-netinst:type = 'srl_nokia-netinst:default'" {
+              error-message "EVPN proxy must be configured in the default network instance";
+            }
+
+            leaf admin-state {
+                type srl_nokia-comm:admin-state;
+                default "enable";
+
+                description "Administratively enable or disable EVPN proxy functionality";
+            }
+        }
+    }
+
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-bgp-evpn:bgp-evpn" {
+        uses evpn-proxy-top;
+    }
+
+}

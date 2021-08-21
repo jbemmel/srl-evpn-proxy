@@ -45,6 +45,7 @@ def help():
 
 #arguments
 interface="mgmt0.0"
+net_namespace="srbase"
 
 if len(argv) == 2:
   if str(argv[1]) == '-h':
@@ -61,7 +62,7 @@ if len(argv) == 3:
 if len(argv) > 3:
   usage()
 
-print ("binding socket to '%s'" % interface)
+print ("binding socket to '%s' in netns '%s'" % interface, net_namespace)
 
 # initialize BPF - load source code from http-parse-simple.c
 bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
@@ -73,7 +74,7 @@ function_arp_filter = bpf.load_func("udp_filter", BPF.SOCKET_FILTER)
 
 #create raw socket, bind it to interface
 #attach bpf program to socket created
-with netns.NetNS(nsname='srbase'):
+with netns.NetNS(nsname=net_namespace):
   BPF.attach_raw_socket(function_arp_filter, interface)
 
   #get file descriptor of the socket previously created inside BPF.attach_raw_socket
