@@ -63,12 +63,12 @@ if len(argv) > 3:
 print ("binding socket to '%s'" % interface)
 
 # initialize BPF - load source code from http-parse-simple.c
-bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 1)
+bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
 #more info about eBPF program types
 #http://man7.org/linux/man-pages/man2/bpf.2.html
-function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
+function_arp_filter = bpf.load_func("udp_filter", BPF.SOCKET_FILTER)
 
 #create raw socket, bind it to interface
 #attach bpf program to socket created
@@ -138,16 +138,23 @@ while 1:
 #
 #                      User Datagram Header Format
   udp_header_length = 8
+  u = ETH_HLEN + ip_header_length
+  src_port = (packet_bytearray[u+0] << 8) + packet_bytearray[u+1]
+  dst_port = (packet_bytearray[u+2] << 8) + packet_bytearray[u+3]
+  print( f"UDP? src={src_port} dst={dst_port}\n" )
 
   #calculate VXLAN offset
   vxlan_offset = ETH_HLEN + ip_header_length + udp_header_length
 
-  parsed_pkt, next_proto_cls, rest_buf = vxlan.vxlan.parser(packet_bytearray[vxlan_offset:])
-  print( f"VXLAN VNI:{parsed_pkt.vni}" )
-  parsed_arp = arp.arp.parser( rest_buf )
-  print( f"SRC MAC:{parsed_arp.src_mac} SRC IP:{parsed_arp.src_ip}" )
+  try:
+    parsed_pkt, next_proto_cls, rest_buf = vxlan.vxlan.parser(packet_bytearray[vxlan_offset:])
+    print( f"VXLAN VNI:{parsed_pkt.vni}" )
+    parsed_arp = arp.arp.parser( rest_buf )
+    print( f"SRC MAC:{parsed_arp.src_mac} SRC IP:{parsed_arp.src_ip}" )
 
-  # print VXLAN packet bytes
-  for i in range (vxlan_offset,len(packet_bytearray)-1):
-    print("%0x" % (packet_bytearray[i]), end = "")
-  print("")
+    # print VXLAN packet bytes
+    for i in range (vxlan_offset,len(packet_bytearray)-1):
+      print("%0x" % (packet_bytearray[i]), end = "")
+    print("")
+  except AssertionError as e:
+    print( "Not a valid VXLAN packet" )
