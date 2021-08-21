@@ -1,4 +1,4 @@
-module evpn-proxy-agent {
+module srl-evpn-proxy-agent {
 
     yang-version "1";
 
