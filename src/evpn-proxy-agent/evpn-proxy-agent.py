@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import eventlet
+
+# BGPSpeaker needs sockets patched -> breaks SRL?
+eventlet.monkey_patch( socket=True )
+
 import grpc
 import datetime
 import time
@@ -33,16 +38,12 @@ from logging.handlers import RotatingFileHandler
 # BGP imports
 #
 import netns
-import eventlet
 import signal
 from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   EVPN_MULTICAST_ETAG_ROUTE,
                                                   EVPN_MAC_IP_ADV_ROUTE,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
-
-# BGPSpeaker needs sockets patched
-eventlet.monkey_patch()
 
 ############################################################
 ## Agent will start with this name
