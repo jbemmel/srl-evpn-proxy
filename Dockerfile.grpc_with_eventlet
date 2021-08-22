@@ -1,7 +1,7 @@
 FROM centos:8
 
 # Install build tools
-RUN yum install -y python3-pip gcc-c++ git
+RUN yum install -y python3-pip gcc-c++ git python3-devel
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries

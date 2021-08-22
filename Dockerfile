@@ -19,7 +19,7 @@ COPY ryu_enhancements/bgpspeaker.py /usr/local/lib/python3.6/site-packages/ryu/s
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
 #  removed: sudo pip3 install -r requirements.bazel.txt && \
-RUN cd /tmp && sudo yum install -y git && \
+RUN cd /tmp && sudo yum install -y git python3-devel && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
   git submodule update --init && \
