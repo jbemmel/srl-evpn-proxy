@@ -19,4 +19,4 @@ build:
 	sudo docker tag ${IMG} ${LATEST}
 
 grpc_eventlet:
-	sudo docker build -f ./Dockerfile.grpc_with_eventlet -t srl/grpc-with-eventlet:latest .
+	sudo docker build -f ./Dockerfile.grpc_with_eventlet.ubuntu -t srl/grpc-with-eventlet:latest .

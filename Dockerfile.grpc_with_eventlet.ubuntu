@@ -1,9 +1,8 @@
-FROM centos:8
-# FROM ubuntu:latest
+FROM ubuntu:latest
 
 # Install build tools
-RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
-# RUN apt update && apt install -y build-essential python3-pip git
+# RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
+RUN apt update && apt install -y build-essential python3-pip git
 
 # Need to upgrade pip and setuptools
 RUN pip3 install --upgrade pip setuptools
@@ -25,9 +24,11 @@ RUN pip3 install --upgrade pip setuptools
 # RUN yum install -y gcc-toolset-10-gcc-c++
 
 # Install Bazel build tool
-RUN cd /etc/yum.repos.d/ && \
-    curl -O https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo && \
-    yum install -y bazel4
+RUN sudo apt install apt-transport-https curl gnupg && \
+    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
+    sudo mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
+    echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list && \
+    sudo apt update && sudo apt install bazel
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
