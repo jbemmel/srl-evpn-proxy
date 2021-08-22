@@ -47,7 +47,7 @@ eventlet.monkey_patch()
 ############################################################
 ## Agent will start with this name
 ############################################################
-agent_name='evpn_proxy_agent'
+agent_name='srl_evpn_proxy_agent'
 
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
@@ -72,7 +72,7 @@ def Subscribe(stream_id, option):
         request = sdk_service_pb2.NotificationRegisterRequest(op=op, stream_id=stream_id, config=entry)
 
     subscription_response = stub.NotificationRegister(request=request, metadata=metadata)
-    print('Status of subscription response for {}:: {}'.format(option, subscription_response.status))
+    logging.info( f'Status of subscription response for {option}:: {subscription_response.status}' )
 
 ############################################################
 ## Subscribe to all the events that Agent needs
@@ -186,8 +186,6 @@ def Handle_Notification(obj, state):
 class State(object):
     def __init__(self):
         self.admin_state = None       # May not be set in config
-        self.network_instances = {}   # Indexed by name
-        # TODO more properties
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
@@ -210,23 +208,24 @@ def Run():
     stream_id = create_subscription_response.stream_id
     logging.info(f"Create subscription response received. stream_id : {stream_id}")
 
-    Subscribe_Notifications(stream_id)
-
-    stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
-    stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
-
-    state = State()
-    count = 1
     try:
-        for r in stream_response:
-            logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
-            count += 1
-            for obj in r.notification:
-                if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
-                    logging.info('TO DO -commit.end config')
-                else:
-                    Handle_Notification(obj, state)
-                    logging.info(f'Updated state: {state}')
+      Subscribe_Notifications(stream_id)
+
+      stream_request = sdk_service_pb2.NotificationStreamRequest(stream_id=stream_id)
+      stream_response = sub_stub.NotificationStream(stream_request, metadata=metadata)
+
+      state = State()
+      count = 1
+
+      for r in stream_response:
+        logging.info(f"Count :: {count}  NOTIFICATION:: \n{r.notification}")
+        count += 1
+        for obj in r.notification:
+            if obj.HasField('config') and obj.config.key.js_path == ".commit.end":
+                logging.info('TO DO -commit.end config')
+            else:
+                Handle_Notification(obj, state)
+                logging.info(f'Updated state: {state}')
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'GOING TO EXIT NOW: {err}')
