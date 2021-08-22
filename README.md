@@ -40,3 +40,6 @@ I tried collecting sFlow samples, but the SR Linux container image only seems to
 * [How to send perf events to Python userspace](https://github.com/iovisor/bcc/blob/master/docs/tutorial_bcc_python_developer.md#lesson-7-hello_perf_outputpy)
 * [Processing VXLAN packets in BPF](https://github.com/iovisor/bcc/tree/master/examples/networking/tunnel_monitor)
 * [Ryu packet parsing](https://ryu.readthedocs.io/en/latest/library_packet.html)
+
+# Issues encountered
+* GRPC and eventlet don't play nicely together, see https://github.com/grpc/grpc/issues/15923 ; 2020 [patch available](https://github.com/Akrog/grpc/blob/eventlet/src/python/grpcio/grpc/experimental/eventlet.py)
