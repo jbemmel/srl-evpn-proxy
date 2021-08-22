@@ -43,3 +43,4 @@ I tried collecting sFlow samples, but the SR Linux container image only seems to
 
 # Issues encountered
 * GRPC and eventlet don't play nicely together, see https://github.com/grpc/grpc/issues/15923
+  2020 patch available: https://github.com/Akrog/grpc/commit/140d072d57c8cc88ef7f7baa5bc111e92f365576
