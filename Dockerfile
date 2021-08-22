@@ -20,14 +20,15 @@ COPY ryu_enhancements/bgpspeaker.py /usr/local/lib/python3.6/site-packages/ryu/s
 # TODO use separate build image and copy only resulting binaries
 #  removed: sudo pip3 install -r requirements.bazel.txt && \
 RUN cd /tmp && sudo yum install -y git python3-devel && \
+  pip3 install --upgrade pip && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
   git submodule update --init && \
-  sudo pip3 install -r requirements.txt
+  sudo python3 -m pip install -r requirements.txt
 
 # Split for now
 COPY ./src /opt/srlinux/agents/
-RUN cd /tmp/grpc && sudo GRPC_PYTHON_BUILD_WITH_CYTHON=1 pip3 install .
+RUN cd /tmp/grpc && sudo GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install .
 
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr

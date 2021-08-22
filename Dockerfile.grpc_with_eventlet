@@ -1,12 +1,26 @@
-# FROM centos:8
-FROM ubuntu:latest
+FROM centos:8
+# FROM ubuntu:latest
 
 # Install build tools
-# RUN yum install -y python3-pip gcc-c++ git python3-devel
-RUN apt update && apt install -y build-essential python3-pip git
+RUN yum install -y python3-pip gcc-c++ git python3-devel
+# RUN apt update && apt install -y build-essential python3-pip git
 
 # Need to upgrade pip
 RUN pip3 install --upgrade pip
+
+# Try building new GCC version, gcc-c++ fails?
+ENV GCC_VERSION=10.3.0
+RUN dnf update -y && \
+   dnf -y group install "Development Tools" && \
+   yum config-manager --set-enabled powertools && \
+   dnf -y install libmpc-devel && \
+   curl -O http://gnu.mirror.constant.com/gcc/gcc-$GCC_VERSION/gcc-$GCC_VERSION.tar.gz && \
+   tar zxf gcc-$GCC_VERSION.tar.gz && \
+   mkdir gcc-build && cd gcc-build && \
+   ../gcc-$GCC_VERSION/configure --enable-languages=c,c++ --disable-multilib && \
+   make -j$(nproc) && make install && \
+   ln -sf /usr/local/bin/gcc /usr/bin/gcc-10 && \
+   ln -sf /usr/local/bin/g++ /usr/bin/g++-10
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
@@ -17,4 +31,4 @@ RUN cd /tmp && \
   cd grpc && \
   git submodule update --init && \
   pip3 install -r requirements.txt && \
-  GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install .
+  GRPC_PYTHON_BUILD_WITH_CYTHON=1 CC=/usr/local/bin/gcc CXX=/usr/local/bin/g++ python3 -m pip install .
