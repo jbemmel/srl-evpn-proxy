@@ -113,6 +113,7 @@ class BGPEVPNThread(Thread):
      # Need to connect from loopback IP, not 127.0.0.x
      # Router ID is used as tunnel endpoint in BGP UPDATEs
      # => Code updated to allow any tunnel endpoint IP
+     logging.info("Starting BGP thread in srbase-default netns...")
      with netns.NetNS(nsname="srbase-default"):
         speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                                   as_number=AS, router_id=LOCAL_LOOPBACK,
@@ -180,7 +181,6 @@ def Handle_Notification(obj, state):
     else:
         logging.info(f"Unexpected notification : {obj}")
 
-    # dont subscribe to LLDP now
     return False
 
 class State(object):
@@ -249,13 +249,13 @@ def Run():
 ## When called, will unregister Agent and gracefully exit
 ############################################################
 def Exit_Gracefully(signum, frame):
-    logging.info("Caught signal :: {}\n will unregister EVPN proxy agent".format(signum))
+    logging.info( f"Caught signal :: {signum}\n will unregister EVPN proxy agent" )
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-        logging.error('try: Unregister response:: {}'.format(response))
+        logging.error( f'try: Unregister response:: {response}' )
         sys.exit()
     except grpc._channel._Rendezvous as err:
-        logging.info('GOING TO EXIT NOW: {}'.format(err))
+        logging.info( f'GOING TO EXIT NOW: {err}' )
         sys.exit()
 
 ##################################################################################################
