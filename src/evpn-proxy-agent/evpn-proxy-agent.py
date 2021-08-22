@@ -3,10 +3,21 @@
 
 import eventlet
 
-# BGPSpeaker needs sockets patched -> breaks SRL?
-eventlet.monkey_patch( socket=True )
+# BGPSpeaker needs sockets patched -> breaks SRL registration if done too late
+# eventlet.monkey_patch( socket=True, select=True ) # adding only ( socket=True ) allows SRL, but then BGP doesn't work :(
+eventlet.monkey_patch() # need thread too
+
+# Google core libraries don't support eventlet; workaround
+# from gevent import monkey
+# monkey.patch_all()
+# import grpc.experimental.gevent
+# grpc.experimental.gevent.init_gevent()
 
 import grpc
+from grpc.experimental import eventlet as grpc_eventlet
+
+# May need to start a separate Python process for BGP
+
 import datetime
 import time
 import sys
@@ -123,6 +134,7 @@ class BGPEVPNThread(Thread):
         rd = f'{AS}:{VNI}'
         speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
 
+        logging.info("Test EVPN multicast route...")
         speaker.evpn_prefix_add(
             route_type=EVPN_MULTICAST_ETAG_ROUTE,
             route_dist=rd,
@@ -146,6 +158,7 @@ class BGPEVPNThread(Thread):
           enable_evpn=True, connect_mode='active') # iBGP with SRL
 
         while True:
+            logging.info( "eventlet sleep loop..." )
             eventlet.sleep(30) # every 30s wake up
 
 ##################################################################
@@ -186,7 +199,7 @@ def Handle_Notification(obj, state):
 
 class State(object):
     def __init__(self):
-        self.admin_state = None       # May not be set in config
+        self.params = {}       # Set through config
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
@@ -264,6 +277,9 @@ def Exit_Gracefully(signum, frame):
 ## Signals handled for graceful exit: SIGTERM
 ##################################################################################################
 if __name__ == '__main__':
+
+    grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking
+
     # hostname = socket.gethostname()
     stdout_dir = '/var/log/srlinux/stdout' # PyTEnv.SRL_STDOUT_DIR
     signal.signal(signal.SIGTERM, Exit_Gracefully)

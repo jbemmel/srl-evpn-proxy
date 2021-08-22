@@ -1,0 +1,17 @@
+FROM centos:8
+
+# Install build tools
+RUN yum install -y python3-pip gcc-c++ git
+
+# Build gRPC with eventlet support
+# TODO use separate build image and copy only resulting binaries
+#  removed: sudo pip3 install -r requirements.bazel.txt && \
+RUN cd /tmp && \
+  git clone https://github.com/jbemmel/grpc.git && \
+  cd grpc && \
+  git submodule update --init && \
+  pip3 install -r requirements.txt
+
+# Split for now
+COPY ./src /opt/srlinux/agents/
+RUN cd /tmp/grpc && python3 ./setup.py install --prefix=/usr/local

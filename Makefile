@@ -17,3 +17,6 @@ build:
 	                  --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
 	                  -f ./Dockerfile -t ${IMG} .
 	sudo docker tag ${IMG} ${LATEST}
+
+grpc_eventlet:
+	sudo docker build -f ./Dockerfile.grpc_with_eventlet -t srl/grpc-with-eventlet:latest .

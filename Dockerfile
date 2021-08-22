@@ -16,6 +16,19 @@ RUN sudo yum install -y python3-bcc kmod xz
 COPY ryu_enhancements/vrf.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/info_base/
 COPY ryu_enhancements/bgpspeaker.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
+# Build gRPC with eventlet support
+# TODO use separate build image and copy only resulting binaries
+#  removed: sudo pip3 install -r requirements.bazel.txt && \
+RUN cd /tmp && sudo yum install -y git && \
+  git clone https://github.com/jbemmel/grpc.git && \
+  cd grpc && \
+  git submodule update --init && \
+  sudo pip3 install -r requirements.txt
+
+# Split for now
+COPY ./src /opt/srlinux/agents/
+RUN cd /tmp/grpc && sudo python3 ./setup.py install --prefix=/usr/local
+
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/srlinux/agents/
