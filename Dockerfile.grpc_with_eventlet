@@ -24,10 +24,11 @@ RUN pip3 install --upgrade pip setuptools
 
 # RUN yum install -y gcc-toolset-10-gcc-c++
 
-# Install Bazel build tool
+# Install Bazel build tool, needs /usr/bin/python
 RUN cd /etc/yum.repos.d/ && \
     curl -O https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo && \
-    yum install -y bazel4
+    yum install -y bazel4 && \
+    sudo alternatives --set python /usr/bin/python3
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries

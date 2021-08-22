@@ -2,7 +2,7 @@ FROM ubuntu:latest
 
 # Install build tools
 # RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
-RUN apt update && apt install -y build-essential python3-pip git
+RUN apt update && apt upgrade -y && apt install -y build-essential python3-pip git python-is-python3
 
 # Need to upgrade pip and setuptools
 RUN pip3 install --upgrade pip setuptools
@@ -28,15 +28,17 @@ RUN apt install apt-transport-https curl gnupg && \
     curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
     mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
     echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
-    apt update && apt install bazel
+    apt update && apt install -y bazel
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
 # Follow these instructions: https://github.com/grpc/grpc/tree/master/src/python/grpcio
 #  removed: sudo pip3 install -r requirements.bazel.txt && \
 # Try: python3 -m pip install --compiler=/usr/local/bin/gcc .
+# Works: https://github.com/grpc/grpc.git
+# Broken: git clone https://github.com/jbemmel/grpc.git && \
 RUN cd /tmp && \
-  git clone https://github.com/jbemmel/grpc.git && \
+  git clone https://github.com/grpc/grpc.git && \
   cd grpc && \
   git submodule update --init && \
   pip3 install -r requirements.txt
@@ -47,4 +49,5 @@ COPY ./src /opt/srlinux/agents/
 # RUN cd /tmp/grpc && GRPC_PYTHON_BUILD_WITH_CYTHON=1 CC=/usr/bin/gcc CXX=/usr/bin/g++ python3 -m pip install .
 # RUN cd /tmp/grpc && GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install --no-clean --verbose --log /tmp/pip.log .
 
+# which python -> empty? need python-is-python3
 RUN cd /tmp/grpc && bazel build :python3
