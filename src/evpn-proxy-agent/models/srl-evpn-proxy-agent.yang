@@ -4,7 +4,7 @@ module srl-evpn-proxy-agent {
 
     namespace "urn:srl_nokia_demo/evpn-proxy";
 
-    prefix "srl_nokia_demo-evpn-proxy";
+    prefix "demo_evpn_proxy";
 
     import srl_nokia-common {
         prefix srl_nokia-comm;
@@ -27,7 +27,7 @@ module srl-evpn-proxy-agent {
         reference "TBD";
     }
 
-    grouping evpn-proxy-top {
+    grouping evpn-proxy-protocol {
         description "Configure EVPN Proxy";
 
         container experimental-bgp-evpn-proxy {
@@ -42,11 +42,60 @@ module srl-evpn-proxy-agent {
 
                 description "Administratively enable or disable EVPN proxy functionality";
             }
+
+            leaf oper-state {
+              config false;
+              srl_nokia-ext:show-importance "high";
+              type srl_nokia-comm:oper-state;
+              description "This leaf contains the operational state of EVPN proxy";
+            }
         }
     }
 
-    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
-        uses evpn-proxy-top;
+    grouping evpn-proxy-state {
+      description "Operational state for EVPN proxy";
+
+      container evpn-proxy {
+        presence "BGP EVPN proxy state";
+        config false;
+
+        list vteps {
+          key "vtep_ip";
+
+          leaf vtep_ip {
+            type srl_nokia-comm:ip-address;
+            srl_nokia-ext:show-importance "high";
+          }
+
+          list vnids {
+            key "vni";
+            leaf vni {
+              type uint32 {
+                range "1..16777215";
+              }
+              srl_nokia-ext:show-importance "high";
+              description "VXLAN Network Identifier learnt for this VTEP.";
+            }
+            list mac {
+              key "address";
+              description "macs learnt on the bridging instance";
+              leaf address {
+                type srl_nokia-comm:mac-address;
+              }
+              leaf last-update {
+                type srl_nokia-comm:date-and-time-delta;
+                srl_nokia-ext:show-importance "high";
+                description "The date and time of the last update of this mac";
+              }
+            }
+          }
+        }
+      }
     }
 
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
+        uses evpn-proxy-protocol;
+    }
+
+    uses evpn-proxy-state;
 }
