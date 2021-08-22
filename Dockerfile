@@ -27,7 +27,7 @@ RUN cd /tmp && sudo yum install -y git python3-devel && \
 
 # Split for now
 COPY ./src /opt/srlinux/agents/
-RUN cd /tmp/grpc && sudo python3 ./setup.py install --prefix=/usr/local
+RUN cd /tmp/grpc && sudo GRPC_PYTHON_BUILD_WITH_CYTHON=1 pip3 install .
 
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr

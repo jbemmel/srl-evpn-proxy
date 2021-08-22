@@ -5,12 +5,16 @@ FROM ubuntu:latest
 # RUN yum install -y python3-pip gcc-c++ git python3-devel
 RUN apt update && apt install -y build-essential python3-pip git
 
+# Need to upgrade pip
+RUN pip3 install --upgrade pip
+
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
+# Follow these instructions: https://github.com/grpc/grpc/tree/master/src/python/grpcio
 #  removed: sudo pip3 install -r requirements.bazel.txt && \
 RUN cd /tmp && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
   git submodule update --init && \
   pip3 install -r requirements.txt && \
-  GRPC_PYTHON_BUILD_WITH_CYTHON=1 pip3 install .
+  GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install .
