@@ -164,8 +164,11 @@ def runBGPThread( params ):
      speaker.neighbor_add( NEIGHBOR, remote_as=params['peer_as'],
                            local_as=params['local_as'], enable_ipv4=False,
                            enable_evpn=True, connect_mode='active') # iBGP with SRL
+
      # After connecting to BGP peer, start ARP thread (in different netns)
+     eventlet.sleep(10) # Could also wait for peer_up event...
      hub.spawn( ARP_receiver_thread, params['vxlan_interface'], speaker, rd, VNI )
+
      while True:
          logging.info( "eventlet sleep loop..." )
          eventlet.sleep(30) # every 30s wake up
