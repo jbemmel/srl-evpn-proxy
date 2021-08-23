@@ -108,10 +108,9 @@ def Subscribe_Notifications(stream_id):
 #   def __init__(self):
 #       Thread.__init__(self)
 
-def runBGPThread():
-     LOCAL_LOOPBACK = '1.1.1.4' # TODO remove hardcoded values
+def runBGPThread( params ):
+     LOCAL_LOOPBACK = params['source_address'] # TODO remove hardcoded values
      VTEP_LOOPBACK = '1.1.1.2'
-     AS = 65000
      VNI = 10
 
      def best_path_change_handler(event):
@@ -131,10 +130,10 @@ def runBGPThread():
      with netns.NetNS(nsname="srbase-default"):
         logging.info("Starting BGPSpeaker in netns...")
         speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
-                                  as_number=AS, router_id=LOCAL_LOOPBACK,
+                                  as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
                                   best_path_change_handler=best_path_change_handler,
                                   peer_down_handler=peer_down_handler)
-        rd = f'{AS}:{VNI}'
+        rd = f"{params['local_as']}:{VNI}"
         logging.info("Adding VRF...")
         speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
 
@@ -158,7 +157,7 @@ def runBGPThread():
 
         logging.info( "Connecting as local SRL neighbor..." )
         # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-        speaker.neighbor_add(LOCAL_LOOPBACK, remote_as=AS, local_as=AS, enable_ipv4=False,
+        speaker.neighbor_add(LOCAL_LOOPBACK, remote_as=params['peer_as'], local_as=params['local_as'], enable_ipv4=False,
           enable_evpn=True, connect_mode='active') # iBGP with SRL
 
         while True:
@@ -190,11 +189,21 @@ def Handle_Notification(obj, state):
                 data = json.loads(json_acceptable_string)
                 if 'admin_state' in data:
                     state.params[ "admin_state" ] = data['admin_state'][12:]
+                if 'local_as' in data:
+                    state.params[ "local_as" ] = int( data['local_as']['value'] )
+                if 'peer_as' in data:
+                    state.params[ "peer_as" ] = int( data['peer_as']['value'] )
+                if 'source_address' in data:
+                    state.params[ "source_address" ] = data['source_address']['value']
+                if 'vnis' in data:
+                    state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
+                else:
+                    state.params[ "vnis" ] = '*' # all
 
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
-               hub.spawn( runBGPThread )
+               hub.spawn( runBGPThread, state.params )
             return True
 
     else:

@@ -43,6 +43,41 @@ module srl-evpn-proxy-agent {
                 description "Administratively enable or disable EVPN proxy functionality";
             }
 
+            leaf source-address {
+              mandatory true;
+              type srl_nokia-comm:ip-address;
+              description "Local loopback IP to connect from";
+            }
+
+            leaf peer-address {
+              type srl_nokia-comm:ip-address;
+              default "127.0.0.1";
+              description "Remote IP to connect from, default localhost";
+            }
+
+            leaf local-as {
+              type uint32 {
+                range "1..4294967295";
+              }
+              default 65000;
+              description "Local AS to use in BGP EVPN peering";
+            }
+
+            leaf peer-as {
+              type uint32 {
+                range "1..4294967295";
+              }
+              default 65000;
+              description "Peer AS to use in BGP EVPN peering";
+            }
+
+            leaf-list vnis {
+              description "Optional list of VNIs to proxy for, defaults to any detected";
+              type uint32 {
+                range "1..16777215";
+              }
+            }
+
             leaf oper-state {
               config false;
               srl_nokia-ext:show-importance "high";
