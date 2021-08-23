@@ -26,10 +26,11 @@ function main()
     # Include local paths where custom packages are installed
     P1="/usr/local/lib/python3.6/site-packages"
     P2="/usr/local/lib64/python3.6/site-packages"
-    P3="/usr/lib64/python3.6/site-packages"
+    P3="/usr/lib/python3.6/site-packages"
+    P4="/usr/lib64/python3.6/site-packages"
     # since 21.6
     SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
-    export PYTHONPATH="$P1:$P2:$P3:$SDK2:$PYTHONPATH"
+    export PYTHONPATH="$P1:$P2:$P3:$P4:$SDK2:$PYTHONPATH"
 
     # Opening srbase-default namespace requires root
     python3 ${main_module} &
