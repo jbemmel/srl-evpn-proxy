@@ -216,7 +216,7 @@ def ARP_receiver_thread( interface, bgp_speaker, rd, vni ):
 
           # Announce EVPN route, TODO parameters from packet
           VTEP_LOOPBACK = '1.2.3.4'
-          bgp_peaker.evpn_prefix_add(
+          bgp_speaker.evpn_prefix_add(
               route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
               route_dist=rd,
               esi=0,
