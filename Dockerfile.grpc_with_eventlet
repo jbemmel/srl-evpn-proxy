@@ -52,6 +52,7 @@ COPY ./src /opt/srlinux/agents/
 
 # Using cmake
 RUN yum install -y cmake && \
+    yum upgrade -y libarchive && \
     cd /tmp/grpc/ && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
