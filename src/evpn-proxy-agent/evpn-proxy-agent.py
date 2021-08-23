@@ -53,8 +53,14 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
 
-# Ryu has its own threading model, does not interwork with regular threads
+# Ryu has its own threading model
 from ryu.lib import hub
+
+#
+# eBPF ARP filter imports
+#
+from bcc import BPF
+from ryu.lib.packet import packet, vxlan, ethernet, arp
 
 ############################################################
 ## Agent will start with this name
@@ -155,14 +161,65 @@ def runBGPThread( params ):
             tunnel_endpoint_ip='1.2.3.4'
         )
 
-        logging.info( "Connecting as local SRL neighbor..." )
+        logging.info( f"Connecting to neighbor {params['peer_address']}..." )
         # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-        speaker.neighbor_add(LOCAL_LOOPBACK, remote_as=params['peer_as'], local_as=params['local_as'], enable_ipv4=False,
-          enable_evpn=True, connect_mode='active') # iBGP with SRL
+        speaker.neighbor_add( params['peer_address'], remote_as=params['peer_as'],
+                              local_as=params['local_as'], enable_ipv4=False,
+                              enable_evpn=True, connect_mode='active') # iBGP with SRL
 
         while True:
             logging.info( "eventlet sleep loop..." )
             eventlet.sleep(30) # every 30s wake up
+
+def ARP_receiver_thread(interface):
+    # initialize BPF - load source code from filter-vxlan-arp.c
+    bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
+
+    #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
+    #more info about eBPF program types
+    #http://man7.org/linux/man-pages/man2/bpf.2.html
+    function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
+
+    #create raw socket, bind it to interface
+    #attach bpf program to socket created
+    with netns.NetNS(nsname="srbase"):
+      BPF.attach_raw_socket(function_arp_filter, interface)
+
+      #get file descriptor of the socket previously created inside BPF.attach_raw_socket
+      socket_fd = function_arp_filter.sock
+
+      #create python socket object, from the file descriptor
+      sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+
+      #set it as blocking socket
+      sock.setblocking(True)
+
+      while 1:
+        #retrieve raw packet from socket
+        packet_str = os.read(socket_fd,2048)
+
+        #DEBUG - print raw packet in hex format
+        #packet_hex = toHex(packet_str)
+        #print ("%s" % packet_hex)
+
+        #convert packet into bytearray
+        packet_bytearray = bytearray(packet_str)
+
+        try:
+          pkt = packet.Packet( packet_bytearray )
+          for p in pkt:
+              print( p.protocol_name, p )
+              if p.protocol_name == 'vlan':
+                  print( f'vlan id = {p.vid}' )
+              elif p.protocol_name == 'vxlan':
+                  print( f'vni = {p.vni}' )
+
+        except Exception as e:
+          print( f"Not a valid VXLAN packet? {e}" )
+
+        # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
+        # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
+        # print( f'trace_fields: {msg}' )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -187,6 +244,8 @@ def Handle_Notification(obj, state):
             else:
                 json_acceptable_string = obj.config.data.json.replace("'", "\"")
                 data = json.loads(json_acceptable_string)
+
+                # JvB there should be a helper for this
                 if 'admin_state' in data:
                     state.params[ "admin_state" ] = data['admin_state'][12:]
                 if 'local_as' in data:
@@ -195,6 +254,8 @@ def Handle_Notification(obj, state):
                     state.params[ "peer_as" ] = int( data['peer_as']['value'] )
                 if 'source_address' in data:
                     state.params[ "source_address" ] = data['source_address']['value']
+                if 'peer_address' in data:
+                    state.params[ "peer_address" ] = data['peer_address']['value']
                 if 'vnis' in data:
                     state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
                 else:
@@ -204,6 +265,7 @@ def Handle_Notification(obj, state):
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
                hub.spawn( runBGPThread, state.params )
+               hub.spawn( ARP_receiver_thread, "e1-1" )
             return True
 
     else:
