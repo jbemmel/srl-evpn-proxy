@@ -60,7 +60,7 @@ from ryu.lib import hub
 # eBPF ARP filter imports
 #
 from bcc import BPF
-from ryu.lib.packet import packet, vxlan, ethernet, arp
+from ryu.lib.packet import packet, ipv4, vxlan, ethernet, arp
 
 ############################################################
 ## Agent will start with this name
@@ -120,11 +120,15 @@ def runBGPThread( params ):
   if NEIGHBOR=="127.0.0.1": # Connect to 127.0.0.1 does not work
      NEIGHBOR = LOCAL_LOOPBACK
 
-  VTEP_LOOPBACK = '1.1.1.2'
-  VNI = 10
+  evpn_vteps = {}
   def best_path_change_handler(event):
       logging.info( f'The best path changed: {event.path}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+      if event.is_withdraw:
+         evpn_vteps.pop( event.nexthop, None )
+      else:
+         evpn_vteps[ event.nexthop ] = event.remote_as
+
   def peer_down_handler(remote_ip, remote_as):
       logging.warning( f'Peer down: {remote_ip} {remote_as}' )
   # need to create socket on localhost on a non-default port, not port 179
@@ -140,25 +144,7 @@ def runBGPThread( params ):
                                as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
                                best_path_change_handler=best_path_change_handler,
                                peer_down_handler=peer_down_handler)
-     rd = f"{params['local_as']}:{VNI}"
-     logging.info("Adding VRF...")
-     speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
-     logging.info("Test EVPN multicast route...")
-     speaker.evpn_prefix_add(
-         route_type=EVPN_MULTICAST_ETAG_ROUTE,
-         route_dist=rd,
-         # esi=0, # should be ignored
-         ethernet_tag_id=0,
-         # mac_addr='00:11:22:33:44:55', # not relevant?
-         ip_addr=VTEP_LOOPBACK, # origin
-         tunnel_type='vxlan',
-         vni=VNI,
-         gw_ip_addr=VTEP_LOOPBACK,
-         next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
-         pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
-         # Added via patch
-         tunnel_endpoint_ip='1.2.3.4'
-     )
+
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
      # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
      speaker.neighbor_add( NEIGHBOR, remote_as=params['peer_as'],
@@ -167,14 +153,15 @@ def runBGPThread( params ):
 
      # After connecting to BGP peer, start ARP thread (in different netns)
      eventlet.sleep(10) # Could also wait for peer_up event...
-     hub.spawn( ARP_receiver_thread, params['vxlan_interface'], speaker, rd, VNI )
+     hub.spawn( ARP_receiver_thread, params['vxlan_interface'], speaker,
+       LOCAL_LOOPBACK, params['local_as'], params['vnis'], evpn_vteps )
 
      while True:
          logging.info( "eventlet sleep loop..." )
          eventlet.sleep(30) # every 30s wake up
 
-def ARP_receiver_thread( interface, bgp_speaker, rd, vni ):
-    logging.info( f"Starting ARP listener on {interface} RD={rd} vni={vni}" )
+def ARP_receiver_thread( interface, bgp_speaker, router_id, ibgp_as, vnis, evpn_vteps ):
+    logging.info( f"Starting ARP listener on {interface} router_id={router_id} AS={ibgp_as} vnis={vnis}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
@@ -183,53 +170,113 @@ def ARP_receiver_thread( interface, bgp_speaker, rd, vni ):
     #http://man7.org/linux/man-pages/man2/bpf.2.html
     function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
 
+    mac_vrfs = {} # Announced MAC VRFs indexed by static VTEP IP
+
     #create raw socket, bind it to interface
     #attach bpf program to socket created
     with netns.NetNS(nsname="srbase"):
       BPF.attach_raw_socket(function_arp_filter, interface)
-
-      #get file descriptor of the socket previously created inside BPF.attach_raw_socket
       socket_fd = function_arp_filter.sock
-
-      #create python socket object, from the file descriptor
       sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
-
-      #set it as blocking socket
       sock.setblocking(True)
-
       while 1:
-        #retrieve raw packet from socket
         packet_str = os.read(socket_fd,2048)
-
-        #DEBUG - print raw packet in hex format
-        #packet_hex = toHex(packet_str)
-        #print ("%s" % packet_hex)
-
-        #convert packet into bytearray
         packet_bytearray = bytearray(packet_str)
-
         try:
           pkt = packet.Packet( packet_bytearray )
+          #
+          # 6 layers:
+          # 0: ethernet
+          # 1: IP                  -> VTEP IP (other side, local VTEP)
+          # 2: UDP
+          # 3: VXLAN               -> VNI
+          # 4: ethernet (inner)
+          # 5: ARP                 -> MAC, IP
+          #
           for p in pkt:
-              print( p.protocol_name, p )
+              logging.info( f"ARP packet:{p.protocol_name}={p}" )
               if p.protocol_name == 'vlan':
-                  print( f'vlan id = {p.vid}' )
+                  logging.info( f'vlan id = {p.vid}' )
               elif p.protocol_name == 'vxlan':
-                  print( f'vni = {p.vni}' )
+                  logging.info( f'vni = {p.vni}' )
 
-          # Announce EVPN route, TODO parameters from packet
-          VTEP_LOOPBACK = '1.2.3.4'
+          _ip = pkt.get_protocol( ipv4.ipv4 )
+          _vxlan = pkt.get_protocol( vxlan.vxlan )
+          _arp = pkt.get_protocol( arp.arp )
+
+          vni = _vxlan.vni
+
+          if vnis!='*' and vni not in vnis:
+              logging.info( f"VNI not enabled for proxy EVPN: {vni}" )
+              continue;
+
+          if _ip.src in evpn_vteps:
+             logging.info( "ARP from EVPN VTEP -> ignoring" )
+             continue
+          elif _ip.dst in evpn_vteps: # typically == us, always?
+             static_vtep = _ip.src
+             if _arp.opcode == 1:
+               mac = _arp.src_mac
+               ip = _arp.src_ip
+               logging.info( f"ARP request from static VTEP: {mac} {ip}" )
+             elif _arp.opcode == 2:
+               mac = _arp.dst_mac
+               ip = _arp.dst_ip
+               logging.info( f"ARP response from static VTEP: {mac} {ip}" )
+             else:
+               logging.info( f"ARP with unsupported opcode: {_arp.opcode} -> ignoring" )
+               continue
+          else:
+             logging.info( f"ARP packet:neither src={_ip.src} nor dst={_ip.dst} is EVPN vtep?" )
+             continue;
+
+          # Announce EVPN route(s)
+          vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
+
+          rd = f"{router_id}:{vni}"
+          if vni not in vni_2_mac:
+              rt = f"{ibgp_as}:{vni}"
+              logging.info(f"Adding VRF...RD={rd} RT={rt}")
+              bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+              logging.info("Adding EVPN multicast route...")
+              bgp_speaker.evpn_prefix_add(
+                  route_type=EVPN_MULTICAST_ETAG_ROUTE,
+                  route_dist=rd,
+                  # esi=0, # should be ignored
+                  ethernet_tag_id=0,
+                  # mac_addr='00:11:22:33:44:55', # not relevant?
+                  ip_addr=static_vtep, # origin
+                  tunnel_type='vxlan',
+                  vni=vni,
+                  gw_ip_addr=static_vtep,
+                  next_hop=static_vtep, # on behalf of remote VTEP
+                  pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+                  # Added via patch
+                  tunnel_endpoint_ip=static_vtep
+              )
+              mac_table = [ { mac : ip } ]
+              mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
+          else:
+              mac_table = vni_2_mac[ vni ]
+              if mac in mac_table:
+                  logging.info( f"MAC {mac} already announced, skipping" )
+                  continue
+              mac_table.update( { mac : ip } )
+
+          logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
+
+          # TODO add RT as extended community?
           bgp_speaker.evpn_prefix_add(
               route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
               route_dist=rd,
               esi=0,
               ethernet_tag_id=0,
-              mac_addr='00:11:22:33:44:55',
-              ip_addr='10.0.0.123',
-              next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
+              mac_addr=mac,
+              ip_addr=ip, # TODO for mac-vrf service, omit this?
+              next_hop=static_vtep, # on behalf of remote VTEP
               tunnel_type='vxlan',
               vni=vni,
-              gw_ip_addr=VTEP_LOOPBACK,
+              gw_ip_addr=static_vtep,
           )
 
         except Exception as e:
