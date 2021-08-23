@@ -7,12 +7,12 @@ topology:
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
       # image: srl/custombase:latest
       image: srl/evpn-proxy-agent:latest
+      agents: [ srl-evpn-proxy-agent.yml ]
       binds:
-        - /lib/modules:/lib/modules:ro # Only works on CentOS 8 system
-        # - /usr/src/kernels:/usr/src/kernels
-        # Need to set bind propagation: https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation
-        # To 'rshared' - else it's not available in srbase-default?
-        # - /sys/kernel/debug:/sys/kernel/debug
+        - /lib/modules:/lib/modules:ro
+        - /usr/src:/usr/src
+        - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+
     cvx:
       image: networkop/cx:4.4.0
       binds:
