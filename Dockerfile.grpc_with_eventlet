@@ -51,7 +51,7 @@ COPY ./src /opt/srlinux/agents/
 # RUN cd /tmp/grpc && bazel build :python3
 
 # Using cmake
-RUN yum install -y cmake && \
+RUN yum install -y cmake make autoconf pkg-config && \
     yum upgrade -y libarchive && \
     cd /tmp/grpc/ && \
     mkdir -p cmake/build && \
