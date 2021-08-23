@@ -1,3 +1,13 @@
+ARG SR_LINUX_RELEASE
+FROM srl/custombase:$SR_LINUX_RELEASE AS target-image
+
+# Install BGP library and eBPF packages
+RUN sudo pip3 install ryu netns
+RUN sudo yum install -y python3-bcc kmod xz
+
+# Install eBPF perf tools?
+# RUN sudo yum install -y perf bpftool
+
 # Build gRPC with eventlet support
 # Use separate build image and copy only resulting binaries, else 3.4GB
 FROM centos:8 AS build-grpc-with-eventlet
@@ -8,7 +18,7 @@ RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
 # Need to upgrade pip and setuptools
 RUN pip3 install --upgrade pip setuptools
 
-RUN cd /tmp && sudo yum install -y git python3-devel && \
+RUN cd /tmp && yum install -y git python3-devel && \
   pip3 install --upgrade pip && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
@@ -19,15 +29,7 @@ RUN cd /tmp && sudo yum install -y git python3-devel && \
 # GRPC_BUILD_WITH_BORING_SSL_ASM="" GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=true GRPC_PYTHON_BUILD_SYSTEM_ZLIB=true
 # GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1 to see errors
 
-ARG SR_LINUX_RELEASE
-FROM srl/custombase:$SR_LINUX_RELEASE
-
-# Install BGP library and eBPF packages
-RUN sudo pip3 install ryu netns
-RUN sudo yum install -y python3-bcc kmod xz
-
-# Install eBPF perf tools?
-# RUN sudo yum install -y perf bpftool
+FROM target-image AS final
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
 # Issue is that these addresses do not get installed as next hop in the RT
