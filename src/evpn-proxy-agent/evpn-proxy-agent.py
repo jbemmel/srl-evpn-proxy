@@ -115,63 +115,63 @@ def Subscribe_Notifications(stream_id):
 #       Thread.__init__(self)
 
 def runBGPThread( params ):
-     LOCAL_LOOPBACK = params['source_address'] # TODO remove hardcoded values
-     VTEP_LOOPBACK = '1.1.1.2'
-     VNI = 10
+  LOCAL_LOOPBACK = params['source_address'] # TODO remove hardcoded values
+  NEIGHBOR = params[ 'peer_address' ]
+  if NEIGHBOR=="127.0.0.1": # Connect to 127.0.0.1 does not work
+     NEIGHBOR = LOCAL_LOOPBACK
 
-     def best_path_change_handler(event):
-         logging.info( f'The best path changed: {event.path}' )
-           # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+  VTEP_LOOPBACK = '1.1.1.2'
+  VNI = 10
+  def best_path_change_handler(event):
+      logging.info( f'The best path changed: {event.path}' )
+        # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+  def peer_down_handler(remote_ip, remote_as):
+      logging.warning( f'Peer down: {remote_ip} {remote_as}' )
+  # need to create socket on localhost on a non-default port, not port 179
+  # Need to connect from loopback IP, not 127.0.0.x
+  # Router ID is used as tunnel endpoint in BGP UPDATEs
+  # => Code updated to allow any tunnel endpoint IP
+  logging.info("Starting BGP thread in srbase-default netns...")
+  # Requires root permissions
+  with netns.NetNS(nsname="srbase-default"):
+     logging.info("Starting BGPSpeaker in netns...")
 
-     def peer_down_handler(remote_ip, remote_as):
-         logging.warning( f'Peer down: {remote_ip} {remote_as}' )
+     speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
+                               as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
+                               best_path_change_handler=best_path_change_handler,
+                               peer_down_handler=peer_down_handler)
+     rd = f"{params['local_as']}:{VNI}"
+     logging.info("Adding VRF...")
+     speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
+     logging.info("Test EVPN multicast route...")
+     speaker.evpn_prefix_add(
+         route_type=EVPN_MULTICAST_ETAG_ROUTE,
+         route_dist=rd,
+         # esi=0, # should be ignored
+         ethernet_tag_id=0,
+         # mac_addr='00:11:22:33:44:55', # not relevant?
+         ip_addr=VTEP_LOOPBACK, # origin
+         tunnel_type='vxlan',
+         vni=VNI,
+         gw_ip_addr=VTEP_LOOPBACK,
+         next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
+         pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+         # Added via patch
+         tunnel_endpoint_ip='1.2.3.4'
+     )
+     logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
+     # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
+     speaker.neighbor_add( NEIGHBOR, remote_as=params['peer_as'],
+                           local_as=params['local_as'], enable_ipv4=False,
+                           enable_evpn=True, connect_mode='active') # iBGP with SRL
+     # After connecting to BGP peer, start ARP thread (in different netns)
+     hub.spawn( ARP_receiver_thread, params['vxlan_interface'], speaker, rd, VNI )
+     while True:
+         logging.info( "eventlet sleep loop..." )
+         eventlet.sleep(30) # every 30s wake up
 
-     # need to create socket on localhost on a non-default port, not port 179
-     # Need to connect from loopback IP, not 127.0.0.x
-     # Router ID is used as tunnel endpoint in BGP UPDATEs
-     # => Code updated to allow any tunnel endpoint IP
-     logging.info("Starting BGP thread in srbase-default netns...")
-
-     # Requires root permissions
-     with netns.NetNS(nsname="srbase-default"):
-        logging.info("Starting BGPSpeaker in netns...")
-        speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
-                                  as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
-                                  best_path_change_handler=best_path_change_handler,
-                                  peer_down_handler=peer_down_handler)
-        rd = f"{params['local_as']}:{VNI}"
-        logging.info("Adding VRF...")
-        speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
-
-        logging.info("Test EVPN multicast route...")
-        speaker.evpn_prefix_add(
-            route_type=EVPN_MULTICAST_ETAG_ROUTE,
-            route_dist=rd,
-            # esi=0, # should be ignored
-            ethernet_tag_id=0,
-            # mac_addr='00:11:22:33:44:55', # not relevant?
-            ip_addr=VTEP_LOOPBACK, # origin
-            tunnel_type='vxlan',
-            vni=VNI,
-            gw_ip_addr=VTEP_LOOPBACK,
-            next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
-            pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
-
-            # Added via patch
-            tunnel_endpoint_ip='1.2.3.4'
-        )
-
-        logging.info( f"Connecting to neighbor {params['peer_address']}..." )
-        # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-        speaker.neighbor_add( params['peer_address'], remote_as=params['peer_as'],
-                              local_as=params['local_as'], enable_ipv4=False,
-                              enable_evpn=True, connect_mode='active') # iBGP with SRL
-
-        while True:
-            logging.info( "eventlet sleep loop..." )
-            eventlet.sleep(30) # every 30s wake up
-
-def ARP_receiver_thread(interface):
+def ARP_receiver_thread( interface, bgp_speaker, rd, vni ):
+    logging.info( f"Starting ARP listener on {interface} RD={rd} vni={vni}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
@@ -213,6 +213,21 @@ def ARP_receiver_thread(interface):
                   print( f'vlan id = {p.vid}' )
               elif p.protocol_name == 'vxlan':
                   print( f'vni = {p.vni}' )
+
+          # Announce EVPN route, TODO parameters from packet
+          VTEP_LOOPBACK = '1.2.3.4'
+          bgp_peaker.evpn_prefix_add(
+              route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
+              route_dist=rd,
+              esi=0,
+              ethernet_tag_id=0,
+              mac_addr='00:11:22:33:44:55',
+              ip_addr='10.0.0.123',
+              next_hop=VTEP_LOOPBACK, # on behalf of remote VTEP
+              tunnel_type='vxlan',
+              vni=vni,
+              gw_ip_addr=VTEP_LOOPBACK,
+          )
 
         except Exception as e:
           print( f"Not a valid VXLAN packet? {e}" )
@@ -256,6 +271,8 @@ def Handle_Notification(obj, state):
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
+                if 'vxlan_interface' in data:
+                    state.params[ "vxlan_interface" ] = data['vxlan_interface']['value']
                 if 'vnis' in data:
                     state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
                 else:
@@ -265,7 +282,8 @@ def Handle_Notification(obj, state):
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
                hub.spawn( runBGPThread, state.params )
-               hub.spawn( ARP_receiver_thread, "e1-1" )
+               # Doesn't work - parallel netns calls
+               # hub.spawn( ARP_receiver_thread, "e1-1" )
             return True
 
     else:

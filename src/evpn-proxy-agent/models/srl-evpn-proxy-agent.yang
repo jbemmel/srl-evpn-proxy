@@ -55,6 +55,12 @@ module srl-evpn-proxy-agent {
               description "Remote IP to connect from, default localhost";
             }
 
+            leaf vxlan-interface {
+              type string;
+              default "e1-1";
+              description "Interface to listen on for VXLAN ARP packets, default e1-1";
+            }
+
             leaf local-as {
               type uint32 {
                 range "1..4294967295";
