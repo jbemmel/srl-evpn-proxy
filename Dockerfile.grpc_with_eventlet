@@ -28,7 +28,7 @@ RUN pip3 install --upgrade pip setuptools
 RUN cd /etc/yum.repos.d/ && \
     curl -O https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo && \
     yum install -y bazel4 && \
-    sudo alternatives --set python /usr/bin/python3
+    alternatives --set python /usr/bin/python3
 
 # Build gRPC with eventlet support
 # TODO use separate build image and copy only resulting binaries
@@ -47,4 +47,20 @@ COPY ./src /opt/srlinux/agents/
 # RUN cd /tmp/grpc && GRPC_PYTHON_BUILD_WITH_CYTHON=1 CC=/usr/bin/gcc CXX=/usr/bin/g++ python3 -m pip install .
 # RUN cd /tmp/grpc && GRPC_PYTHON_BUILD_WITH_CYTHON=1 python3 -m pip install --no-clean --verbose --log /tmp/pip.log .
 
-RUN cd /tmp/grpc && bazel build :python3
+# or CC=/usr/bin/gcc bazel build :all
+# RUN cd /tmp/grpc && bazel build :python3
+
+# Using cmake
+RUN yum install -y cmake && \
+    cd /tmp/grpc/ && \
+    mkdir -p cmake/build && \
+    pushd cmake/build && \
+    cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ../.. && \
+    make -j && \
+    make install && \
+    popd && \
+    mkdir -p third_party/abseil-cpp/cmake/build && \
+    pushd third_party/abseil-cpp/cmake/build && \
+    cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE ../.. && \
+    make -j && \
+    make install
