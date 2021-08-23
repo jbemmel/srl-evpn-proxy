@@ -27,14 +27,11 @@ function main()
     P1="/usr/local/lib/python3.6/site-packages"
     P2="/usr/local/lib64/python3.6/site-packages"
     P3="/usr/lib64/python3.6/site-packages"
-    NDK="/opt/rh/rh-python36/root/usr/lib/python3.6/site-packages/sdk_protos"
     # since 21.6
     SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
-    export PYTHONPATH="$P1:$P2:$P3:$NDK:$SDK2:$PYTHONPATH"
+    export PYTHONPATH="$P1:$P2:$P3:$SDK2:$PYTHONPATH"
 
-    export http_proxy=""
-    export https_proxy=""
-    export no_proxy=""
+    # Opening srbase-default namespace requires root
     python3 ${main_module} &
 
     child=$!

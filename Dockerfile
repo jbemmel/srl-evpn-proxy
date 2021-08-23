@@ -41,6 +41,7 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/vrf.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/info_base/
 COPY ryu_enhancements/bgpspeaker.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
+COPY ryu_enhancements/prefix.py /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/api/
 
 RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr

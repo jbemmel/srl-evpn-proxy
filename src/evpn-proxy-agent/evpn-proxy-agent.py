@@ -8,13 +8,10 @@ import eventlet
 eventlet.monkey_patch() # need thread too
 
 # Google core libraries don't support eventlet; workaround
-# from gevent import monkey
-# monkey.patch_all()
-# import grpc.experimental.gevent
-# grpc.experimental.gevent.init_gevent()
-
 import grpc
 from grpc.experimental import eventlet as grpc_eventlet
+
+grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
 
 # May need to start a separate Python process for BGP
 
@@ -55,6 +52,9 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   EVPN_MAC_IP_ADV_ROUTE,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
+
+# Ryu has its own threading model, does not interwork with regular threads
+from ryu.lib import hub
 
 ############################################################
 ## Agent will start with this name
@@ -101,14 +101,14 @@ def Subscribe_Notifications(stream_id):
     Subscribe(stream_id, 'cfg')
 
 #
-# Runs BGP EVPN as a separate thread
+# Runs BGP EVPN as a separate thread>, using Ryu hub
 #
-from threading import Thread
-class BGPEVPNThread(Thread):
-   def __init__(self):
-       Thread.__init__(self)
+#from threading import Thread
+#class BGPEVPNThread(Thread):
+#   def __init__(self):
+#       Thread.__init__(self)
 
-   def run(self):
+def runBGPThread():
      LOCAL_LOOPBACK = '1.1.1.4' # TODO remove hardcoded values
      VTEP_LOOPBACK = '1.1.1.2'
      AS = 65000
@@ -126,12 +126,16 @@ class BGPEVPNThread(Thread):
      # Router ID is used as tunnel endpoint in BGP UPDATEs
      # => Code updated to allow any tunnel endpoint IP
      logging.info("Starting BGP thread in srbase-default netns...")
+
+     # Requires root permissions
      with netns.NetNS(nsname="srbase-default"):
+        logging.info("Starting BGPSpeaker in netns...")
         speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                                   as_number=AS, router_id=LOCAL_LOOPBACK,
                                   best_path_change_handler=best_path_change_handler,
                                   peer_down_handler=peer_down_handler)
         rd = f'{AS}:{VNI}'
+        logging.info("Adding VRF...")
         speaker.vrf_add(route_dist=rd,import_rts=[rd],export_rts=[rd],route_family=RF_L2_EVPN)
 
         logging.info("Test EVPN multicast route...")
@@ -189,7 +193,8 @@ def Handle_Notification(obj, state):
 
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
-               BGPEVPNThread().start()
+               # BGPEVPNThread().start()
+               hub.spawn( runBGPThread )
             return True
 
     else:
@@ -278,7 +283,7 @@ def Exit_Gracefully(signum, frame):
 ##################################################################################################
 if __name__ == '__main__':
 
-    grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking
+    # grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking
 
     # hostname = socket.gethostname()
     stdout_dir = '/var/log/srlinux/stdout' # PyTEnv.SRL_STDOUT_DIR

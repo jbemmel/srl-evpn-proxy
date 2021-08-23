@@ -1,7 +1,7 @@
 # See example_config.yml for an explanation of all the accepted fields
 srl_evpn_proxy_agent:
    path: /opt/srlinux/agents/evpn-proxy-agent
-   launch-command: /opt/srlinux/agents/evpn-proxy-agent/scripts/evpn-proxy-agent.sh
+   launch-command: sudo /opt/srlinux/agents/evpn-proxy-agent/scripts/evpn-proxy-agent.sh
    search-command: python3 /opt/srlinux/agents/evpn-proxy-agent/evpn-proxy-agent.py
    wait-for-config: Yes
    failure-threshold: 100
