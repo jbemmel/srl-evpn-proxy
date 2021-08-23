@@ -57,11 +57,11 @@ RUN yum install -y cmake make autoconf pkg-config && \
     mkdir -p cmake/build && \
     pushd cmake/build && \
     cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=/usr/local ../.. && \
-    make -j && \
+    make -j$(nproc) && \
     make install && \
     popd && \
     mkdir -p third_party/abseil-cpp/cmake/build && \
     pushd third_party/abseil-cpp/cmake/build && \
     cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE ../.. && \
-    make -j && \
+    make -j$(nproc) && \
     make install
