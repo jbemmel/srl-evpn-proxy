@@ -331,15 +331,15 @@ def Handle_Notification(obj, state):
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
-               if has_attr( state, 'bgpThread' ):
+               if hasattr( state, 'bgpThread' ):
                    hub.kill( state.bgpThread )
                    # TODO cleanup ARP thread too, use link() ?
                state.bgpThread = hub.spawn( runBGPThread, state.params )
-            elif has_attr( state, 'bgpThread' ):
+            elif hasattr( state, 'bgpThread' ):
                hub.kill( state.bgpThread )
                del state.bgpThread
                # TODO cleanup ARP thread too, use link() ?
-               
+
                # Doesn't work - parallel netns calls
                # hub.spawn( ARP_receiver_thread, "e1-1" )
             return True
