@@ -19,17 +19,19 @@ This Github repo implements such an approach, using the following components:
 * Google gRPC framework, [modified to support eventlet](https://github.com/jbemmel/grpc) (used by Ryu)
 * VXLAN ARP snooping using [Extended Berkeley Packet Filters(eBPF)](https://prototype-kernel.readthedocs.io/en/latest/bpf/) filters
 
-# Step 1: Adding eBPF based VXLAN aware MAC learning from ARP packets
+# Step 1: Adding an eBPF based VXLAN packet filter to capture ARP packets
 The idea is to create an eBPF program to filter out VXLAN packets on a given fabric interface inside the srbase network instance (associated with a MAC VRF (L2) or an IP VRF (L3) overlay service). The filter program selects only VXLAN packets (UDP port 4789) containing ARP packets (requests or responses).
 
 The Python userspace program then uses BGP EVPN to advertise a route (type 2 for MAC-VRF, type 5 for IP-VRF) to the fabric (locally or towards a route reflector).
 It participates in the EVPN fabric and only advertises routes for VTEPs that are not sending EVPN routes themselves.
 
 ```Python
-Rx packet event( dst_vtep_IP, src_vtep_IP, VXLAN_VNI, arp_is_req, arp_src_mac, arp_dst_mac, arp_src_ip, arp_dst_ip ) {
-For an enabled L2 VNI:
-
+Rx( packet ) {
+if (packet==VXLAN) && (packet.inner == ARP) {
+  forward to Python userspace program
+}
 ```
+
 
 ## Other options considered
 I looked into attaching to the loopback TCP connection between the datapath (sr_xdp_lc_1) and the ARP/ND manager process (sr_arp_nd_mgr); there are 3 connections, and one of them received a packet containing the ARP request from a host. However, as neither the VTEP IP nor the VXLAN VNID are available in this message, there appears to be no easy way to associate the source MAC from these ARP packets with the correct service.
