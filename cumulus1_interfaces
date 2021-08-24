@@ -42,4 +42,6 @@ iface vni-10
     vxlan-remoteip 1.1.1.2
     # SRL1 via Cumulus2
     vxlan-remoteip 1.1.1.5
+    # SRL2 via Cumuls2 + SRL1
+    vxlan-remoteip 1.1.1.7
     # bridge-learning on # Cumulus complains about conflict with EVPN?

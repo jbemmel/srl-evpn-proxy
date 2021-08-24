@@ -1192,7 +1192,7 @@
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "1.1.1.6/32"
+                "ip-prefix": "1.1.1.7/32"
               }
             ]
           }
@@ -1410,6 +1410,9 @@
           "name": "ethernet-1/1.0"
         },
         {
+          "name": "lo0.0"
+        },
+        {
           "name": "system0.0"
         }
       ],
@@ -1443,6 +1446,28 @@
             }
           ]
         }
+      },
+      "srl_nokia-static-routes:static-routes": {
+        "route": [
+          {
+            "prefix": "1.1.1.0/29",
+            "next-hop-group": "srl1"
+          }
+        ]
+      },
+      "srl_nokia-next-hop-groups:next-hop-groups": {
+        "group": [
+          {
+            "name": "srl1",
+            "admin-state": "enable",
+            "nexthop": [
+              {
+                "index": 0,
+                "ip-address": "192.168.0.0"
+              }
+            ]
+          }
+        ]
       }
     },
     {
