@@ -159,7 +159,7 @@ def runBGPThread( params ):
                            enable_evpn=True, connect_mode='active') # iBGP with SRL
 
      # After connecting to BGP peer, start ARP thread (in different netns)
-     # eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
+     eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
   # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
   while True:
