@@ -231,6 +231,10 @@ rtt min/avg/max/mdev = 2.633/2.935/3.238/0.307 ms
 ```
 This could be avoided by running the EVPN proxy on every SRL node.
 
+## TODO
+* EVPN proxy requires VXLAN traffic to be sent to the SRL node, and hence should only be provisioned for mac-vrfs with bgp-evpn that are configured (not arbitrary VNIDs). The YANG model hooks are added (proxy=true), but currently not used; a specific EVI and VNID list must be configured instead.
+* eBPF ARP filter could reduce packets sent to userspace by implementing a hashmap of ARPs already forwarded; the Python userspace could program a list of EVPN VTEPs to ignore
+
 ## A note on sFlow sampling
 On physical SRL nodes, sFlow sampling could be used to learn MAC/IP routes, instead of eBPF filters. If required and over time, the sampling frequency could be reduced, or a target could be set on the number of VTEPs to discover before transitioning to a forwarding-only mode
 
