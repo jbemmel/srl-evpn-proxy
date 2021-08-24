@@ -1454,7 +1454,7 @@
           "admin-state": "enable",
           "autonomous-system": 65000,
           "export-policy": "accept-all",
-          "router-id": "1.1.1.1",
+          "router-id": "1.1.1.5",
           "group": [
             {
               "group-name": "leaves",
@@ -1484,11 +1484,6 @@
         "route": [
           {
             "prefix": "1.1.1.0/30",
-            "admin-state": "enable",
-            "next-hop-group": "cumulus2"
-          },
-          {
-            "prefix": "1.1.1.2/32",
             "admin-state": "enable",
             "next-hop-group": "cumulus2"
           }
