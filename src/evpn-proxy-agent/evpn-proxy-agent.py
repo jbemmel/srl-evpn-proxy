@@ -286,7 +286,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
             esi=0,
             ethernet_tag_id=0,
             mac_addr=mac,
-            ip_addr=ip, # TODO for mac-vrf service, omit this
+            # ip_addr=ip, # TODO for mac-vrf service, omit this
             next_hop=static_vtep, # on behalf of remote VTEP
             tunnel_type='vxlan',
             vni=vni,
