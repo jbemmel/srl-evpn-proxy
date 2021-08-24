@@ -114,9 +114,9 @@ def Subscribe_Notifications(stream_id):
 #   def __init__(self):
 #       Thread.__init__(self)
 
-def runBGPThread( params ):
-  LOCAL_LOOPBACK = params['source_address']
-  NEIGHBOR = params[ 'peer_address' ]
+def runBGPThread( state ):
+  LOCAL_LOOPBACK = state.params['source_address']
+  NEIGHBOR = state.params[ 'peer_address' ]
   if NEIGHBOR=="127.0.0.1": # Connect to 127.0.0.1 does not work
      NEIGHBOR = LOCAL_LOOPBACK
 
@@ -128,14 +128,12 @@ def runBGPThread( params ):
          evpn_vteps[ event.nexthop ] = event.remote_as
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
-  arp_thread = None
   def peer_up_handler(remote_ip, remote_as):
       logging.warning( f'Peer UP: {remote_ip} {remote_as}' )
       # Start ARP thread if not already
-      global arp_thread
-      if arp_thread is None:
+      if not hasattr(state,'arp_thread'):
          logging.info( "Starting ARP listener thread..." )
-         arp_thread = hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
+         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps )
 
   def peer_down_handler(remote_ip, remote_as):
       logging.warning( f'Peer DOWN: {remote_ip} {remote_as}' )
@@ -149,16 +147,18 @@ def runBGPThread( params ):
      logging.info("Starting BGPSpeaker in netns...")
 
      speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
-                               as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
+                               as_number=state.params['local_as'], router_id=LOCAL_LOOPBACK,
                                best_path_change_handler=best_path_change_handler,
                                peer_up_handler=peer_up_handler,
                                peer_down_handler=peer_down_handler)
 
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
      # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-     speaker.neighbor_add( NEIGHBOR, remote_as=params['peer_as'],
-                           local_as=params['local_as'], enable_ipv4=False,
-                           enable_evpn=True, connect_mode='active') # iBGP with SRL
+     speaker.neighbor_add( NEIGHBOR,
+                           remote_as=state.params['peer_as'],
+                           local_as=state.params['local_as'],
+                           enable_ipv4=False, enable_evpn=True,
+                           connect_mode='active') # iBGP with SRL
 
      # After connecting to BGP peer, start ARP thread (in different netns)
      eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
@@ -342,20 +342,22 @@ def Handle_Notification(obj, state):
                 if 'evi' in data: #TODO use 'proxy' flag instead, lookup using gNMI GET
                     state.params[ "evi" ] = int( data['evi']['value'] )
 
+            # cleanup ARP thread always, use link()?
+            if hasattr( state, 'arp_thread' ):
+               hub.kill( state.arp_thread ) # TODO cleanup eBPF
+               del state.arp_thread
+
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
                if hasattr( state, 'bgpThread' ):
                    hub.kill( state.bgpThread )
-                   # TODO cleanup ARP thread too, use link() ?
-               state.bgpThread = hub.spawn( runBGPThread, state.params )
+
+               state.bgpThread = hub.spawn( runBGPThread, state )
             elif hasattr( state, 'bgpThread' ):
                hub.kill( state.bgpThread )
                del state.bgpThread
-               # TODO cleanup ARP thread too, use link() ?
 
-               # Doesn't work - parallel netns calls
-               # hub.spawn( ARP_receiver_thread, "e1-1" )
             return True
 
         # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
