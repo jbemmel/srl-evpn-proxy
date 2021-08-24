@@ -254,4 +254,6 @@ I tried collecting sFlow samples, but the SR Linux container image only seems to
 * [Ryu packet parsing](https://ryu.readthedocs.io/en/latest/library_packet.html)
 
 # Issues encountered
-* GRPC and eventlet don't play nicely together, see https://github.com/grpc/grpc/issues/15923 ; 2020 [patch available](https://github.com/Akrog/grpc/blob/eventlet/src/python/grpcio/grpc/experimental/eventlet.py)
+* gRPC and eventlet don't play nicely together, see https://github.com/grpc/grpc/issues/15923 ; 2020 [patch available](https://github.com/Akrog/grpc/blob/eventlet/src/python/grpcio/grpc/experimental/eventlet.py) and [merged with master](https://github.com/jbemmel/grpc)
+* gRPC parallel builds obfuscate compiler errors; [use](https://github.com/jbemmel/srl-evpn-proxy/blob/main/Dockerfile#L30) 'GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1' to build serially
+* Network namespaces can be tricky to work with in Python
