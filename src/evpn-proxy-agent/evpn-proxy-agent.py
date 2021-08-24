@@ -224,10 +224,16 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
         else:
            logging.info( f"ARP packet:neither src={_ip.src} nor dst={_ip.dst} is EVPN vtep? {evpn_vteps}" )
            continue;
+
         # Announce EVPN route(s)
+
+        # For RD, use the static VTEP's IP, just as would happen when it would
+        # advertise the routes itself. This implies we need to create a VRF
+        # per static VTEP locally
+        rd = f"{static_vtep}:{params['evi']}"
+
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
         if vni not in vni_2_mac:
-            rd = f"{params['source_address']}:{params['evi']}"
             if rd not in bgp_vrfs:
                rt = f"{params['local_as']}:{params['evi']}"
                logging.info(f"Adding VRF...RD={rd} RT={rt}")
@@ -241,7 +247,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
             #
             bgp_speaker.evpn_prefix_add(
                 route_type=EVPN_MULTICAST_ETAG_ROUTE,
-                route_dist=f"{static_vtep}:{params['evi']}",
+                route_dist=rd,
                 # esi=0, # should be ignored
                 ethernet_tag_id=0,
                 # mac_addr='00:11:22:33:44:55', # not relevant for MC route
@@ -266,7 +272,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
         # TODO add RT as extended community?
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-            route_dist=f"{static_vtep}:{params['evi']}",
+            route_dist=rd,
             esi=0,
             ethernet_tag_id=0,
             mac_addr=mac,
