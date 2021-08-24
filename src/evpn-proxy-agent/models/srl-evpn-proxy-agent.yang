@@ -12,6 +12,9 @@ module srl-evpn-proxy-agent {
     import srl_nokia-network-instance {
         prefix srl_nokia-netinst;
     }
+    import srl_nokia-bgp-evpn {
+        prefix srl_nokia-bgp-evpn;
+    }
     import srl_nokia-interfaces {
         prefix srl_nokia-if;
     }
@@ -84,6 +87,14 @@ module srl-evpn-proxy-agent {
               }
             }
 
+            leaf evi {
+              type uint32 {
+                range "1..65535";
+              }
+              mandatory true;
+              description "Ethernet Virtual Identifier to use for auto-generating RT and RD; TODO lookup in config";
+            }
+
             leaf oper-state {
               config false;
               srl_nokia-ext:show-importance "high";
@@ -136,6 +147,18 @@ module srl-evpn-proxy-agent {
 
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
         uses evpn-proxy-protocol;
+    }
+
+    // Need to get the evi value for generating correct auto RD/RT
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-netinst:bgp-evpn/srl_nokia-bgp-evpn:bgp-instance" {
+        leaf proxy {
+          description "Enable learning and advertisement of proxy EVPN routes for this instance";
+          type boolean;
+
+          must ". = false() or ../../../../srl_nokia-netinst:type = 'srl_nokia-netinst:mac-vrf'" {
+            error-message "EVPN proxy can only be enabled for L2 mac-vrf";
+          }
+        }
     }
 
     uses evpn-proxy-state;

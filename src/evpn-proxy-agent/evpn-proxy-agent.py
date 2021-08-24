@@ -115,7 +115,7 @@ def Subscribe_Notifications(stream_id):
 #       Thread.__init__(self)
 
 def runBGPThread( params ):
-  LOCAL_LOOPBACK = params['source_address'] # TODO remove hardcoded values
+  LOCAL_LOOPBACK = params['source_address']
   NEIGHBOR = params[ 'peer_address' ]
   if NEIGHBOR=="127.0.0.1": # Connect to 127.0.0.1 does not work
      NEIGHBOR = LOCAL_LOOPBACK
@@ -153,15 +153,14 @@ def runBGPThread( params ):
 
      # After connecting to BGP peer, start ARP thread (in different netns)
      eventlet.sleep(10) # Could also wait for peer_up event...
-     hub.spawn( ARP_receiver_thread, params['vxlan_interface'], speaker,
-       LOCAL_LOOPBACK, params['local_as'], params['vnis'], evpn_vteps )
+     hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
      while True:
          logging.info( "eventlet sleep loop..." )
          eventlet.sleep(30) # every 30s wake up
 
-def ARP_receiver_thread( interface, bgp_speaker, router_id, ibgp_as, vnis, evpn_vteps ):
-    logging.info( f"Starting ARP listener on {interface} router_id={router_id} AS={ibgp_as} vnis={vnis}" )
+def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
+    logging.info( f"Starting ARP listener params {params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
@@ -175,7 +174,7 @@ def ARP_receiver_thread( interface, bgp_speaker, router_id, ibgp_as, vnis, evpn_
     #create raw socket, bind it to interface
     #attach bpf program to socket created
     with netns.NetNS(nsname="srbase"):
-      BPF.attach_raw_socket(function_arp_filter, interface)
+      BPF.attach_raw_socket(function_arp_filter, params['vxlan_interface'])
       socket_fd = function_arp_filter.sock
       sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
       sock.setblocking(True)
@@ -206,7 +205,7 @@ def ARP_receiver_thread( interface, bgp_speaker, router_id, ibgp_as, vnis, evpn_
 
           vni = _vxlan.vni
 
-          if vnis!='*' and vni not in vnis:
+          if params['vnis']!='*' and vni not in params['vnis']:
               logging.info( f"VNI not enabled for proxy EVPN: {vni}" )
               continue;
 
@@ -233,9 +232,9 @@ def ARP_receiver_thread( interface, bgp_speaker, router_id, ibgp_as, vnis, evpn_
           # Announce EVPN route(s)
           vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
 
-          rd = f"{router_id}:{vni}"
+          rd = f"{params['source_address']}:{params['evi']}"
           if vni not in vni_2_mac:
-              rt = f"{ibgp_as}:{vni}"
+              rt = f"{params['local_as']}:{params['evi']}"
               logging.info(f"Adding VRF...RD={rd} RT={rt}")
               bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
               logging.info("Adding EVPN multicast route...")
@@ -327,6 +326,8 @@ def Handle_Notification(obj, state):
                     state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
                 else:
                     state.params[ "vnis" ] = '*' # all
+                if 'evi' in data: #TODO use 'proxy' flag instead, lookup using gNMI GET
+                    state.params[ "evi" ] = int( data['evi']['value'] )
 
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
@@ -343,6 +344,9 @@ def Handle_Notification(obj, state):
                # Doesn't work - parallel netns calls
                # hub.spawn( ARP_receiver_thread, "e1-1" )
             return True
+
+        # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
+        # Lookup configured EVI using gNMI
 
     else:
         logging.info(f"Unexpected notification : {obj}")
