@@ -168,7 +168,8 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
     #http://man7.org/linux/man-pages/man2/bpf.2.html
     function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
 
-    mac_vrfs = {} # Announced MAC VRFs indexed by static VTEP IP
+    mac_vrfs = {} # Announced MAC VRFs: VTEP IP => { vni: mac table }
+    bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
 
     #create raw socket, bind it to interface
     #attach bpf program to socket created
@@ -228,8 +229,10 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
         rd = f"{params['source_address']}:{params['evi']}"
         if vni not in vni_2_mac:
             rt = f"{params['local_as']}:{params['evi']}"
-            logging.info(f"Adding VRF...RD={rd} RT={rt}")
-            bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+            if rd not in bgp_vrfs:
+               logging.info(f"Adding VRF...RD={rd} RT={rt}")
+               bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+               bgp_vrfs[ rd ] = static_vtep
             logging.info("Adding EVPN multicast route...")
             bgp_speaker.evpn_prefix_add(
                 route_type=EVPN_MULTICAST_ETAG_ROUTE,
@@ -262,7 +265,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
             esi=0,
             ethernet_tag_id=0,
             mac_addr=mac,
-            ip_addr=ip, # TODO for mac-vrf service, omit this?
+            ip_addr=ip, # TODO for mac-vrf service, omit this
             next_hop=static_vtep, # on behalf of remote VTEP
             tunnel_type='vxlan',
             vni=vni,
