@@ -257,11 +257,11 @@ class VrfTable(Table):
 
             # MpReachNlri and/or MpUnReachNlri attribute info. is contained
             # in the path. Hence we do not add these attributes here.
-            # from ryu.services.protocols.bgp.core import EXPECTED_ORIGIN
-            from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_IGP # JvB
+            from ryu.services.protocols.bgp.core import EXPECTED_ORIGIN
+            # from ryu.lib.packet.bgp import BGP_ATTR_ORIGIN_IGP # JvB
 
             pattrs[BGP_ATTR_TYPE_ORIGIN] = BGPPathAttributeOrigin(
-                BGP_ATTR_ORIGIN_IGP) # JvB EXPECTED_ORIGIN->BGP_ATTR_ORIGIN_IGP
+                EXPECTED_ORIGIN) # JvB EXPECTED_ORIGIN->BGP_ATTR_ORIGIN_IGP
             pattrs[BGP_ATTR_TYPE_AS_PATH] = BGPPathAttributeAsPath([])
             communities = []
 
