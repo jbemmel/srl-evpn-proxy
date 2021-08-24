@@ -24,32 +24,33 @@ topology:
   nodes:
     cumulus1:
       kind: cvx
+      group: static-fabric
       binds:
         - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
     cumulus2:
       kind: cvx
+      group: static-fabric
       binds:
         - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
     srl1:
       kind: srl
+      group: evpn-fabric
       startup-config: srl1.conf.json
 
     # SRL2 acts as an EVPN proxy for cumulus2, using the same VXLAN loopback IP
-    srl2:
-      kind: srl
-      startup-config: srl2.conf.json
+    # srl2: { kind: srl, group: evpn-fabric, startup-config: srl2.conf.json }
 
-    h1: { kind: linux, binds: [ h1_interfaces:/etc/network/interfaces ] }
-    h2: { kind: linux, binds: [ h2_interfaces:/etc/network/interfaces ] }
-    h3: { kind: linux, binds: [ h3_interfaces:/etc/network/interfaces ] }
-    # h4: { kind: linux, binds: [ h4_interfaces:/etc/network/interfaces ] }
+    h1: { kind: linux, group: static-hosts, binds: [ h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ h3_interfaces:/etc/network/interfaces ] }
+    # h4: { kind: linux, group: evpn-hosts,   binds: [ h4_interfaces:/etc/network/interfaces ] }
 
   links:
     # Static L2 VXLAN between Cumulus nodes
     - endpoints: ["cumulus1:e1-1", "cumulus2:e1-1"]
 
     # EVPN VXLAN between SRL nodes
-    - endpoints: ["srl1:e1-1", "srl2:e1-1"]
+    # - endpoints: ["srl1:e1-1", "srl2:e1-1"]
 
     # A host connected to each switch
     - endpoints: ["cumulus1:e1-3", "h1:eth1"]
