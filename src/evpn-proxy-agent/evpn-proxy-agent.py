@@ -128,8 +128,15 @@ def runBGPThread( params ):
          evpn_vteps[ event.nexthop ] = event.remote_as
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
+  arp_thread = None
+  def peer_up_handler(remote_ip, remote_as):
+      logging.warning( f'Peer UP: {remote_ip} {remote_as}' )
+      # Start ARP thread if not already
+      if arp_thread is None:
+         arp_thread = hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
+
   def peer_down_handler(remote_ip, remote_as):
-      logging.warning( f'Peer down: {remote_ip} {remote_as}' )
+      logging.warning( f'Peer DOWN: {remote_ip} {remote_as}' )
   # need to create socket on localhost on a non-default port, not port 179
   # Need to connect from loopback IP, not 127.0.0.x
   # Router ID is used as tunnel endpoint in BGP UPDATEs
@@ -142,6 +149,7 @@ def runBGPThread( params ):
      speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                                as_number=params['local_as'], router_id=LOCAL_LOOPBACK,
                                best_path_change_handler=best_path_change_handler,
+                               peer_up_handler=peer_up_handler,
                                peer_down_handler=peer_down_handler)
 
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
@@ -151,8 +159,8 @@ def runBGPThread( params ):
                            enable_evpn=True, connect_mode='active') # iBGP with SRL
 
      # After connecting to BGP peer, start ARP thread (in different netns)
-     eventlet.sleep(10) # Could also wait for peer_up event...
-  hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
+     # eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
+  # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
   while True:
      logging.info( "eventlet sleep loop..." )
