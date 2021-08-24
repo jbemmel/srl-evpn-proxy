@@ -226,20 +226,25 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
            continue;
         # Announce EVPN route(s)
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
-        rd = f"{params['source_address']}:{params['evi']}"
         if vni not in vni_2_mac:
-            rt = f"{params['local_as']}:{params['evi']}"
+            rd = f"{params['source_address']}:{params['evi']}"
             if rd not in bgp_vrfs:
+               rt = f"{params['local_as']}:{params['evi']}"
                logging.info(f"Adding VRF...RD={rd} RT={rt}")
                bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
                bgp_vrfs[ rd ] = static_vtep
             logging.info("Adding EVPN multicast route...")
+            #
+            # For RD use the static VTEP's IP, just like it would do if it was
+            # EVPN enabled itself. That way, any proxy will announce the same
+            # route
+            #
             bgp_speaker.evpn_prefix_add(
                 route_type=EVPN_MULTICAST_ETAG_ROUTE,
-                route_dist=rd,
+                route_dist=f"{static_vtep}:{params['evi']}",
                 # esi=0, # should be ignored
                 ethernet_tag_id=0,
-                # mac_addr='00:11:22:33:44:55', # not relevant?
+                # mac_addr='00:11:22:33:44:55', # not relevant for MC route
                 ip_addr=static_vtep, # origin
                 tunnel_type='vxlan',
                 vni=vni,
@@ -261,7 +266,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
         # TODO add RT as extended community?
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-            route_dist=rd,
+            route_dist=f"{static_vtep}:{params['evi']}",
             esi=0,
             ethernet_tag_id=0,
             mac_addr=mac,
