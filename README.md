@@ -19,17 +19,48 @@ This Github repo implements such an approach, using the following components:
 * Google gRPC framework, [modified to support eventlet](https://github.com/jbemmel/grpc) (used by Ryu)
 * VXLAN ARP snooping using [Extended Berkeley Packet Filters(eBPF)](https://prototype-kernel.readthedocs.io/en/latest/bpf/) filters
 
-# Step 1: Adding an eBPF based VXLAN packet filter to capture ARP packets
+## Step 1: Adding an eBPF based VXLAN packet filter to capture ARP packets
 The idea is to create an eBPF program to filter out VXLAN packets on a given fabric interface inside the srbase network instance (associated with a MAC VRF (L2) or an IP VRF (L3) overlay service). The filter program selects only VXLAN packets (UDP port 4789) containing ARP packets (requests or responses).
-
-The Python userspace program then uses BGP EVPN to advertise a route (type 2 for MAC-VRF, type 5 for IP-VRF) to the fabric (locally or towards a route reflector).
-It participates in the EVPN fabric and only advertises routes for VTEPs that are not sending EVPN routes themselves.
 
 ```Python
 Rx( packet ) {
 if (packet==VXLAN) && (packet.inner == ARP) {
   forward to Python userspace program
 }
+```
+
+## Step 2: Send out EVPN routes (multicast, RT2 for each MAC/IP) on behalf of static VTEPs
+The Python userspace program receives filtered VXLAN ARP packets and uses BGP EVPN to advertise a route (type 2 for MAC-VRF, type 5 for IP-VRF[TODO]) to the fabric (locally or towards a route reflector). It participates in the EVPN fabric and only advertises routes for VTEPs that are not sending EVPN routes themselves.
+
+As it was found that Ryu implicitly assumes the sending endpoint is also the tunnel endpoint, [some minor changes](https://github.com/jbemmel/srl-evpn-proxy/tree/main/ryu_enhancements) had to be made to allow for arbitrary tunnel endpoint IPs in multicast routes.
+
+# Lab prototype demo
+Using [Containerlab](https://containerlab.srlinux.dev/), the topology described above is easily deployed:
+
+```
+make # to build the custom 'srl/evpn-proxy-agent' Docker container
+containerlab deploy -t static-vxlan.lab
+```
+
+Out of the box, the EVPN proxy agent is disabled; h1 can ping h2 and h3 can ping h4 (after giving the nodes enough time to boot):
+
+```
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h1 ping 10.0.0.102 -c2
+PING 10.0.0.102 (10.0.0.102) 56(84) bytes of data.
+64 bytes from 10.0.0.102: icmp_seq=1 ttl=64 time=2.35 ms
+64 bytes from 10.0.0.102: icmp_seq=2 ttl=64 time=6.27 ms
+
+--- 10.0.0.102 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 2ms
+rtt min/avg/max/mdev = 2.351/4.312/6.274/1.962 ms
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h3 ping 10.0.0.104 -c2
+PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
+64 bytes from 10.0.0.104: icmp_seq=1 ttl=64 time=0.975 ms
+64 bytes from 10.0.0.104: icmp_seq=2 ttl=64 time=0.958 ms
+
+--- 10.0.0.104 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 2ms
+rtt min/avg/max/mdev = 0.958/0.966/0.975/0.032 ms
 ```
 
 
