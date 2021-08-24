@@ -132,7 +132,9 @@ def runBGPThread( params ):
   def peer_up_handler(remote_ip, remote_as):
       logging.warning( f'Peer UP: {remote_ip} {remote_as}' )
       # Start ARP thread if not already
+      global arp_thread
       if arp_thread is None:
+         logging.info( "Starting ARP listener thread..." )
          arp_thread = hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
   def peer_down_handler(remote_ip, remote_as):
