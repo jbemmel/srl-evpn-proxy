@@ -38,6 +38,7 @@ As it was found that Ryu implicitly assumes the sending endpoint is also the tun
 Using [Containerlab](https://containerlab.srlinux.dev/), the topology described above is easily deployed:
 
 ```
+git clone & make https://github.com/jbemmel/srl-baseimage
 make # to build the custom 'srl/evpn-proxy-agent' Docker container
 containerlab deploy -t static-vxlan.lab
 ```
