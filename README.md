@@ -88,6 +88,7 @@ bgp {
     }
   }
   neighbor 1.1.1.4 {
+    description "Local EVPN proxy agent"
     admin-state enable
     peer-group leaves
   }
