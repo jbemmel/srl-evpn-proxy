@@ -61,7 +61,17 @@ module srl-evpn-proxy-agent {
             leaf vxlan-interface {
               type string;
               default "e1-1";
-              description "Interface to listen on for VXLAN ARP packets, default e1-1";
+              description "Interface to listen on for VXLAN ARP packets, default e1-1.
+                           Set to empty string to disable ARP learning";
+            }
+
+            leaf-list vxlan-remoteips {
+              type srl_nokia-comm:ip-address;
+              description "Optional list of remote VTEP IPs for static non-EVPN peers";
+
+              must( ../vnis ) {
+                error-message "Must provision a static list of VNIs for static VTEP IP(s)";
+              }
             }
 
             leaf local-as {

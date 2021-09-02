@@ -131,7 +131,7 @@ def runBGPThread( state ):
   def peer_up_handler(remote_ip, remote_as):
       logging.warning( f'Peer UP: {remote_ip} {remote_as}' )
       # Start ARP thread if not already
-      if not hasattr(state,'arp_thread'):
+      if not hasattr(state,'arp_thread') and state.params['vxlan_interface']!="":
          logging.info( "Starting ARP listener thread..." )
          state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps )
 
@@ -164,9 +164,42 @@ def runBGPThread( state ):
      eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
   # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
+  # Add any static VTEPs/VNIs
+  for static_vtep in params['vxlan_remoteips']:
+      # params['vnis']!='*': enforced by YANG
+     for vni in params['vnis']:
+       Add_Static_VTEP( speaker, params, static_vtep, vni )
+
   while True:
      logging.info( "eventlet sleep loop..." )
      eventlet.sleep(30) # every 30s wake up
+
+def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
+    rd = f"{remote_ip}:{params['evi']}"
+    rt = f"{params['local_as']}:{params['evi']}"
+    logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
+    bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+    logging.info("Adding EVPN multicast route...")
+    #
+    # For RD use the static VTEP's IP, just like it would do if it was
+    # EVPN enabled itself. That way, any proxy will announce the same
+    # route
+    #
+    bgp_speaker.evpn_prefix_add(
+        route_type=EVPN_MULTICAST_ETAG_ROUTE,
+        route_dist=rd,
+        # esi=0, # should be ignored
+        ethernet_tag_id=0,
+        # mac_addr='00:11:22:33:44:55', # not relevant for MC route
+        ip_addr=remote_ip, # origin
+        tunnel_type='vxlan',
+        vni=vni,
+        gw_ip_addr=remote_ip,
+        next_hop=remote_ip, # on behalf of remote VTEP
+        pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+        # Added via patch
+        tunnel_endpoint_ip=remote_ip
+    )
 
 def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
     logging.info( f"Starting ARP listener params {params}" )
@@ -245,31 +278,8 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
         if vni not in vni_2_mac:
             if rd not in bgp_vrfs:
-               rt = f"{params['local_as']}:{params['evi']}"
-               logging.info(f"Adding VRF...RD={rd} RT={rt}")
-               bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+               Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
                bgp_vrfs[ rd ] = static_vtep
-            logging.info("Adding EVPN multicast route...")
-            #
-            # For RD use the static VTEP's IP, just like it would do if it was
-            # EVPN enabled itself. That way, any proxy will announce the same
-            # route
-            #
-            bgp_speaker.evpn_prefix_add(
-                route_type=EVPN_MULTICAST_ETAG_ROUTE,
-                route_dist=rd,
-                # esi=0, # should be ignored
-                ethernet_tag_id=0,
-                # mac_addr='00:11:22:33:44:55', # not relevant for MC route
-                ip_addr=static_vtep, # origin
-                tunnel_type='vxlan',
-                vni=vni,
-                gw_ip_addr=static_vtep,
-                next_hop=static_vtep, # on behalf of remote VTEP
-                pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
-                # Added via patch
-                tunnel_endpoint_ip=static_vtep
-            )
             mac_table = [ { mac : ip } ]
             mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
         else:
@@ -335,6 +345,8 @@ def Handle_Notification(obj, state):
                     state.params[ "peer_address" ] = data['peer_address']['value']
                 if 'vxlan_interface' in data:
                     state.params[ "vxlan_interface" ] = data['vxlan_interface']['value']
+
+                state.params[ "vxlan_remoteips" ] = data['vxlan_remoteips'] if 'vxlan_remoteips' in data else []
                 if 'vnis' in data:
                     state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
                 else:
