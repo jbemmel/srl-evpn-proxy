@@ -18,6 +18,7 @@ iface e1-3
     mstpctl-portbpdufilter yes
     # Native VLAN 1 untagged
     bridge-access 10
+    bridge-l2protocol-tunnel all
 
 # Shared bridge: Underlay native VLAN 1 untagged for VXLAN traffic
 auto bridge
@@ -32,6 +33,7 @@ iface bridge
 auto vni-10
 iface vni-10
     bridge-access 10
+    bridge-l2protocol-tunnel all
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     # 0xaabbcc = 11189196

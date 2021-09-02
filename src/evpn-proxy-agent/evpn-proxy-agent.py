@@ -165,10 +165,10 @@ def runBGPThread( state ):
   # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
   # Add any static VTEPs/VNIs
-  for static_vtep in params['vxlan_remoteips']:
+  for static_vtep in state.params['vxlan_remoteips']:
       # params['vnis']!='*': enforced by YANG
-     for vni in params['vnis']:
-       Add_Static_VTEP( speaker, params, static_vtep, vni )
+     for vni in state.params['vnis']:
+       Add_Static_VTEP( speaker, state.params, static_vtep, vni )
 
   while True:
      logging.info( "eventlet sleep loop..." )

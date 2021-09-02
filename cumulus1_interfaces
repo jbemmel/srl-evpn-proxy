@@ -19,6 +19,7 @@ iface e1-3
     mstpctl-portbpdufilter yes
     # Native VLAN 1 untagged?
     bridge-access 10
+    bridge-l2protocol-tunnel all
 
 # Shared bridge: Underlay untagged to VXLAN traffic on VLAN/VNI 10
 auto bridge
@@ -33,6 +34,9 @@ iface bridge
 auto vni-10
 iface vni-10
     bridge-access 10
+    # Enable transparent forwarding of L2 protocols
+    # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-41/Network-Virtualization/Bridge-Layer-2-Protocol-Tunneling/
+    bridge-l2protocol-tunnel all
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
     # 0xaabbcc = 11189196
