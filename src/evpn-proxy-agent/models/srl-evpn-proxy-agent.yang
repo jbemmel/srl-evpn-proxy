@@ -55,7 +55,7 @@ module srl-evpn-proxy-agent {
             leaf peer-address {
               type srl_nokia-comm:ip-address;
               default "127.0.0.1";
-              description "Remote IP to connect from, default localhost";
+              description "Remote IP to connect to, default localhost";
             }
 
             leaf vxlan-interface {
@@ -66,10 +66,10 @@ module srl-evpn-proxy-agent {
             }
 
             leaf-list vxlan-remoteips {
-              type srl_nokia-comm:ip-address;
-              description "Optional list of remote VTEP IPs for static non-EVPN peers";
+              type srl_nokia-comm:ipv4-address;
+              description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
 
-              must "../vnis" {
+              must "boolean(../vnis)" {
                 error-message "Must provision a static list of VNIs for static VTEP IP(s)";
               }
             }
