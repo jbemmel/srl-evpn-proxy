@@ -69,7 +69,7 @@ module srl-evpn-proxy-agent {
               type srl_nokia-comm:ip-address;
               description "Optional list of remote VTEP IPs for static non-EVPN peers";
 
-              must( ../vnis ) {
+              must "../vnis" {
                 error-message "Must provision a static list of VNIs for static VTEP IP(s)";
               }
             }
