@@ -249,11 +249,11 @@ For redundancy, multiple proxies can be instantiated, and any one of them can as
 We can test MAC mobility by swapping the MACs of H1 and H2, and then ping from H2 to H3:
 ```bash
 cat > test_mac_move.sh << EOF
-MAC1=\`docker exec -it clab-static-vxlan-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
-MAC2=\`docker exec -it clab-static-vxlan-lab-h2 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
-docker exec -it clab-static-vxlan-lab-h1 ip link set address \$MAC2 dev eth1
-docker exec -it clab-static-vxlan-lab-h2 ip link set address \$MAC1 dev eth1
-docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.103 -c2
+MAC1=\`docker exec -it clab-static-vxlan-spine-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+MAC2=\`docker exec -it clab-static-vxlan-spine-lab-h2 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+docker exec -it clab-static-vxlan-spine-lab-h1 ip link set address \$MAC2 dev eth1
+docker exec -it clab-static-vxlan-spine-lab-h2 ip link set address \$MAC1 dev eth1
+docker exec -it clab-static-vxlan-spine-lab-h2 ping 10.0.0.103 -c2
 EOF
 chmod +x ./test_mac_move.sh 
 bash -c ./test_mac_move.sh
@@ -261,8 +261,8 @@ bash -c ./test_mac_move.sh
 
 Similarly, we can move the MAC to EVPN (H4 attached to SRL2) and repeat the test:
 ```
-docker exec -it clab-static-vxlan-lab-h4 ip link set address $MAC dev eth1
-docker exec -it clab-static-vxlan-lab-h4 ping 10.0.0.103 -c2
+docker exec -it clab-static-vxlan-spine-lab-h4 ip link set address $MAC dev eth1
+docker exec -it clab-static-vxlan-spine-lab-h4 ping 10.0.0.103 -c2
 ```
 
 ## A note on sFlow sampling
