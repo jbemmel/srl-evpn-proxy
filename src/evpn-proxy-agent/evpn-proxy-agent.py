@@ -122,7 +122,11 @@ def runBGPThread( state ):
 
   evpn_vteps = {}
   bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
-  mac_vrfs = {} # Announced MAC VRFs: VTEP IP => { vni: mac table }
+
+  # Since this application only supports single homed endpoints, the ESI=0 and
+  # we can organize MAC tables per VXLAN VNI (24-bit)
+  # mac_vrfs: { vni: { mac: { vtep, sequence_number } } }
+  mac_vrfs = {}
 
   def best_path_change_handler(event):
       logging.info( f'The best path changed: {event.path}' )
@@ -131,14 +135,11 @@ def runBGPThread( state ):
          evpn_vteps[ event.nexthop ] = event.remote_as
 
          # check for RT2 MAC moves
-         if event.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
-            mac = event.nlri.mac_address
-            logging.info( f"Check MAC {mac}" )
-            if mac in mac_vrfs:
-                cur = mac_vrfs[mac]
-                logging.info( f"Known/advertised MAC: {mac}={cur}" )
-            else:
-                logging.info( f"MAC {mac} not found locally" )
+         if event.nlri().type == EVPN_MAC_IP_ADV_ROUTE:
+            rd = event.nlri().route_dist()
+            mac = event.nlri().mac_address()
+            logging.info( f"Check MAC {mac} for RD {rd}" )
+            # TODO get VNI from label - how?
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
@@ -289,37 +290,35 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
         # per static VTEP locally
         rd = f"{static_vtep}:{params['evi']}"
 
-        vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
+        vni_2_mac_vrf = mac_vrfs[ vni ] if vni in mac_vrfs else {}
         mobility_seq = None # First time: no attribute
-        if vni not in vni_2_mac:
-            # TODO check if other proxy is announcing it
-            if rd not in bgp_vrfs:
-               Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
-               bgp_vrfs[ rd ] = static_vtep
-            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : -1 } } ]
-            mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
-        else:
-            mac_table = vni_2_mac[ vni ]
-            if mac in mac_table:
-                logging.info( f"MAC {mac} already announced, checking for MAC move" )
-                cur = mac_table[ mac ]
-                # TODO various cases: different IP, different VTEP, ...
-                if cur['vtep'] == static_vtep:
-                   logging.info( f"MAC {mac} already announced with VTEP {static_vtep}" )
-                   continue
 
-                # RFC talks about different ESI as reason for mobility seq inc
-                # We have ESI 0 == single homed
-                mobility_seq = cur['seq'] + 1
-                bgp_speaker.evpn_prefix_del(
-                  route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-                  route_dist=rd,
-                  mac_addr=mac,
-                  ip_addr=ip, # TODO for mac-vrf service, omit this?
-                )
-                cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
-            else:
-               mac_table.update( { mac : ip } )
+        # TODO check if other proxy is announcing it
+        if rd not in bgp_vrfs:
+           Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
+           bgp_vrfs[ rd ] = static_vtep
+
+        if mac in vni_2_mac_vrf:
+            logging.info( f"MAC {mac} already announced, checking for MAC move" )
+            cur = vni_2_mac_vrf[ mac ]
+            # TODO various cases: different IP, different VTEP, ...
+            if cur['vtep'] == static_vtep:
+               logging.info( f"VNI {vni}: MAC {mac} already announced with VTEP {static_vtep}" )
+               continue
+            # RFC talks about different ESI as reason for mobility seq inc
+            # We have ESI 0 == single homed
+            mobility_seq = cur['seq'] + 1
+            bgp_speaker.evpn_prefix_del(
+              route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
+              route_dist=rd,
+              mac_addr=mac,
+              ip_addr=ip, # TODO for mac-vrf service, omit this?
+            )
+            # Could add a timestamp (last seen) + aging
+            cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
+        else:
+           vni_2_mac_vrf.update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
+        mac_vrfs[ vni ] = vni_2_mac_vrf
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
