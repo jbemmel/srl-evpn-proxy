@@ -285,6 +285,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
         mobility_seq = 0
         if vni not in vni_2_mac:
+            # TODO check if other proxy is announcing it
             if rd not in bgp_vrfs:
                Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
                bgp_vrfs[ rd ] = static_vtep
