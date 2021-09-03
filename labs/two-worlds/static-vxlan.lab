@@ -40,10 +40,10 @@ topology:
     # SRL2 can act as an EVPN proxy for cumulus2, using the same VXLAN loopback IP
     srl2: { kind: srl, group: evpn-fabric, startup-config: srl2.conf.json }
 
-    h1: { kind: linux, group: static-hosts, binds: [ h1_interfaces:/etc/network/interfaces ] }
-    h2: { kind: linux, group: static-hosts, binds: [ h2_interfaces:/etc/network/interfaces ] }
-    h3: { kind: linux, group: evpn-hosts,   binds: [ h3_interfaces:/etc/network/interfaces ] }
-    h4: { kind: linux, group: evpn-hosts,   binds: [ h4_interfaces:/etc/network/interfaces ] }
+    h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ ../h3_interfaces:/etc/network/interfaces ] }
+    h4: { kind: linux, group: evpn-hosts,   binds: [ ../h4_interfaces:/etc/network/interfaces ] }
 
   links:
     # Static L2 VXLAN between Cumulus nodes
