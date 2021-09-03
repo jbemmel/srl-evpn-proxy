@@ -312,10 +312,11 @@ class VrfTable(Table):
             mac_mobility_seq = kwargs.get('mac_mobility', None)
             if mac_mobility_seq is not None:
                 from ryu.lib.packet.bgp import BGPEvpnMacMobilityExtendedCommunity
+                is_static = (mac_mobility_seq==-1) # Magic value for static MACs
                 communities.append(BGPEvpnMacMobilityExtendedCommunity(
                     subtype=0,
-                    flags=0, # 0x1 = sticky (static) MAC
-                    sequence_number=mac_mobility_seq))
+                    flags=1 if is_static else 0, # 0x1 = sticky (static) MAC
+                    sequence_number=mac_mobility_seq if not is_static else 0))
 
             pattrs[BGP_ATTR_TYPE_EXTENDED_COMMUNITIES] = \
                 BGPPathAttributeExtendedCommunities(communities=communities)

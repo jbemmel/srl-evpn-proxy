@@ -308,6 +308,11 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             # RFC talks about different ESI as reason for mobility seq inc
             # We have ESI 0 == single homed
             mobility_seq = cur['seq'] + 1
+
+            #
+            # If this is the last MAC route for this VTEP, could also remove the VRF
+            # and withdraw the multicast route? (for dynamically added VRFs)
+            #
             bgp_speaker.evpn_prefix_del(
               route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
               route_dist=f"{cur['vtep']}:{params['evi']}", # original RD
