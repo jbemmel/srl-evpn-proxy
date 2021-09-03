@@ -239,6 +239,12 @@ This could be avoided by running the EVPN proxy on every SRL node.
 * EVPN proxy requires VXLAN traffic to be sent to the SRL node, and hence should only be provisioned for mac-vrfs with bgp-evpn that are configured (not arbitrary VNIDs). The YANG model hooks are added (proxy=true), but currently not used; a specific EVI and VNID list must be configured instead.
 * eBPF ARP filter could reduce packets sent to userspace by implementing a hashmap of ARPs already forwarded; the Python userspace could program a list of EVPN VTEPs to ignore
 
+# EVPN MAC Mobility
+EVPN MAC Mobility procedures are defined in [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432#section-7.7) and amounts to adding a sequence number extended community to RT2 updates. Ryu supports the parsing and generation of these attributes, but the code currently does not use them; a patch was created to change that.
+
+## EVPN MAC Mobility in case of multiple proxies
+For redundancy, multiple proxies can be instantiated, and any one of them can assume responsibility for announcing EVPN MAC IP routes as they are discovered. Each proxy will listen for RT2 updates from other proxies, and if an announcement for a MAC with a different VTEP is received with a higher sequence number, the proxy will withdraw its own route.
+
 ## A note on sFlow sampling
 On physical SRL nodes, sFlow sampling could be used to learn MAC/IP routes, instead of eBPF filters. If required and over time, the sampling frequency could be reduced, or a target could be set on the number of VTEPs to discover before transitioning to a forwarding-only mode
 
