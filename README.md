@@ -85,7 +85,7 @@ bgp {
   group leaves {
     route-reflector {
       client true
-      cluster-id 1.1.1.1
+      cluster-id 1.1.1.5
     }
   }
   neighbor 1.1.1.4 {
@@ -108,6 +108,7 @@ experimental-bgp-evpn-proxy
   source-address 1.1.1.4
   vxlan-interface e1-2
   vnis [ ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni} ]
+  vxlan-remoteips [ 1.1.1.1 ]
   evi 57069
   admin-state enable
 
