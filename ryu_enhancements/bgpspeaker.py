@@ -689,7 +689,7 @@ class BGPSpeaker(object):
                         ethernet_tag_id=None, mac_addr=None, ip_addr=None,
                         ip_prefix=None, gw_ip_addr=None, vni=None,
                         next_hop=None, tunnel_type=None, pmsi_tunnel_type=None,
-                        redundancy_mode=None, tunnel_endpoint_ip=None):
+                        redundancy_mode=None, tunnel_endpoint_ip=None, mac_mobility=None):
         """ This method adds a new EVPN route to be advertised.
 
         ``route_type`` specifies one of the EVPN route type name.
@@ -799,6 +799,10 @@ class BGPSpeaker(object):
             # Set tunnel type specific arguments
             if tunnel_type in [TUNNEL_TYPE_VXLAN, TUNNEL_TYPE_NVGRE]:
                 kwargs[EVPN_VNI] = vni
+
+            # JvB: add mac_mobility
+            if mac_mobility is not None:
+                kwargs['mac_mobility'] = mac_mobility
         elif route_type == EVPN_MULTICAST_ETAG_ROUTE:
             kwargs.update({
                 EVPN_ETHERNET_TAG_ID: ethernet_tag_id,
@@ -833,6 +837,10 @@ class BGPSpeaker(object):
             # Set tunnel type specific arguments
             if tunnel_type in [TUNNEL_TYPE_VXLAN, TUNNEL_TYPE_NVGRE]:
                 kwargs[EVPN_VNI] = vni
+
+            # JvB: add mac_mobility
+            if mac_mobility is not None:
+                kwargs['mac_mobility'] = mac_mobility
         else:
             raise ValueError('Unsupported EVPN route type: %s' % route_type)
 

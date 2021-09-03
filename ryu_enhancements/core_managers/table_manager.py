@@ -614,11 +614,12 @@ class TableCoreManager(object):
             # If we do not have any VRF with import RT that match with path RT
             LOG.debug('No VRF table found that imports RTs: %s', path_rts)
 
-    # JvB: added 'tunnel_endpoint_ip'
+    # JvB: added 'tunnel_endpoint_ip' and 'mac_mobility'
     def update_vrf_table(self, route_dist, prefix=None, next_hop=None,
                          route_family=None, route_type=None, tunnel_type=None,
                          is_withdraw=False, redundancy_mode=None,
-                         pmsi_tunnel_type=None, tunnel_endpoint_ip=None, **kwargs):
+                         pmsi_tunnel_type=None, tunnel_endpoint_ip=None,
+                         mac_mobility=None, **kwargs):
         """Update a BGP route in the VRF table identified by `route_dist`
         with the given `next_hop`.
 

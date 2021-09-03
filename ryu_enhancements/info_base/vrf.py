@@ -307,6 +307,16 @@ class VrfTable(Table):
                                        flags=flags,
                                        mpls_label=label_list[0]))
 
+            # JvB: Add MAC Move functionality
+            # see https://datatracker.ietf.org/doc/html/rfc7432#section-7.7
+            mac_mobility_seq = kwargs.get('mac_mobility', None)
+            if mac_mobility_seq is not None:
+                from ryu.lib.packet.bgp import BGPEvpnMacMobilityExtendedCommunity
+                communities.append(BGPEvpnMacMobilityExtendedCommunity(
+                    subtype=0,
+                    flags=0, # 0x1 = sticky (static) MAC
+                    sequence_number=mac_mobility_seq))
+
             pattrs[BGP_ATTR_TYPE_EXTENDED_COMMUNITIES] = \
                 BGPPathAttributeExtendedCommunities(communities=communities)
             if vrf_conf.multi_exit_disc:

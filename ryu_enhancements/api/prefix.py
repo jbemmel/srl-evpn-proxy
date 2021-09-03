@@ -174,6 +174,7 @@ SUPPORTED_PMSI_TUNNEL_TYPES = [
 
 # JvB added argument
 TUNNEL_ENDPOINT_IP = 'tunnel_endpoint_ip'
+MAC_MOBILITY = 'mac_mobility'
 
 @add_bgp_error_metadata(code=PREFIX_ERROR_CODE,
                         sub_code=1,
@@ -362,7 +363,8 @@ def delete_local(route_dist, prefix, route_family=VRF_RF_IPV4):
                        opt_args=[EVPN_ESI, EVPN_ETHERNET_TAG_ID,
                                  REDUNDANCY_MODE, MAC_ADDR, IP_ADDR, IP_PREFIX,
                                  GW_IP_ADDR, EVPN_VNI, TUNNEL_TYPE,
-                                 PMSI_TUNNEL_TYPE,TUNNEL_ENDPOINT_IP])
+                                 PMSI_TUNNEL_TYPE,TUNNEL_ENDPOINT_IP,
+                                 MAC_MOBILITY])
 def add_evpn_local(route_type, route_dist, next_hop, **kwargs):
     """Adds EVPN route from VRF identified by *route_dist*.
     """
