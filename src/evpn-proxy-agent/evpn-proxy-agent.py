@@ -121,6 +121,8 @@ def runBGPThread( state ):
      NEIGHBOR = LOCAL_LOOPBACK
 
   evpn_vteps = {}
+  bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
+
   def best_path_change_handler(event):
       logging.info( f'The best path changed: {event.path}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
@@ -133,7 +135,7 @@ def runBGPThread( state ):
       # Start ARP thread if not already
       if not hasattr(state,'arp_thread') and state.params['vxlan_interface']!="":
          logging.info( "Starting ARP listener thread..." )
-         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps )
+         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps, bgp_vrfs )
 
   def peer_down_handler(remote_ip, remote_as):
       logging.warning( f'Peer DOWN: {remote_ip} {remote_as}' )
@@ -166,9 +168,10 @@ def runBGPThread( state ):
 
   # Add any static VTEPs/VNIs
   for static_vtep in state.params['vxlan_remoteips']:
-      # params['vnis']!='*': enforced by YANG
-     for vni in state.params['vnis']:
-       Add_Static_VTEP( speaker, state.params, static_vtep, vni )
+    # params['vnis']!='*': enforced by YANG
+    for vni in state.params['vnis']:
+       rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
+       bgp_vrfs[ rd ] = static_vtep
 
   while True:
      logging.info( "eventlet sleep loop..." )
@@ -200,8 +203,9 @@ def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
         # Added via patch
         tunnel_endpoint_ip=remote_ip
     )
+    return rd
 
-def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
+def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
     logging.info( f"Starting ARP listener params {params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
@@ -212,7 +216,6 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps ):
     function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
 
     mac_vrfs = {} # Announced MAC VRFs: VTEP IP => { vni: mac table }
-    bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
 
     #create raw socket, bind it to interface
     #attach bpf program to socket created
