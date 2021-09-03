@@ -128,6 +128,9 @@ def runBGPThread( state ):
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
+
+         # TODO in case of multiple proxies, listen for RT2 MAC moves
+
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
   def peer_up_handler(remote_ip, remote_as):
@@ -280,18 +283,32 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
         rd = f"{static_vtep}:{params['evi']}"
 
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
+        mobility_seq = 0
         if vni not in vni_2_mac:
             if rd not in bgp_vrfs:
                Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
                bgp_vrfs[ rd ] = static_vtep
-            mac_table = [ { mac : ip } ]
+            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : 0 } ]
             mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
         else:
             mac_table = vni_2_mac[ vni ]
             if mac in mac_table:
-                logging.info( f"MAC {mac} already announced, skipping" )
-                continue
-            mac_table.update( { mac : ip } )
+                logging.info( f"MAC {mac} already announced, checking for MAC move" )
+                cur = mac_table[ mac ]
+                # TODO various cases: different IP, different VTEP, ...
+                if cur['vtep'] == static_vtep:
+                   logging.info( f"MAC {mac} already announced with VTEP {static_vtep}" )
+                   continue
+                mobility_seq = cur['seq'] + 1
+                bgp_speaker.evpn_prefix_del(
+                  route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
+                  route_dist=rd,
+                  mac_addr=mac,
+                  ip_addr=ip, # TODO for mac-vrf service, omit this?
+                )
+                cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
+            else:
+               mac_table.update( { mac : ip } )
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
@@ -304,7 +321,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
             tunnel_type='vxlan',
             vni=vni,
             gw_ip_addr=static_vtep,
-            mac_mobility=1234 # Sequence number for MAC mobility, TODO use
+            mac_mobility=mobility_seq # Sequence number for MAC mobility
         )
       except Exception as e:
         print( f"Not a valid VXLAN packet? {e}" )
