@@ -311,12 +311,15 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             bgp_speaker.evpn_prefix_del(
               route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
               route_dist=rd,
+              ethernet_tag_id=0,
               mac_addr=mac,
               ip_addr=ip, # TODO for mac-vrf service, omit this?
             )
             # Could add a timestamp (last seen) + aging
+            logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
             cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
         else:
+           logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
            vni_2_mac_vrf.update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
         mac_vrfs[ vni ] = vni_2_mac_vrf
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
