@@ -62,7 +62,7 @@ module srl-evpn-proxy-agent {
               type string;
               default "e1-1";
               description "Interface to listen on for VXLAN ARP packets, default e1-1.
-                           Set to empty string to disable ARP learning";
+                           Set to empty string to disable ARP/VTEP learning";
             }
 
             leaf-list vxlan-remoteips {

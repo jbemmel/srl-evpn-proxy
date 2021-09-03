@@ -129,12 +129,21 @@ def runBGPThread( state ):
   mac_vrfs = {}
 
   def best_path_change_handler(event):
-      logging.info( f'The best path changed: {event.path} prefix={event.prefix}' )
+      logging.info( f'The best path changed: {event.path} prefix={event.prefix} label(VNI)={event.label}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
 
-         # check for RT2 MAC moves
+         # check for RT2 MAC moves between static VTEPs and EVPN VTEPs
+         # Note: In case of multiple proxies, this update can also be from
+         # another proxy -> TODO distinguish?
+
+         vni = event.label
+         if vni is not None:
+             if vni in mac_vrfs:
+                 cur_macs = mac_vrfs[ vni ]
+                 logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
+
          # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
          #    rd = event.path.nlri.route_dist
          #    mac = event.nlri().mac_address()
@@ -302,6 +311,17 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
                    continue
 
                # Could also opt to keep both routes: MAC -> [ip],
+               # Spec says: "If there are multiple IP addresses associated with a MAC address,
+               # then multiple MAC/IP Advertisement routes MUST be generated, one for
+               # each IP address.  For instance, this may be the case when there are
+               # both an IPv4 and an IPv6 address associated with the same MAC address
+               # for dual-IP-stack scenarios.  When the IP address is dissociated with
+               # the MAC address, then the MAC/IP Advertisement route with that
+               # particular IP address MUST be withdrawn."
+               #
+               # For the purpose of this EVPN proxy application (L2 reachability)
+               # it is sufficient to keep 1 IP address association
+
                # Maybe keep track of sequence number per IP, with newer ones having a higher sequence?
                logging.info( f"IP change detected: {cur['ip']}->{ip}, updating EVPN" )
 
@@ -334,7 +354,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             esi=0, # Single homed
             ethernet_tag_id=0,
             mac_addr=mac,
-            ip_addr=ip, # TODO for mac-vrf service, omit this?
+            ip_addr=ip, # Enables remote peers to perform proxy ARP
             next_hop=static_vtep, # on behalf of remote VTEP
             tunnel_type='vxlan',
             vni=vni,
