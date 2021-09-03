@@ -245,6 +245,20 @@ EVPN MAC Mobility procedures are defined in [RFC7432](https://datatracker.ietf.o
 ## EVPN MAC Mobility in case of multiple proxies
 For redundancy, multiple proxies can be instantiated, and any one of them can assume responsibility for announcing EVPN MAC IP routes as they are discovered. Each proxy will listen for RT2 updates from other proxies, and if an announcement for a MAC with a different VTEP is received with a higher sequence number, the proxy will withdraw its own route.
 
+## Testing MAC Mobility
+We can test MAC mobility by assigning the MAC of H1 to H2, and then ping from H2 to H3:
+```
+MAC=`docker exec -it clab-static-vxlan-lab-h1 ip a show dev eth1 | awk '/ether/{ print $2 }' | head -1`
+docker exec -it clab-static-vxlan-lab-h2 ip link set address $MAC dev eth1
+docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.103 -c2
+```
+
+Similarly, we can move the MAC to EVPN (H4 attached to SRL2) and repeat the test:
+```
+docker exec -it clab-static-vxlan-lab-h4 ip link set address $MAC dev eth1
+docker exec -it clab-static-vxlan-lab-h4 ping 10.0.0.103 -c2
+```
+
 ## A note on sFlow sampling
 On physical SRL nodes, sFlow sampling could be used to learn MAC/IP routes, instead of eBPF filters. If required and over time, the sampling frequency could be reduced, or a target could be set on the number of VTEPs to discover before transitioning to a forwarding-only mode
 
