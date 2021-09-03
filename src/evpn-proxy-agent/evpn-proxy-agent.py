@@ -154,6 +154,14 @@ def runBGPThread( state ):
                                peer_up_handler=peer_up_handler,
                                peer_down_handler=peer_down_handler)
 
+     # Add any static VTEPs/VNIs, before starting ARP thread
+     for v in state.params['vxlan_remoteips']:
+       static_vtep = v['value']
+       # params['vnis']!='*': enforced by YANG (TODO)
+       for vni in state.params['vnis']:
+         rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
+         bgp_vrfs[ rd ] = static_vtep
+
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
      # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
      speaker.neighbor_add( NEIGHBOR,
@@ -165,14 +173,6 @@ def runBGPThread( state ):
      # After connecting to BGP peer, start ARP thread (in different netns)
      eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
   # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
-
-  # Add any static VTEPs/VNIs
-  for v in state.params['vxlan_remoteips']:
-    static_vtep = v['value']
-    # params['vnis']!='*': enforced by YANG
-    for vni in state.params['vnis']:
-       rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
-       bgp_vrfs[ rd ] = static_vtep
 
   while True:
      logging.info( "eventlet sleep loop..." )
