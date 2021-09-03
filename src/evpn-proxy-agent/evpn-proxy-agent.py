@@ -122,6 +122,7 @@ def runBGPThread( state ):
 
   evpn_vteps = {}
   bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
+  mac_vrfs = {} # Announced MAC VRFs: VTEP IP => { vni: mac table }
 
   def best_path_change_handler(event):
       logging.info( f'The best path changed: {event.path}' )
@@ -132,7 +133,12 @@ def runBGPThread( state ):
          # check for RT2 MAC moves
          if event.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
             mac = event.nlri.mac_address
-            logging.info( f"TODO: Check MAC {mac}" )
+            logging.info( f"Check MAC {mac}" )
+            if mac in mac_vrfs:
+                cur = mac_vrfs[mac]
+                logging.info( f"Known/advertised MAC: {mac}={cur}" )
+            else:
+                logging.info( f"MAC {mac} not found locally" )
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
@@ -141,7 +147,7 @@ def runBGPThread( state ):
       # Start ARP thread if not already
       if not hasattr(state,'arp_thread') and state.params['vxlan_interface']!="":
          logging.info( "Starting ARP listener thread..." )
-         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps, bgp_vrfs )
+         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps, bgp_vrfs, mac_vrfs )
 
   def peer_down_handler(remote_ip, remote_as):
       logging.warning( f'Peer DOWN: {remote_ip} {remote_as}' )
@@ -212,7 +218,7 @@ def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
     )
     return rd
 
-def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
+def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
     logging.info( f"Starting ARP listener params {params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
@@ -221,8 +227,6 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
     #more info about eBPF program types
     #http://man7.org/linux/man-pages/man2/bpf.2.html
     function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
-
-    mac_vrfs = {} # Announced MAC VRFs: VTEP IP => { vni: mac table }
 
     #create raw socket, bind it to interface
     #attach bpf program to socket created
