@@ -253,6 +253,7 @@ MAC=\`docker exec -it clab-static-vxlan-lab-h1 ip a show dev eth1 | awk '/ether/
 docker exec -it clab-static-vxlan-lab-h2 ip link set address \$MAC dev eth1
 docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.103 -c2
 EOF
+chmod +x ./test_mac_move.sh 
 bash -c ./test_mac_move.sh
 ```
 
