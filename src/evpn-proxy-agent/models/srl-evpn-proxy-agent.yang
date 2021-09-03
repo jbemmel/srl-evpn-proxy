@@ -69,9 +69,10 @@ module srl-evpn-proxy-agent {
               type srl_nokia-comm:ipv4-address;
               description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
 
-              must "count( ../vnis ) > 0" {
-                error-message "Must provision a static list of VNIs for static VTEP IP(s)";
-              }
+              // count() function not supported
+              // must "count( ../vnis ) > 0" {
+              //  error-message "Must provision a static list of VNIs for static VTEP IP(s)";
+              // }
             }
 
             leaf local-as {
