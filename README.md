@@ -76,9 +76,9 @@ From 10.0.0.101 icmp_seq=2 Destination Host Unreachable
 pipe 2
 ```
 
-The EVPN VTEPs [have been added to the static configuration](https://github.com/jbemmel/srl-evpn-proxy/blob/main/cumulus1_interfaces#L44) and static underlay routes make them reachable, however return traffic gets dropped on the SRL nodes as there is no valid route.
+The EVPN VTEPs [have been added to the static configuration](https://github.com/jbemmel/srl-evpn-proxy/blob/main/labs/spine-leaf/cumulus1_interfaces#L42) and static underlay routes make them reachable, however return traffic gets dropped on the SRL nodes as there is no valid route.
 
-We can enable the EVPN proxy on SRL1:
+We can enable the EVPN proxy on SRL1 (or SRL2, or both):
 ```
 enter candidate
 /network-instance default protocols 
@@ -117,7 +117,7 @@ experimental-bgp-evpn-proxy
 
 commit stay
 ```
-This configures SRL1 to be a route reflector too, such that it will update SRL2 with any proxy routes. If we now retry the ping:
+This configures the local SRL node to be a route reflector too, such that it will update other EVPN VTEPs with any proxy routes. If we now retry the ping:
 ```
 commit stay                                                                                                                                                                                                        
 Lookup state path=${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni} _root=/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress parts=['', 'tunnel-interface[name=vxlan0]', 'vxlan-interface[index=0]', 'ingress', 'vni']
