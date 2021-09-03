@@ -246,11 +246,13 @@ EVPN MAC Mobility procedures are defined in [RFC7432](https://datatracker.ietf.o
 For redundancy, multiple proxies can be instantiated, and any one of them can assume responsibility for announcing EVPN MAC IP routes as they are discovered. Each proxy will listen for RT2 updates from other proxies, and if an announcement for a MAC with a different VTEP is received with a higher sequence number, the proxy will withdraw its own route.
 
 ## Testing MAC Mobility
-We can test MAC mobility by assigning the MAC of H1 to H2, and then ping from H2 to H3:
+We can test MAC mobility by swapping the MACs of H1 and H2, and then ping from H2 to H3:
 ```bash
 cat > test_mac_move.sh << EOF
-MAC=\`docker exec -it clab-static-vxlan-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
-docker exec -it clab-static-vxlan-lab-h2 ip link set address \$MAC dev eth1
+MAC1=\`docker exec -it clab-static-vxlan-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+MAC2=\`docker exec -it clab-static-vxlan-lab-h2 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+docker exec -it clab-static-vxlan-lab-h1 ip link set address \$MAC2 dev eth1
+docker exec -it clab-static-vxlan-lab-h2 ip link set address \$MAC1 dev eth1
 docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.103 -c2
 EOF
 chmod +x ./test_mac_move.sh 
