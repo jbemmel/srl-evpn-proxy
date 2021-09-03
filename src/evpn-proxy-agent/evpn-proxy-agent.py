@@ -310,7 +310,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             mobility_seq = cur['seq'] + 1
             bgp_speaker.evpn_prefix_del(
               route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-              route_dist=rd,
+              route_dist=f"{cur['vtep']}:{params['evi']}", # original RD
               ethernet_tag_id=0,
               mac_addr=mac,
               ip_addr=ip, # TODO for mac-vrf service, omit this?
