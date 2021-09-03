@@ -129,7 +129,10 @@ def runBGPThread( state ):
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
 
-         # TODO in case of multiple proxies, listen for RT2 MAC moves
+         # check for RT2 MAC moves
+         if event.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
+            mac = event.nlri.mac_address
+            logging.info( f"TODO: Check MAC {mac}" )
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
@@ -283,13 +286,13 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
         rd = f"{static_vtep}:{params['evi']}"
 
         vni_2_mac = mac_vrfs[ static_vtep ] if static_vtep in mac_vrfs else {}
-        mobility_seq = 0
+        mobility_seq = None # First time: no attribute
         if vni not in vni_2_mac:
             # TODO check if other proxy is announcing it
             if rd not in bgp_vrfs:
                Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
                bgp_vrfs[ rd ] = static_vtep
-            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : 0 } ]
+            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : -1 } ]
             mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
         else:
             mac_table = vni_2_mac[ vni ]
@@ -300,6 +303,9 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
                 if cur['vtep'] == static_vtep:
                    logging.info( f"MAC {mac} already announced with VTEP {static_vtep}" )
                    continue
+
+                # RFC talks about different ESI as reason for mobility seq inc
+                # We have ESI 0 == single homed
                 mobility_seq = cur['seq'] + 1
                 bgp_speaker.evpn_prefix_del(
                   route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
@@ -314,7 +320,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
             route_dist=rd,
-            esi=0,
+            esi=0, # Single homed
             ethernet_tag_id=0,
             mac_addr=mac,
             ip_addr=ip, # TODO for mac-vrf service, omit this?
