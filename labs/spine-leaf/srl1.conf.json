@@ -1400,9 +1400,6 @@
           "name": "ethernet-1/1.0"
         },
         {
-          "name": "ethernet-1/2.0"
-        },
-        {
           "name": "lo0.0"
         },
         {
@@ -1428,12 +1425,15 @@
               },
               "evpn": {
                 "admin-state": "enable"
+              },
+              "transport": {
+               "local-address": "1.1.1.5"
               }
             }
           ],
           "neighbor": [
             {
-              "peer-address": "192.168.0.1",
+              "peer-address": "1.1.1.7",
               "admin-state": "enable",
               "peer-group": "leaves"
             }
