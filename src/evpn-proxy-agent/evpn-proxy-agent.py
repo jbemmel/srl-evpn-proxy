@@ -129,14 +129,14 @@ def runBGPThread( state ):
   mac_vrfs = {}
 
   def best_path_change_handler(event):
-      logging.info( f'The best path changed: {event.path}' )
+      logging.info( f'The best path changed: {event.path} prefix={event.prefix}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
 
          # check for RT2 MAC moves
-         # if event.nlri().type == EVPN_MAC_IP_ADV_ROUTE:
-         #    rd = event.nlri().route_dist()
+         # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
+         #    rd = event.path.nlri.route_dist
          #    mac = event.nlri().mac_address()
          #    logging.info( f"Check MAC {mac} for RD {rd}" )
             # TODO get VNI from label - how?
