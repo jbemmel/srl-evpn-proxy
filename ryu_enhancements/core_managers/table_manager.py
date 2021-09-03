@@ -710,6 +710,7 @@ class TableCoreManager(object):
         return vrf_table.insert_vrf_path(
             nlri=prefix, next_hop=next_hop, gen_lbl=gen_lbl,
             is_withdraw=is_withdraw, redundancy_mode=redundancy_mode,
+            mac_mobility=mac_mobility,
             vni=vni, tunnel_type=tunnel_type,
             pmsi_tunnel_type=pmsi_tunnel_type)
 
