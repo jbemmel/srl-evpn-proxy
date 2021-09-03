@@ -293,7 +293,6 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
                 continue
             mac_table.update( { mac : ip } )
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
-        # TODO add RT as extended community?
         bgp_speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
             route_dist=rd,
@@ -305,6 +304,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs ):
             tunnel_type='vxlan',
             vni=vni,
             gw_ip_addr=static_vtep,
+            mac_mobility=1234 # Sequence number for MAC mobility, TODO use
         )
       except Exception as e:
         print( f"Not a valid VXLAN packet? {e}" )
