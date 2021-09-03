@@ -135,10 +135,10 @@ def runBGPThread( state ):
          evpn_vteps[ event.nexthop ] = event.remote_as
 
          # check for RT2 MAC moves
-         if event.nlri().type == EVPN_MAC_IP_ADV_ROUTE:
-            rd = event.nlri().route_dist()
-            mac = event.nlri().mac_address()
-            logging.info( f"Check MAC {mac} for RD {rd}" )
+         # if event.nlri().type == EVPN_MAC_IP_ADV_ROUTE:
+         #    rd = event.nlri().route_dist()
+         #    mac = event.nlri().mac_address()
+         #    logging.info( f"Check MAC {mac} for RD {rd}" )
             # TODO get VNI from label - how?
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
@@ -337,7 +337,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             mac_mobility=mobility_seq # Sequence number for MAC mobility
         )
       except Exception as e:
-        print( f"Not a valid VXLAN packet? {e}" )
+        logging.error( f"Error processing ARP: {e}" )
           # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
         # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
         # print( f'trace_fields: {msg}' )
