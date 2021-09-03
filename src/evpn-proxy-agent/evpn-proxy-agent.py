@@ -291,12 +291,20 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
            bgp_vrfs[ rd ] = static_vtep
 
         if mac in vni_2_mac_vrf:
-            logging.info( f"MAC {mac} already announced, checking for MAC move" )
             cur = vni_2_mac_vrf[ mac ]
+            logging.info( f"MAC {mac} already announced: {cur}, checking for MAC move" )
             # TODO various cases: different IP, different VTEP, ...
             if cur['vtep'] == static_vtep:
                logging.info( f"VNI {vni}: MAC {mac} already announced with VTEP {static_vtep}" )
-               continue
+
+               # If IP remains the same, do nothing
+               if cur['ip'] == ip:
+                   continue
+
+               # Could also opt to keep both routes: MAC -> [ip],
+               # Maybe keep track of sequence number per IP, with newer ones having a higher sequence?
+               logging.info( f"IP change detected: {cur['ip']}->{ip}, updating EVPN" )
+
             # RFC talks about different ESI as reason for mobility seq inc
             # We have ESI 0 == single homed
             mobility_seq = cur['seq'] + 1
@@ -305,11 +313,11 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
               route_dist=f"{cur['vtep']}:{params['evi']}", # original RD
               ethernet_tag_id=0,
               mac_addr=mac,
-              ip_addr=ip, # TODO for mac-vrf service, omit this?
+              ip_addr=cur['ip'], # Use announced IP
             )
             # Could add a timestamp (last seen) + aging
             logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
-            cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
+            cur.update( { 'vtep' : static_vtep, 'ip': ip, 'seq' : mobility_seq } )
         else:
            logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
            vni_2_mac_vrf.update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
