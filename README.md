@@ -35,19 +35,20 @@ The Python userspace program receives filtered VXLAN ARP packets and uses BGP EV
 As it was found that Ryu implicitly assumes the sending endpoint is also the tunnel endpoint, [some minor changes](https://github.com/jbemmel/srl-evpn-proxy/tree/main/ryu_enhancements) had to be made to allow for arbitrary tunnel endpoint IPs in multicast routes.
 
 # Lab prototype demo
-Using [Containerlab](https://containerlab.srlinux.dev/), the topology described above is easily deployed:
+Using [Containerlab](https://containerlab.srlinux.dev/), the following topology can be deployed:
+![plot](images/EVPN_proxy_lab_with_spine.png)
 
 ```
 git clone & make https://github.com/jbemmel/containerlab.git to get a customized containerlab binary with agent support
 git clone & make https://github.com/jbemmel/srl-baseimage
 make # to build the custom 'srl/evpn-proxy-agent' Docker container
-containerlab deploy -t static-vxlan.lab
+cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
 ```
-
+All VXLAN traffic is forwarded via a single spine.
 Out of the box, the EVPN proxy agent is disabled; h1 can ping h2 and h3 can ping h4 (after giving the nodes enough time to boot):
 
 ```
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h1 ping 10.0.0.102 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.102 -c2
 PING 10.0.0.102 (10.0.0.102) 56(84) bytes of data.
 64 bytes from 10.0.0.102: icmp_seq=1 ttl=64 time=2.35 ms
 64 bytes from 10.0.0.102: icmp_seq=2 ttl=64 time=6.27 ms
@@ -55,7 +56,7 @@ PING 10.0.0.102 (10.0.0.102) 56(84) bytes of data.
 --- 10.0.0.102 ping statistics ---
 2 packets transmitted, 2 received, 0% packet loss, time 2ms
 rtt min/avg/max/mdev = 2.351/4.312/6.274/1.962 ms
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h3 ping 10.0.0.104 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h3 ping 10.0.0.104 -c2
 PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 64 bytes from 10.0.0.104: icmp_seq=1 ttl=64 time=0.975 ms
 64 bytes from 10.0.0.104: icmp_seq=2 ttl=64 time=0.958 ms
@@ -65,7 +66,7 @@ PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 rtt min/avg/max/mdev = 0.958/0.966/0.975/0.032 ms
 
 # Cannot ping from static to EVPN VTEP
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h1 ping 10.0.0.103 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.103 -c2
 PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 From 10.0.0.101 icmp_seq=1 Destination Host Unreachable
 From 10.0.0.101 icmp_seq=2 Destination Host Unreachable
@@ -124,8 +125,8 @@ root=/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress leaf=vni ->
 All changes have been committed. Starting new transaction.
 --{ + candidate shared default }--[ network-instance default protocols experimental-bgp-evpn-proxy ]--                                                                                                             
 A:srl1# quit                                                                                                                                                                                                       
-Connection to clab-static-vxlan-lab-srl1 closed.
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h1 ping 10.0.0.103 -c2
+Connection to clab-static-vxlan-spine-lab-srl1 closed.
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.103 -c2
 PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 64 bytes from 10.0.0.103: icmp_seq=1 ttl=64 time=1038 ms
 64 bytes from 10.0.0.103: icmp_seq=2 ttl=64 time=5.96 ms
@@ -137,7 +138,7 @@ rtt min/avg/max/mdev = 5.960/521.770/1037.581/515.811 ms, pipe 2
 
 Looking at the EVPN routes received from the custom proxy application:
 ```
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ ssh admin@clab-static-vxlan-lab-srl1
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ ssh admin@clab-static-vxlan-spine-lab-srl1
 Warning: Permanently added 'clab-static-vxlan-lab-srl1,2001:172:20:20::3' (ECDSA) to the list of known hosts.
 Last login: Tue Aug 24 22:04:55 2021 from 2001:172:20:20::1
 Using configuration file(s): ['/home/admin/.srlinuxrc']
@@ -209,7 +210,7 @@ rtt min/avg/max/mdev = 2.393/18.640/34.888/16.248 ms
 
 In case a host first tries to reach H4 without trying H3, the datapath will not work; a multicast route must first be established. Without a specific MAC/IP route, traffic will still get flooded until the proxy on SRL1 learns the correct VTEP:
 ```
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.104 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h2 ping 10.0.0.104 -c2
 PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 64 bytes from 10.0.0.104: icmp_seq=1 ttl=64 time=2068 ms
 64 bytes from 10.0.0.104: icmp_seq=2 ttl=64 time=1043 ms
@@ -217,14 +218,14 @@ PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 --- 10.0.0.104 ping statistics ---
 2 packets transmitted, 2 received, 0% packet loss, time 26ms
 rtt min/avg/max/mdev = 1042.896/1555.218/2067.540/512.322 ms, pipe 2
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.103 -c1
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h2 ping 10.0.0.103 -c1
 PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 64 bytes from 10.0.0.103: icmp_seq=1 ttl=64 time=2.31 ms
 
 --- 10.0.0.103 ping statistics ---
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
 rtt min/avg/max/mdev = 2.306/2.306/2.306/0.000 ms
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h2 ping 10.0.0.104 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h2 ping 10.0.0.104 -c2
 PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 64 bytes from 10.0.0.104: icmp_seq=1 ttl=64 time=3.24 ms
 64 bytes from 10.0.0.104: icmp_seq=2 ttl=64 time=2.63 ms
