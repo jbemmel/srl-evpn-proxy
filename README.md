@@ -9,9 +9,9 @@ The internet and most modern large scale data center designs use dynamic control
 
 ## Option 1: SRL nodes as EVPN proxies
 By configuring an SRL node with the same VTEP tunnel IP and announcing a type 3 EVPN multicast route, we can send return traffic to static VXLAN endpoints.
-However, as there is no data plane MAC learning, all MACs residing on such endpoints are effectively "unknown" as far as SRL is concerned, hence every packet to such MACs gets flooded to every VTEP in the fabric. Not very elegant nor practical.
+However, as there is no data plane MAC learning, all MACs residing on such endpoints are effectively "unknown" as far as SRL is concerned, hence every packet to such MACs gets flooded to every VTEP in the fabric. This may be acceptible for point-to-point connections, but for point-to-multipoint this quickly becomes inefficient.
 
-# Solution: Implement an EVPN proxy agent
+# Dynamic learning solution: An EVPN proxy agent
 By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
 
 This Github repo implements such an approach, using the following components:
