@@ -296,7 +296,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             if rd not in bgp_vrfs:
                Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
                bgp_vrfs[ rd ] = static_vtep
-            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : -1 } ]
+            mac_table = [ { mac : { 'ip' : ip, 'vtep' : static_vtep, 'seq' : -1 } } ]
             mac_vrfs[ static_vtep ] = vni_2_mac = { vni: mac_table }
         else:
             mac_table = vni_2_mac[ vni ]
