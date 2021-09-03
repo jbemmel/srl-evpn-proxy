@@ -85,10 +85,10 @@ bgp {
   group leaves {
     route-reflector {
       client true
-      cluster-id 1.1.1.5
+      cluster-id ${/network-instance[name=default]/protocols/bgp/router-id}
     }
   }
-  neighbor 1.1.1.4 {
+  neighbor ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]} {
     description "Local EVPN proxy agent"
     admin-state enable
     peer-group leaves
@@ -105,7 +105,7 @@ bgp {
 experimental-bgp-evpn-proxy
   local-as 65000
   peer-as 65000
-  source-address 1.1.1.4
+  source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   vxlan-interface e1-2
   vnis [ ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni} ]
   vxlan-remoteips [ 1.1.1.1 ]
