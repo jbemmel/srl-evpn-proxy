@@ -143,15 +143,15 @@ def runBGPThread( state ):
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
-  def peer_up_handler(remote_ip, remote_as):
-      logging.warning( f'Peer UP: {remote_ip} {remote_as}' )
+  def peer_up_handler(router_id, remote_as):
+      logging.warning( f'Peer UP: {router_id} {remote_as}' )
       # Start ARP thread if not already
       if not hasattr(state,'arp_thread') and state.params['vxlan_interface']!="":
          logging.info( "Starting ARP listener thread..." )
          state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps, bgp_vrfs, mac_vrfs )
 
-  def peer_down_handler(remote_ip, remote_as):
-      logging.warning( f'Peer DOWN: {remote_ip} {remote_as}' )
+  def peer_down_handler(router_id, remote_as):
+      logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
   # need to create socket on localhost on a non-default port, not port 179
   # Need to connect from loopback IP, not 127.0.0.x
   # Router ID is used as tunnel endpoint in BGP UPDATEs
@@ -266,19 +266,11 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
         if _ip.src in evpn_vteps:
            logging.info( "ARP from EVPN VTEP -> ignoring" )
            continue
-        elif _ip.dst in evpn_vteps: # typically == us, always?
+        elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
            static_vtep = _ip.src
-           if _arp.opcode == 1:
-             mac = _arp.src_mac
-             ip = _arp.src_ip
-             logging.info( f"ARP request from static VTEP: {mac} {ip}" )
-           elif _arp.opcode == 2:
-             mac = _arp.dst_mac
-             ip = _arp.dst_ip
-             logging.info( f"ARP response from static VTEP: {mac} {ip}" )
-           else:
-             logging.info( f"ARP with unsupported opcode: {_arp.opcode} -> ignoring" )
-             continue
+           mac = _arp.src_mac # Same field in both request and response packets
+           ip = _arp.src_ip
+           logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from static VTEP: {mac} {ip}" )
         else:
            logging.info( f"ARP packet:neither src={_ip.src} nor dst={_ip.dst} is EVPN vtep? {evpn_vteps}" )
            continue;
