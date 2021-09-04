@@ -244,7 +244,46 @@ This could be avoided by running the EVPN proxy on every SRL node.
 EVPN MAC Mobility procedures are defined in [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432#section-7.7) and amount to adding a sequence number extended community to RT2 updates. Ryu supports the parsing and generation of these attributes, but the code currently does not use them; a patch was created to change that.
 
 ## EVPN MAC Mobility in case of multiple proxies
-For redundancy, multiple proxies can be instantiated, and any one of them can assume responsibility for announcing EVPN MAC IP routes as they are discovered. Each proxy will listen for RT2 updates from other proxies, and if an announcement for a MAC with a different VTEP is received with a higher sequence number, the proxy will withdraw its own route.
+For redundancy, multiple proxies can be instantiated, and any one of them can assume responsibility for announcing EVPN MAC IP routes as they are discovered. Each proxy will listen for RT2 updates from other proxies, and if an announcement for a MAC with a different VTEP is received (TODO: with a higher sequence number? currently always), the proxy will withdraw its own route.
+
+Each proxy uses its own IP as originator when sending the RT3 multicast route; this allows EVPN peers to pick the best route consistently.
+For example, with an EVPN proxy running locally at 1.1.1.6, SRL2 picks the routes from the proxy at SRL1 due to its lower originator IP
+```
+A:srl2# show network-instance default protocols bgp neighbor 1.1.1.5 received-routes evpn                                                                                                                          
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Peer        : 1.1.1.5, remote AS: 65000, local AS: 65000
+Type        : static
+Description : None
+Group       : leaves
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Status codes: u=used, *=valid, >=best, x=stale
+Origin codes: i=IGP, e=EGP, ?=incomplete
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 2 MAC-IP Advertisement Routes
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+| Status |     Route-distinguisher      |   Tag-ID   |    MAC-address    |          IP-address          |           Next-Hop           |             MED              | LocPref |             Path             |
++========+==============================+============+===================+==============================+==============================+==============================+=========+==============================+
+| u*>    | 1.1.1.1:57069                | 0          | AA:C1:AB:1D:2C:6E | 10.0.0.101                   | 1.1.1.1                      | -                            | 100     |                              |
+| u*>    | 1.1.1.2:57069                | 0          | AA:C1:AB:DC:39:CE | 10.0.0.102                   | 1.1.1.2                      | -                            | 100     |                              |
+| u*>    | 1.1.1.5:57069                | 0          | AA:C1:AB:9C:80:6C | 0.0.0.0                      | 1.1.1.5                      | -                            | 100     |                              |
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 3 Inclusive Multicast Ethernet Tag Routes
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+--------------------------------------+
+| Status |         Route-distinguisher          |   Tag-ID   |    Originator-IP    |               Next-Hop               |                 MED                  | LocPref |                 Path                 |
++========+======================================+============+=====================+======================================+======================================+=========+======================================+
+| u*>    | 1.1.1.1:57069                        | 0          | 1.1.1.4             | 1.1.1.1                              | -                                    | 100     |                                      |
+| u*>    | 1.1.1.2:57069                        | 0          | 1.1.1.4             | 1.1.1.2                              | -                                    | 100     |                                      |
+| u*>    | 1.1.1.5:57069                        | 0          | 1.1.1.5             | 1.1.1.5                              | -                                    | 100     |                                      |
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+--------------------------------------+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+0 Ethernet Auto-Discovery routes 0 used, 0 valid
+3 MAC-IP Advertisement routes 3 used, 3 valid
+3 Inclusive Multicast Ethernet Tag routes 3 used, 3 valid
+0 Ethernet Segment routes 0 used, 0 valid
+0 IP Prefix routes 0 used, 0 valid
+```
+The above also provides insight into which routes are 'native' EVPN ( next hop == originator IP ), and which ones are proxied
 
 ## Testing MAC Mobility
 We can test MAC mobility by swapping the MACs of H1 and H2, and then ping from H2 to H3:
