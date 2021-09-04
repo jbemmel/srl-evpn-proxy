@@ -106,6 +106,15 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
+def WithdrawRoute( bgp_speaker, rd, mac, ip ):
+    bgp_speaker.evpn_prefix_del(
+      route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
+      route_dist=rd, # original RD
+      ethernet_tag_id=0,
+      mac_addr=mac,
+      ip_addr=ip
+    )
+
 #
 # Runs BGP EVPN as a separate thread>, using Ryu hub
 #
@@ -127,7 +136,7 @@ def runBGPThread( state ):
   # we can organize MAC tables per VXLAN VNI (24-bit)
   # mac_vrfs: { vni: { mac: { vtep, sequence_number } } }
   mac_vrfs = {}
-
+  speaker = None # Created below
   def best_path_change_handler(event):
       logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
@@ -143,12 +152,14 @@ def runBGPThread( state ):
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
              logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
-
-         # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
-         #    rd = event.path.nlri.route_dist
-         #    mac = event.nlri().mac_address()
-         #    logging.info( f"Check MAC {mac} for RD {rd}" )
-            # TODO get VNI from label - how?
+             mac = event.prefix.mac_addr
+             if mac in cur_macs:
+                 cur = cur_macs[ mac ]
+                 if cur['vtep'] != event.nexthop:
+                     logging.info( f"EVPN MAC-move detected {cur['vtep']} -> {event.nexthop}" )
+                     WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
+                     logging.info( f"Removing MAC from EVPN proxy: {mac}" )
+                     del cur_macs[ mac ]
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
 
@@ -333,13 +344,8 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             # If this is the last MAC route for this VTEP, could also remove the VRF
             # and withdraw the multicast route? (for dynamically added VRFs)
             #
-            bgp_speaker.evpn_prefix_del(
-              route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-              route_dist=f"{cur['vtep']}:{params['evi']}", # original RD
-              ethernet_tag_id=0,
-              mac_addr=mac,
-              ip_addr=cur['ip'], # Use announced IP
-            )
+            WithdrawRoute(bgp_speaker,f"{cur['vtep']}:{params['evi']}",mac,cur['ip'])
+
             # Could add a timestamp (last seen) + aging
             logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
             cur.update( { 'vtep' : static_vtep, 'ip': ip, 'seq' : mobility_seq } )
