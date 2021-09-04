@@ -97,6 +97,12 @@ module srl-evpn-proxy-agent {
               description "Local preference to use for advertising EVPN MAC routes, default 100";
             }
 
+            leaf include-ip {
+              type boolean;
+              default true;
+              description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
+            }
+
             leaf-list vnis {
               description "Optional list of VNIs to proxy for, defaults to any detected";
               type uint32 {
