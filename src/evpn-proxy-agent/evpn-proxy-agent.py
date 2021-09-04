@@ -53,6 +53,8 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
 
+from ryu.lib.packet.bgp import EvpnNLRI, BGP_ATTR_TYPE_ORIGINATOR_ID
+
 # Ryu has its own threading model
 from ryu.lib import hub
 
@@ -134,20 +136,29 @@ def runBGPThread( state ):
 
   # Since this application only supports single homed endpoints, the ESI=0 and
   # we can organize MAC tables per VXLAN VNI (24-bit)
-  # mac_vrfs: { vni: { mac: { vtep, sequence_number } } }
+  # mac_vrfs: { vni: { mac: { vtep, last known ip, sequence_number } } }
   mac_vrfs = {}
   speaker = None # Created below
   def best_path_change_handler(event):
-      logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
+    logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
+
+    try:
+      # Could remove VTEP IP upon withdraw too
       if not event.is_withdraw:
-         evpn_vteps[ event.nexthop ] = event.remote_as
+         if event.path.nlri.type == EvpnNLRI.INCLUSIVE_MULTICAST_ETHERNET_TAG:
+            originator_id = event.path.get_pattr(BGP_ATTR_TYPE_ORIGINATOR_ID)
+
+            # SRL EVPN VTEP does not normally include an 'originator' attribute
+            if originator_id and originator_id.value != event.nexthop:
+               logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
+            else:
+               logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
+               evpn_vteps[ event.nexthop ] = event.remote_as
 
          # check for RT2 MAC moves between static VTEPs and EVPN VTEPs
-         # Note: In case of multiple proxies, this update can also be from
-         # another proxy -> TODO distinguish?
          # event.label is reduced to the 20-bit MPLS label
-         if hasattr( event.path.nlri, 'vni'):
+         elif hasattr( event.path.nlri, 'vni'):
            vni = event.path.nlri.vni
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
@@ -162,8 +173,12 @@ def runBGPThread( state ):
                      WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
                      logging.info( f"Removing MAC from EVPN proxy: {mac}" )
                      del cur_macs[ mac ]
+         else:
+           logging.info( "Not multicast and no VNI -> ignoring" )
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
+    except Exception as ex:
+      logging.error( f"Exception in best_path_change_handler: {ex}" )
 
   def peer_up_handler(router_id, remote_as):
       logging.warning( f'Peer UP: {router_id} {remote_as}' )
@@ -178,6 +193,12 @@ def runBGPThread( state ):
   # Need to connect from loopback IP, not 127.0.0.x
   # Router ID is used as tunnel endpoint in BGP UPDATEs
   # => Code updated to allow any tunnel endpoint IP
+
+  # During system startup, wait for netns to be created
+  while not os.path.exists('/var/run/netns/srbase-default'):
+     logging.info("Waiting for srbase-default netns to be created...")
+     eventlet.sleep(1)
+
   logging.info("Starting BGP thread in srbase-default netns...")
   # Requires root permissions
   with netns.NetNS(nsname="srbase-default"):
@@ -286,7 +307,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             logging.info( f"VNI not enabled for proxy EVPN: {vni}" )
             continue;
         if _ip.src in evpn_vteps:
-           logging.info( "ARP from EVPN VTEP -> ignoring" )
+           logging.info( f"ARP from EVPN VTEP {_ip.src} -> ignoring" )
            continue
         elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
            static_vtep = _ip.src
