@@ -152,7 +152,7 @@ def runBGPThread( state ):
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
              logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
-             mac = event.prefix.mac_addr
+             mac = event.path.nlri.mac_addr
              if mac in cur_macs:
                  cur = cur_macs[ mac ]
                  if cur['vtep'] != event.nexthop:
