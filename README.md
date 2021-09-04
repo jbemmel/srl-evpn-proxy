@@ -198,7 +198,7 @@ Meaning SRL1 received an ARP request sent by static VTEP 1.1.1.1 (CVX1), the VNI
 
 Once SRL1 learns a MAC/IP route, it sends it to SRL2 such that a ping from H1 to H4 should now work too:
 ```
-jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-lab-h1 ping 10.0.0.104 -c2
+jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.104 -c2
 PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 64 bytes from 10.0.0.104: icmp_seq=1 ttl=64 time=34.9 ms
 64 bytes from 10.0.0.104: icmp_seq=2 ttl=64 time=2.39 ms
