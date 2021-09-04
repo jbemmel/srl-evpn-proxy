@@ -155,6 +155,8 @@ def runBGPThread( state ):
              mac = event.path.nlri.mac_addr
              if mac in cur_macs:
                  cur = cur_macs[ mac ]
+                 # Don't bother checking IP; SRL MAC-VRF doesn't send it
+                 # Only other proxies do
                  if cur['vtep'] != event.nexthop:
                      logging.info( f"EVPN MAC-move detected {cur['vtep']} -> {event.nexthop}" )
                      WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
