@@ -333,7 +333,7 @@ def _cmp_by_local_origin(path1, path2):
 
     # Here we consider prefix from NC as locally originating static route.
     # Hence it is preferred.
-    if path1.source is None:
+    if path1.source is None: # XXX or VRF_TABLE?
         return path1
 
     if path2.source is None:
@@ -421,6 +421,10 @@ def _cmp_by_med(path1, path2):
         return path1
     return path2
 
+def _normalizeSource(path):
+    if path.source is None or path.source == VRF_TABLE:
+        return None
+    return path.source
 
 def _cmp_by_asn(local_asn, path1, path2):
     """Select the path based on source (iBGP/eBGP) peer.
@@ -430,7 +434,7 @@ def _cmp_by_asn(local_asn, path1, path2):
     """
     def get_path_source_asn(path):
         asn = None
-        if path.source is None or path.source == VRF_TABLE:
+        if _normalizeSource(path) is None:
             asn = local_asn
         else:
             asn = path.source.remote_as # BUG happens here, path.source can be a string
@@ -474,7 +478,7 @@ def _cmp_by_router_id(local_asn, path1, path2):
             return path_source.remote_as
 
     def get_router_id(path, local_bgp_id):
-        path_source = path.source
+        path_source = _normalizeSource(path)
         if path_source is None:
             return local_bgp_id
         else:
@@ -483,8 +487,8 @@ def _cmp_by_router_id(local_asn, path1, path2):
                 return originator_id.value
             return path_source.protocol.recv_open_msg.bgp_identifier
 
-    path_source1 = path1.source
-    path_source2 = path2.source
+    path_source1 = _normalizeSource(path1)
+    path_source2 = _normalizeSource(path2)
 
     # If both paths are from NC we have same router Id, hence cannot compare.
     if path_source1 is None and path_source2 is None:
