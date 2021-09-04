@@ -138,7 +138,7 @@ def runBGPThread( state ):
          # Note: In case of multiple proxies, this update can also be from
          # another proxy -> TODO distinguish?
 
-         if event.label != []:
+         if event.label is not None and len(event.label) >= 1:
            vni = event.label[0]
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
