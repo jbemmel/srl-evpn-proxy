@@ -230,7 +230,7 @@ def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
         # esi=0, # should be ignored
         ethernet_tag_id=0,
         # mac_addr='00:11:22:33:44:55', # not relevant for MC route
-        ip_addr=remote_ip, # origin
+        ip_addr=params['source_address'], # originator == proxy IP
         tunnel_type='vxlan',
         vni=vni, # Not sent in advertisement
         gw_ip_addr=remote_ip,
