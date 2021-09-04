@@ -129,7 +129,7 @@ def runBGPThread( state ):
   mac_vrfs = {}
 
   def best_path_change_handler(event):
-      logging.info( f'The best path changed: {event.path} prefix={event.prefix} label(VNI)={event.label}' )
+      logging.info( f'The best path changed: {event.path} prefix={event.prefix} label(s)(incl VNI)={event.label}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
@@ -138,11 +138,11 @@ def runBGPThread( state ):
          # Note: In case of multiple proxies, this update can also be from
          # another proxy -> TODO distinguish?
 
-         vni = event.label
-         if vni is not None:
-             if vni in mac_vrfs:
-                 cur_macs = mac_vrfs[ vni ]
-                 logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
+         if event.label != []:
+           vni = event.label[0]
+           if vni in mac_vrfs:
+             cur_macs = mac_vrfs[ vni ]
+             logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
 
          # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
          #    rd = event.path.nlri.route_dist
