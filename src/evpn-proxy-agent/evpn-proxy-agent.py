@@ -138,13 +138,11 @@ def runBGPThread( state ):
          # Note: In case of multiple proxies, this update can also be from
          # another proxy -> TODO distinguish?
          # event.label is reduced to the 20-bit MPLS label
-         try:
+         if hasattr( event.path.nlri, 'vni'):
            vni = event.path.nlri.vni
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
              logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
-         except Exception as ex:
-           logging.error( ex )
 
          # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
          #    rd = event.path.nlri.route_dist
