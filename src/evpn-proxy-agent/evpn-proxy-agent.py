@@ -146,8 +146,8 @@ def runBGPThread( state ):
     try:
       # Could remove VTEP IP upon withdraw too
       if not event.is_withdraw:
+         originator_id = event.path.get_pattr(BGP_ATTR_TYPE_ORIGINATOR_ID)
          if event.path.nlri.type == EvpnNLRI.INCLUSIVE_MULTICAST_ETHERNET_TAG:
-            originator_id = event.path.get_pattr(BGP_ATTR_TYPE_ORIGINATOR_ID)
 
             # SRL EVPN VTEP does not normally include an 'originator' attribute
             if originator_id and originator_id.value != event.nexthop:
@@ -170,9 +170,21 @@ def runBGPThread( state ):
                  # Only other proxies do
                  if cur['vtep'] != event.nexthop:
                      logging.info( f"EVPN MAC-move detected {cur['vtep']} -> {event.nexthop}" )
-                     WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
-                     logging.info( f"Removing MAC from EVPN proxy: {mac}" )
-                     del cur_macs[ mac ]
+
+                     # if this is from an EVPN VTEP, withdraw our route - our job is done
+                     if not originator_id or originator_id.value == event.nexthop:
+                        logging.info( f"Removing MAC moved to EVPN VTEP {event.nexthop} from EVPN proxy: {mac}" )
+                        WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
+                        del cur_macs[ mac ]
+                     # else (from other EVPN proxy) only withdraw if VTEP IP changed, but don't remove MAC
+                     # as we need to keep track of the mobility sequence number
+                     elif originator_id and originator_id.value != event.nexthop:
+                        logging.info( f"Withdrawing MAC {mac} route announced by other EVPN proxy {originator_id.value} with different VTEP: {event.nexthop}" )
+                        if cur['vtep'] != "tbd":
+                           WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
+                           cur['vtep'] = "tbd" # Mark as withdrawn
+                     else:
+                        logging.warning( "TODO: Compare/update mobility sequence number, even if same VTEP nexthop?" )
          else:
            logging.info( "Not multicast and no VNI -> ignoring" )
 
@@ -206,6 +218,7 @@ def runBGPThread( state ):
 
      speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                                as_number=state.params['local_as'],
+                               local_pref=state.params['local_preference'],
                                router_id=LOCAL_LOOPBACK,
                                best_path_change_handler=best_path_change_handler,
                                peer_up_handler=peer_up_handler,
@@ -368,7 +381,10 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             # If this is the last MAC route for this VTEP, could also remove the VRF
             # and withdraw the multicast route? (for dynamically added VRFs)
             #
-            WithdrawRoute(bgp_speaker,f"{cur['vtep']}:{params['evi']}",mac,cur['ip'])
+            if cur['vtep'] != "tbd":
+               WithdrawRoute(bgp_speaker,f"{cur['vtep']}:{params['evi']}",mac,cur['ip'])
+            else:
+               logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
 
             # Could add a timestamp (last seen) + aging
             logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
@@ -428,6 +444,8 @@ def Handle_Notification(obj, state):
                     state.params[ "local_as" ] = int( data['local_as']['value'] )
                 if 'peer_as' in data:
                     state.params[ "peer_as" ] = int( data['peer_as']['value'] )
+                if 'local_preference' in data:
+                    state.params[ "local_preference" ] = int( data['local_preference']['value'] )
                 if 'source_address' in data:
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:

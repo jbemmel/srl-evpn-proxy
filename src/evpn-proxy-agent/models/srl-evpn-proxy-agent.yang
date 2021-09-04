@@ -91,6 +91,12 @@ module srl-evpn-proxy-agent {
               description "Peer AS to use in BGP EVPN peering";
             }
 
+            leaf local-preference {
+              type uint32;
+              default 100;
+              description "Local preference to use for advertising EVPN MAC routes, default 100";
+            }
+
             leaf-list vnis {
               description "Optional list of VNIs to proxy for, defaults to any detected";
               type uint32 {
