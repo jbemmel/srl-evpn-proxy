@@ -114,7 +114,7 @@ def WithdrawRoute( bgp_speaker, vni, rd, mac, ip ):
     bgp_speaker.evpn_prefix_del(
       route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
       route_dist=rd, # original RD
-      vni=vni,
+      # vni=vni, # not used/allowed in withdraw
       ethernet_tag_id=0,
       mac_addr=mac,
       ip_addr=ip
@@ -192,8 +192,8 @@ def runBGPThread( state ):
                            return -1 # not present
 
                         if GetMACMobility() < cur['seq']:
-                            logging.info( f"Local mobility sequence {cur['seq']} higher than peer - keeping route" )
-                            return
+                           logging.info( f"Local mobility sequence {cur['seq']} higher than peer - keeping route" )
+                           return
 
                         logging.info( f"Withdrawing MAC {mac} route announced by other EVPN proxy {originator_id.value} with different VTEP: {event.nexthop}" )
                         WithdrawRoute( speaker, vni, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
