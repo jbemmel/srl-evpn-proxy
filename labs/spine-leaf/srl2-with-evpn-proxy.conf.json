@@ -1465,6 +1465,7 @@
           "admin-state": "enable",
           "source-address": "1.1.1.6",
           "vxlan-interface": "e1-1",
+	  "include-ip": false,
           "local-as": 65000,
           "peer-as": 65000,
           "evi": 57069,
