@@ -129,7 +129,7 @@ def runBGPThread( state ):
   mac_vrfs = {}
 
   def best_path_change_handler(event):
-      logging.info( f'The best path changed: {event.path} prefix={event.prefix} label(s)(incl VNI)={event.label}' )
+      logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
       if not event.is_withdraw:
          evpn_vteps[ event.nexthop ] = event.remote_as
@@ -137,12 +137,14 @@ def runBGPThread( state ):
          # check for RT2 MAC moves between static VTEPs and EVPN VTEPs
          # Note: In case of multiple proxies, this update can also be from
          # another proxy -> TODO distinguish?
-
-         if event.label is not None and len(event.label) >= 1:
-           vni = event.label[0]
+         # event.label is reduced to the 20-bit MPLS label
+         try:
+           vni = event.path.nlri.vni
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
              logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
+         except Exception as ex:
+           logging.error( ex )
 
          # if event.path.nlri.type == EVPN_MAC_IP_ADV_ROUTE:
          #    rd = event.path.nlri.route_dist
@@ -219,7 +221,7 @@ def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
         # mac_addr='00:11:22:33:44:55', # not relevant for MC route
         ip_addr=remote_ip, # origin
         tunnel_type='vxlan',
-        vni=vni,
+        vni=vni, # Not sent in advertisement
         gw_ip_addr=remote_ip,
         next_hop=remote_ip, # on behalf of remote VTEP
         pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
