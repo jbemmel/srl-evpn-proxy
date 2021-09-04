@@ -206,7 +206,6 @@ def runBGPThread( state ):
 
      speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
                                as_number=state.params['local_as'],
-                               local_pref=state.params['local_preference'],
                                router_id=LOCAL_LOOPBACK,
                                best_path_change_handler=best_path_change_handler,
                                peer_up_handler=peer_up_handler,
@@ -429,8 +428,6 @@ def Handle_Notification(obj, state):
                     state.params[ "local_as" ] = int( data['local_as']['value'] )
                 if 'peer_as' in data:
                     state.params[ "peer_as" ] = int( data['peer_as']['value'] )
-                if 'local_preference' in data:
-                    state.params[ "local_preference" ] = int( data['local_preference']['value'] )
                 if 'source_address' in data:
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
