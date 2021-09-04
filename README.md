@@ -250,6 +250,7 @@ For redundancy, multiple proxies can be instantiated, and any one of them can as
 We can test MAC mobility by swapping the MACs of H1 and H2, and then ping from H2 to H3:
 ```bash
 cat > test_mac_move.sh << EOF
+docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.103 -c2
 MAC1=\`docker exec -it clab-static-vxlan-spine-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
 MAC2=\`docker exec -it clab-static-vxlan-spine-lab-h2 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
 docker exec -it clab-static-vxlan-spine-lab-h1 ip link set address \$MAC2 dev eth1
@@ -261,10 +262,19 @@ bash -c ./test_mac_move.sh
 ```
 
 Similarly, we can move the MAC to EVPN (H4 attached to SRL2) and repeat the test:
-```
-docker exec -it clab-static-vxlan-spine-lab-h4 ip link set address $MAC dev eth1
+```bash
+cat > test_mac_move_2_evpn.sh << EOF
+docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.103 -c2
+MAC1=\`docker exec -it clab-static-vxlan-spine-lab-h1 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+MAC2=\`docker exec -it clab-static-vxlan-spine-lab-h4 ip a show dev eth1 | awk '/ether/{ print \$2 }' | head -1\`
+docker exec -it clab-static-vxlan-spine-lab-h1 ip link set address \$MAC2 dev eth1
+docker exec -it clab-static-vxlan-spine-lab-h4 ip link set address \$MAC1 dev eth1
 docker exec -it clab-static-vxlan-spine-lab-h4 ping 10.0.0.103 -c2
+EOF
+chmod +x ./test_mac_move_2_evpn.sh 
+bash -c ./test_mac_move_2_evpn.sh
 ```
+In the latter case, when the EVPN proxy receives a MAC update for a MAC it has advertised, it withdraws the route if the VTEP and/or IP has changed.
 
 ## A note on sFlow sampling
 On physical SRL nodes, sFlow sampling could be used to learn MAC/IP routes, instead of eBPF filters. If required and over time, the sampling frequency could be reduced, or a target could be set on the number of VTEPs to discover before transitioning to a forwarding-only mode
