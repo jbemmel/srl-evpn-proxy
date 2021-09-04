@@ -53,7 +53,9 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
 
-from ryu.lib.packet.bgp import EvpnNLRI, BGP_ATTR_TYPE_ORIGINATOR_ID
+from ryu.lib.packet.bgp import (EvpnNLRI, BGPEvpnMacMobilityExtendedCommunity,
+                                BGP_ATTR_TYPE_ORIGINATOR_ID,
+                                BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
 
 # Ryu has its own threading model
 from ryu.lib import hub
@@ -108,10 +110,11 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
-def WithdrawRoute( bgp_speaker, rd, mac, ip ):
+def WithdrawRoute( bgp_speaker, vni, rd, mac, ip ):
     bgp_speaker.evpn_prefix_del(
       route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
       route_dist=rd, # original RD
+      vni=vni,
       ethernet_tag_id=0,
       mac_addr=mac,
       ip_addr=ip
@@ -168,21 +171,33 @@ def runBGPThread( state ):
                  cur = cur_macs[ mac ]
                  # Don't bother checking IP; SRL MAC-VRF doesn't send it
                  # Only other proxies do
-                 if cur['vtep'] != event.nexthop:
+                 if cur['vtep'] != event.nexthop and cur['vtep'] != 'tbd':
                      logging.info( f"EVPN MAC-move detected {cur['vtep']} -> {event.nexthop}" )
 
                      # if this is from an EVPN VTEP, withdraw our route - our job is done
                      if not originator_id or originator_id.value == event.nexthop:
                         logging.info( f"Removing MAC moved to EVPN VTEP {event.nexthop} from EVPN proxy: {mac}" )
-                        WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
+                        WithdrawRoute( speaker, vni, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
                         del cur_macs[ mac ]
                      # else (from other EVPN proxy) only withdraw if VTEP IP changed, but don't remove MAC
                      # as we need to keep track of the mobility sequence number
                      elif originator_id and originator_id.value != event.nexthop:
+
+                        # Check Mobility sequence - route may be stale
+                        def GetMACMobility():
+                           ext_comms = event.path.get_pattr(BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
+                           for c in ext_comms.communities:
+                              if isinstance( c, BGPEvpnMacMobilityExtendedCommunity ):
+                                  return c.sequence_number
+                           return -1 # not present
+
+                        if GetMACMobility() < cur['seq']:
+                            logging.info( f"Local mobility sequence {cur['seq']} higher than peer - keeping route" )
+                            return
+
                         logging.info( f"Withdrawing MAC {mac} route announced by other EVPN proxy {originator_id.value} with different VTEP: {event.nexthop}" )
-                        if cur['vtep'] != "tbd":
-                           WithdrawRoute( speaker, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
-                           cur['vtep'] = "tbd" # Mark as withdrawn
+                        WithdrawRoute( speaker, vni, f"{cur['vtep']}:{state.params['evi']}", mac, cur['ip'])
+                        cur['vtep'] = "tbd" # Mark as withdrawn
                      else:
                         logging.warning( "TODO: Compare/update mobility sequence number, even if same VTEP nexthop?" )
          else:
@@ -382,7 +397,8 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             # and withdraw the multicast route? (for dynamically added VRFs)
             #
             if cur['vtep'] != "tbd":
-               WithdrawRoute(bgp_speaker,f"{cur['vtep']}:{params['evi']}",mac,cur['ip'])
+               logging.info( f"IP changed {cur['ip']}->{ip}, withdrawing my route" )
+               WithdrawRoute(bgp_speaker,vni,f"{cur['vtep']}:{params['evi']}",mac,cur['ip'])
             else:
                logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
 
