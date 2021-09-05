@@ -5,10 +5,11 @@ import eventlet
 eventlet.monkey_patch() # need thread too
 
 # Google core libraries don't support eventlet; workaround
-#import grpc
-#from grpc.experimental import eventlet as grpc_eventlet
-#grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
+import grpc
+from grpc.experimental import eventlet as grpc_eventlet
+grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
 
+import asyncio
 import logging
 
 from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
@@ -16,6 +17,9 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   EVPN_MAC_IP_ADV_ROUTE,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
+from ryu.lib.packet.bgp import (EvpnNLRI,
+                                BGP_ATTR_TYPE_ORIGINATOR_ID,
+                                BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
 
 class EVPNProxy(object):
 
@@ -33,14 +37,30 @@ class EVPNProxy(object):
    self.vni_2_macvrf = {}
    self.bgp_vrfs = {}
 
- def connectBGP_EVPN(self,local_bgp_port=1179,local_pref=100):
+ async def connectBGP_EVPN(self,local_bgp_port=1179,local_pref=100):
    """ Connects to BGP peer to receive EVPN route updates """
+
+   connect_done = asyncio.Event()
 
    def best_path_change_event(event):
      logging.warning( f'Best path changed: {event}' )
 
+     # Could remove VTEP IP upon withdraw too
+     if not event.is_withdraw:
+        originator_id = event.path.get_pattr(BGP_ATTR_TYPE_ORIGINATOR_ID)
+        if event.path.nlri.type == EvpnNLRI.INCLUSIVE_MULTICAST_ETHERNET_TAG:
+
+           # SRL EVPN VTEP does not normally include an 'originator' attribute
+           if originator_id and originator_id.value != event.nexthop:
+              logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
+           else:
+              logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
+              self.evpn_vteps[ event.nexthop ] = event.remote_as
+
    def peer_up_handler(router_id, remote_as):
      logging.warning( f'Peer UP: {router_id} {remote_as}' )
+     connect_done.set()
+
    def peer_down_handler(router_id, remote_as):
      logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
 
@@ -59,6 +79,8 @@ class EVPNProxy(object):
                                 local_as=self.as_number,
                                 enable_ipv4=False, enable_evpn=True,
                                 connect_mode='active')
+
+   await asyncio.wait_for( connect_done.wait(), timeout=5.0 )
    return self
 
  def shutdown(self):
@@ -74,7 +96,7 @@ class EVPNProxy(object):
  def _addStaticVTEP( self, vni : int, evi : int, vtep_ip : str ):
      """
      Adds a static VTEP to the configuration and announces a multicast route
-     to EVPN peer
+     to EVPN peers
 
      vni: Virtual Network Identifier from VXLAN
      evi: Ethernet Virtual Instance (used for auto-generated RT/RD)
@@ -85,6 +107,12 @@ class EVPNProxy(object):
      logging.info(f"addStaticVTEP: Adding VRF...RD={rd} RT={rt}")
      self.bgpSpeaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
      logging.info("Adding EVPN multicast route...")
+
+     self.announceEVPNMulticastRoute( rd, vni, vtep_ip )
+     self.bgp_vrfs[ rd ] = vni
+     return rd
+
+ def announceEVPNMulticastRoute( self, rd: str, vni: int, static_vtep: str ):
      #
      # For RD use the static VTEP's IP, just like it would do if it was
      # EVPN enabled itself. That way, any proxy will announce the same
@@ -99,14 +127,12 @@ class EVPNProxy(object):
          ip_addr=self.router_id, # originator == proxy IP
          tunnel_type='vxlan',
          vni=vni, # Not sent in advertisement
-         gw_ip_addr=vtep_ip,
-         next_hop=vtep_ip, # on behalf of remote VTEP
+         gw_ip_addr=static_vtep,
+         next_hop=static_vtep, # on behalf of remote VTEP
          pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
          # Added via patch
-         tunnel_endpoint_ip=vtep_ip
+         tunnel_endpoint_ip=static_vtep
      )
-     self.bgp_vrfs[ rd ] = vni
-     return rd
 
  def announceEVPNRoute( self, rd: str, vni: int, mac: str, static_vtep: str,
                         mobility_seq: int, ip=None ):
@@ -215,5 +241,5 @@ class EVPNProxy(object):
     logging.debug( f"No route advertised for MAC {mac} in VNI {vni}" )
     return None
 
- def isEVPNPeer( self, vtep: str ):
+ def isEVPNVTEP( self, vtep: str ):
     return vtep in self.evpn_vteps

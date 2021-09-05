@@ -1,10 +1,8 @@
 import eventlet
-
-eventlet.monkey_patch() # BGPSpeaker needs this
-
 import unittest
 import logging
 import sys
+import asyncio
 
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
@@ -43,9 +41,11 @@ class EVPNProxyTestCase(unittest.TestCase):
    self.evpn_proxy = EVPNProxy(router_id="1.1.1.4")
 
    # Assumes a BGP neighbor config in SRL
-   self.evpn_proxy.connectBGP_EVPN()
-   eventlet.sleep(5)
-   self.assertTrue( self.evpn_proxy.isEVPNPeer(VTEP3),
+   self.evpn_proxy.connectBGP_EVPN() # Waits for connect event
+
+   eventlet.sleep(3)
+
+   self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP3),
      "Proxy failed to detect EVPN VTEP" )
 
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
@@ -73,4 +73,6 @@ class EVPNProxyTestCase(unittest.TestCase):
   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP2,dst=VTEP3)
 
 if __name__ == '__main__':
-  unittest.main()
+  # asyncio.run( unittest.main() ) # Python 3.7+
+  loop = asyncio.get_event_loop()
+  loop.run_until_complete( unittest.main() )
