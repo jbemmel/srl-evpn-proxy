@@ -27,19 +27,19 @@ class EVPNProxyTestCase(unittest.TestCase):
 
  def setUp(self):
 
-   def _startProxy(loopback,local_port,peer,remote_port,connect_mode):
-      evpn_proxy = EVPNProxy(loopback=loopback)
+   def _startProxy(router_id,local_port,remote_port,connect_mode):
+      evpn_proxy = EVPNProxy(router_id=router_id)
 
       def thread():
-       evpn_proxy.connectBGP_EVPN(
-      peer=peer, local_bgp_port=local_port, remote_bgp_port=remote_port,
-      connect_mode=connect_mode )
+        evpn_proxy.connectBGP_EVPN( peer="127.0.0.1", local_bgp_port=local_port,
+                                    remote_bgp_port=remote_port,
+                                    connect_mode=connect_mode )
       t = hub.spawn( thread )
       eventlet.sleep(3)
       return evpn_proxy, t
 
-   self.evpn_proxy1, self.t1 = _startProxy("127.0.0.1",BGP_PORT1,"127.0.0.2",BGP_PORT2,'passive')
-   self.evpn_proxy2, self.t2 = _startProxy("127.0.0.2",BGP_PORT2,"127.0.0.1",BGP_PORT1,'active')
+   self.evpn_proxy1, self.t1 = _startProxy("1.1.1.1",BGP_PORT1,BGP_PORT2,'passive')
+   self.evpn_proxy2, self.t2 = _startProxy("2.2.2.2",BGP_PORT2,BGP_PORT1,'active')
 
  def tearDown(self):
    self.evpn_proxy1.shutdown()

@@ -20,11 +20,12 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
 
 class EVPNProxy(object):
 
- def __init__(self,loopback="127.0.0.1",as_number=65000):
+ def __init__(self,router_id,loopback="127.0.0.1",as_number=65000):
   logging.info( "Starting new EVPN Proxy instance..." )
   self.vni_2_macvrf = {}
 
   # BGP properties used in multiple places
+  self.router_id = router_id
   self.loopback = loopback
   self.as_number = as_number
 
@@ -42,7 +43,7 @@ class EVPNProxy(object):
                                bgp_server_port=local_bgp_port,
                                as_number=self.as_number,
                                local_pref=local_pref,
-                               router_id=self.loopback,
+                               router_id=self.router_id,
                                best_path_change_handler=best_path_change_event,
                                peer_up_handler=peer_up_handler,
                                peer_down_handler=peer_down_handler)
