@@ -353,7 +353,7 @@ class Activity(object):
         return s
 
     def _listen_socket_loop(self, s, conn_handle):
-        while not s.closed: # JvB changed from 'True'
+        while not s._closed: # JvB changed from 'True'
             sock, client_address = s.accept()
             client_address, port = self.get_remotename(sock)
             LOG.debug('Connect request received from client for port'
