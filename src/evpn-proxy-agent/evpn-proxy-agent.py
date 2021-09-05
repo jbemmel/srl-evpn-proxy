@@ -139,7 +139,7 @@ def runBGPThread( state ):
 
   # Since this application only supports single homed endpoints, the ESI=0 and
   # we can organize MAC tables per VXLAN VNI (24-bit)
-  # mac_vrfs: { vni: { mac: { vtep, last known ip, sequence_number } } }
+  # mac_vrfs: { vni: { mac: { vtep, last known ip, sequence_number } AND ip: {mac} } }
   mac_vrfs = {}
   speaker = None # Created below
   def best_path_change_handler(event):
@@ -402,6 +402,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
                logging.info( f"IP changed {cur['ip']}->{ip}, withdrawing my route" )
                old_ip = cur['ip'] if params['include_ip'] else None
                WithdrawRoute(bgp_speaker,vni,f"{cur['vtep']}:{params['evi']}",mac,old_ip)
+               vni_2_mac_vrf.pop( old_ip, None ) # Remove any IP mapping too
             else:
                logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
 
@@ -411,6 +412,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
         else:
            logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
            vni_2_mac_vrf.update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
+
         mac_vrfs[ vni ] = vni_2_mac_vrf
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
         bgp_speaker.evpn_prefix_add(
@@ -426,6 +428,8 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             gw_ip_addr=static_vtep,
             mac_mobility=mobility_seq # Sequence number for MAC mobility
         )
+        if params['include_ip']:
+           vni_2_mac_vrf.update( { ip: { 'mac' : mac, 'vtep' : static_vtep } } ) # Also track IP mobility
       except Exception as e:
         logging.error( f"Error processing ARP: {e}" )
           # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
