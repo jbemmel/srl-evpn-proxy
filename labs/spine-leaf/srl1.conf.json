@@ -1436,6 +1436,12 @@
               "transport": {
                "local-address": "1.1.1.5"
               }
+            },
+            {
+              "description": "Local EVPN proxy agent",
+              "peer-address": "1.1.1.4",
+              "admin-state": "enable",
+              "peer-group": "leaves"
             }
           ]
         }
