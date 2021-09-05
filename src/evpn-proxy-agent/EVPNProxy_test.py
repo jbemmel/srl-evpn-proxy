@@ -15,17 +15,15 @@ logger.addHandler(stream_handler)
 from EVPNProxy import EVPNProxy
 
 VNI = 1234
+EVI = 57069
 
 MAC1 = "00:11:22:33:44:01"
 MAC2 = "00:11:22:33:44:02"
 
 # Static VTEPs (TODO emulate dynamic EVPN VTEPs too, by calling rxEVPN_RT2)
 VTEP1 = "1.1.1.1"
-VTEP2 = "2.2.2.2"
-
-# BGP ports, don't interfere with SRL
-BGP_PORT1=10179
-BGP_PORT2=20179
+VTEP2 = "1.1.1.2"
+VTEP3 = "1.1.1.5" # SRL1
 
 #
 # Run: ip netns exec srbase-default python3 -m unittest EVPNProxy_test.EVPNProxyTestCase -v
@@ -47,27 +45,29 @@ class EVPNProxyTestCase(unittest.TestCase):
    # Assumes a BGP neighbor config in SRL
    self.evpn_proxy.connectBGP_EVPN()
    eventlet.sleep(5)
+   self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
+   self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
  def tearDown(self):
    print( "TEARDOWN" )
    self.evpn_proxy.shutdown()
 
- def test_1_normal_scenario_arp_request_broadcast(self,vtep=VTEP1):
-   # ARP request broadcast to both proxies
-   self.evpn_proxy.rxVXLAN_ARP( VNI, MAC1, vtep )
+ def test_1_normal_scenario_arp_request_broadcast(self,src=VTEP1,dst=VTEP2):
+   # ARP request broadcast to all proxies
+   self.evpn_proxy.rxVXLAN_ARP( VNI, src, dst, MAC1 )
    eventlet.sleep(1)
 
-   self.assertEqual( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1), vtep,
+   self.assertEqual( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1), src,
     "proxy failed to advertise correct VTEP" )
 
  # Case: ARP response sent from static VTEP (or lost ARP broadcast request)
 
  # Case: MAC move static VTEP1 to static VTEP2
  def test_3_normal_scenario_mac_move(self):
-  self.test_1_normal_scenario_arp_request_broadcast(VTEP1)
+  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
 
   # Emulate MAC1 moving to static VTEP2
-  self.test_1_normal_scenario_arp_request_broadcast(VTEP2)
+  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP2,dst=VTEP3)
 
 if __name__ == '__main__':
   unittest.main()
