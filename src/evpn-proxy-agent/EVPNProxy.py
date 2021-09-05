@@ -37,13 +37,14 @@ class EVPNProxy(object):
    self.vni_2_macvrf = {}
    self.bgp_vrfs = {}
 
- async def connectBGP_EVPN(self,local_bgp_port=1179,local_pref=100):
+ # TODO async
+ def connectBGP_EVPN(self,local_bgp_port=1179,local_pref=100):
    """ Connects to BGP peer to receive EVPN route updates """
 
-   connect_done = asyncio.Event()
+   # connect_done = asyncio.Event()
 
    def best_path_change_event(event):
-     logging.warning( f'Best path changed: {event}' )
+     logging.warning( f'Best path changed: {event.path}' )
 
      # Could remove VTEP IP upon withdraw too
      if not event.is_withdraw:
@@ -54,12 +55,12 @@ class EVPNProxy(object):
            if originator_id and originator_id.value != event.nexthop:
               logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
            else:
-              logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
+              logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}, adding" )
               self.evpn_vteps[ event.nexthop ] = event.remote_as
 
    def peer_up_handler(router_id, remote_as):
      logging.warning( f'Peer UP: {router_id} {remote_as}' )
-     connect_done.set()
+     # connect_done.set()
 
    def peer_down_handler(router_id, remote_as):
      logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
@@ -80,7 +81,7 @@ class EVPNProxy(object):
                                 enable_ipv4=False, enable_evpn=True,
                                 connect_mode='active')
 
-   await asyncio.wait_for( connect_done.wait(), timeout=5.0 )
+   # TODO # await asyncio.wait_for( connect_done.wait(), timeout=5.0 )
    return self
 
  def shutdown(self):
@@ -234,11 +235,12 @@ class EVPNProxy(object):
   pass
 
  def checkAdvertisedRoute( self, vni, mac ):
+    logging.info( f"checkAdvertisedRoute vni={vni} mac={mac} table={self.vni_2_macvrf}" )
     # lookup MAC in vni table
     if vni in self.vni_2_macvrf:
         macvrf = self.vni_2_macvrf[ vni ]
         return macvrf[mac]['vtep'] if mac in macvrf else None
-    logging.debug( f"No route advertised for MAC {mac} in VNI {vni}" )
+    logging.info( f"No route advertised for MAC {mac} in VNI {vni}" )
     return None
 
  def isEVPNVTEP( self, vtep: str ):

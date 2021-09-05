@@ -1,12 +1,13 @@
 import eventlet
 import unittest
+import aiounittest # until Python 3.8 is available
 import logging
 import sys
 import asyncio
 
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
-logger.level = logging.DEBUG
+logger.level = logging.INFO # DEBUG
 stream_handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(stream_handler)
 
@@ -31,7 +32,9 @@ VTEP3 = "1.1.1.5" # SRL1
 #
 # These tests are designed to be run inside the srbase_default namespace on SRL
 #
-class EVPNProxyTestCase(unittest.TestCase):
+# TODO use unittest.IsolatedAsyncioTestCase (Python 3.8)
+#
+class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
 
  def setUp(self):
 
@@ -41,9 +44,10 @@ class EVPNProxyTestCase(unittest.TestCase):
    self.evpn_proxy = EVPNProxy(router_id="1.1.1.4")
 
    # Assumes a BGP neighbor config in SRL
-   self.evpn_proxy.connectBGP_EVPN() # Waits for connect event
+   # Cannot 'await'
+   self.evpn_proxy.connectBGP_EVPN() # TODO wait for connect event
 
-   eventlet.sleep(3)
+   eventlet.sleep(10)
 
    self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP3),
      "Proxy failed to detect EVPN VTEP" )
