@@ -214,3 +214,6 @@ class EVPNProxy(object):
         return macvrf[mac]['vtep'] if mac in macvrf else None
     logging.debug( f"No route advertised for MAC {mac} in VNI {vni}" )
     return None
+
+ def isEVPNPeer( self, vtep: str ):
+    return vtep in self.evpn_vteps

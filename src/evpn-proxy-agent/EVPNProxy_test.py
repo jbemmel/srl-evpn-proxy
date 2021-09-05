@@ -45,6 +45,9 @@ class EVPNProxyTestCase(unittest.TestCase):
    # Assumes a BGP neighbor config in SRL
    self.evpn_proxy.connectBGP_EVPN()
    eventlet.sleep(5)
+   self.assertTrue( self.evpn_proxy.isEVPNPeer(VTEP3),
+     "Proxy failed to detect EVPN VTEP" )
+
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
