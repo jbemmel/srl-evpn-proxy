@@ -10,6 +10,8 @@ from grpc.experimental import eventlet as grpc_eventlet
 
 grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
 
+import logging
+
 from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   EVPN_MULTICAST_ETAG_ROUTE,
                                                   EVPN_MAC_IP_ADV_ROUTE,

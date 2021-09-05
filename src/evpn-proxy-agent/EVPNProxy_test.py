@@ -1,28 +1,30 @@
 import unittest
 
-import EVPNProxy
+from EVPNProxy import EVPNProxy
 import eventlet
+
+VNI = 1234
+
+MAC1 = "00:11:22:33:44:01"
+MAC2 = "00:11:22:33:44:02"
+
+# Static VTEPs (TODO emulate dynamic EVPN VTEPs too, by calling rxEVPN_RT2)
+VTEP1 = "1.1.1.1"
+VTEP2 = "2.2.2.2"
 
 #
 # Run: python3 -m unittest discover . "*_test.py"
 #
 class EVPNProxyTestCase(unittest.TestCase):
 
- VNI = 1234
-
- MAC1 = "00:11:22:33:44:01"
- MAC2 = "00:11:22:33:44:02"
-
- # Static VTEPs (TODO emulate dynamic EVPN VTEPs too, by calling rxEVPN_RT2)
- VTEP1 = "1.1.1.1"
- VTEP2 = "2.2.2.2"
-
  def setUp(self):
-  self.evpn_proxy1 = EVPNProxy(loopback="127.0.0.1").connectBGP_EVPN(
+  self.evpn_proxy1 = EVPNProxy(loopback="127.0.0.1")
+  self.evpn_proxy1.connectBGP_EVPN(
     peer="127.0.0.2", local_bgp_port=179, remote_bgp_port=1179,
     connect_mode='passive' )
 
-  self.evpn_proxy2 = EVPNProxy(loopback="127.0.0.2").connectBGP_EVPN(
+  self.evpn_proxy2 = EVPNProxy(loopback="127.0.0.2")
+  self.evpn_proxy2.connectBGP_EVPN(
     peer="127.0.0.1", local_bgp_port=1179, remote_bgp_port=179,
     connect_mode='active' )
 
