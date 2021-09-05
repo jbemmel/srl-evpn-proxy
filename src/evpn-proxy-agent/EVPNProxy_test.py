@@ -52,7 +52,7 @@ class EVPNProxyTestCase(unittest.TestCase):
    print( "TEARDOWN" )
    self.evpn_proxy.shutdown()
 
- def test_1_normal_scenario_arp_request_broadcast(self,src=VTEP1,dst=VTEP2):
+ def test_1_normal_scenario_arp_request_broadcast(self,src=VTEP1,dst=VTEP3):
    # ARP request broadcast to all proxies
    self.evpn_proxy.rxVXLAN_ARP( VNI, src, dst, MAC1 )
    eventlet.sleep(1)
@@ -63,7 +63,7 @@ class EVPNProxyTestCase(unittest.TestCase):
  # Case: ARP response sent from static VTEP (or lost ARP broadcast request)
 
  # Case: MAC move static VTEP1 to static VTEP2
- def test_3_normal_scenario_mac_move(self):
+ def test_2_normal_scenario_mac_move(self):
   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
 
   # Emulate MAC1 moving to static VTEP2
