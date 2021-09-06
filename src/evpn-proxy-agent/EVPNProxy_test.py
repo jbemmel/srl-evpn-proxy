@@ -5,6 +5,8 @@ import logging
 import sys
 import asyncio
 
+from ryu.lib import hub
+
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
 logger.level = logging.INFO # DEBUG
@@ -56,8 +58,9 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
  def tearDown(self):
-   print( "TEARDOWN" )
+   print( "TEARDOWN - shutdown EVPN proxy" )
    self.evpn_proxy.shutdown()
+   eventlet.sleep(1)
 
  def test_1_normal_scenario_arp_request_broadcast(self,src=VTEP1,dst=VTEP3):
    # ARP request broadcast to all proxies

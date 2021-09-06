@@ -12,9 +12,6 @@
 # implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# JvB 2021-9-5: Modified to support clean shutdown and restart of event loops
-#
 """
   Defines some base class related to managing green threads.
 """
@@ -288,7 +285,8 @@ class Activity(object):
         """Stops all threads spawn by this activity.
         """
         for thread_name, thread in list(self._child_thread_map.items()):
-            if name is not None and thread_name is name:
+            # JvB fixed logic
+            if name is None or thread_name is name:
                 LOG.debug('%s: Stopping child thread %s',
                           self.name, thread_name)
                 thread.kill()
@@ -353,7 +351,7 @@ class Activity(object):
         return s
 
     def _listen_socket_loop(self, s, conn_handle):
-        while not s._closed: # JvB changed from 'True'
+        while True:
             sock, client_address = s.accept()
             client_address, port = self.get_remotename(sock)
             LOG.debug('Connect request received from client for port'

@@ -86,7 +86,11 @@ class EVPNProxy(object):
 
  def shutdown(self):
    if self.bgpSpeaker is not None:
+      self.bgpSpeaker.neighbor_del( self.router_id )
       self.bgpSpeaker.shutdown()
+
+      # XXX Ryu bug: eventlet.hubs.IOClosed: [Errno 107] Operation on closed file
+  
       self.bgpSpeaker = None
 
  def addStaticVTEP( self, vni : int, evi : int, vtep_ip : str ):
