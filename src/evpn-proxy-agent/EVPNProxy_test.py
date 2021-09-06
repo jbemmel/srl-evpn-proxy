@@ -50,7 +50,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    # Cannot 'await'
    self.evpn_proxy.connectBGP_EVPN() # TODO wait for connect event
 
-   eventlet.sleep(10)
+   eventlet.sleep(5)
 
    self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP3),
      f"Proxy failed to detect EVPN VTEP {VTEP3}" )

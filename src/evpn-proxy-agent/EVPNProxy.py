@@ -187,17 +187,18 @@ class EVPNProxy(object):
    if self.vnis=='*' or vni in self.vnis:
       # Check if src or dst is from an EVPN VTEP
       if vtep_src in self.evpn_vteps:
-         logging.info( f"ARP from EVPN VTEP {vtep_src} -> ignoring" )
+         logging.info( f"ARP from EVPN VTEP {vtep_src}" )
+         return self.rxVXLAN_ARP_from_VTEP(vni,vtep_src,False,mac)
       elif vtep_dst in self.evpn_vteps:
          logging.info( f"ARP from static VTEP: {vtep_src}" )
-         return self.rxVXLAN_ARP_from_static_VTEP(vni,vtep_src,mac)
+         return self.rxVXLAN_ARP_from_VTEP(vni,vtep_src,True,mac)
       else:
          logging.info( f"ARP packet:neither src={vtep_src} nor dst={vtep_dst} is EVPN vtep? {self.evpn_vteps}" )
    else:
        logging.warning( f"rxVXLAN_ARP: VNI {vni} not enabled, ignoring {mac} on {vtep_src}->{vtep_dst}" )
    return False # Ignored
 
- def rxVXLAN_ARP_from_static_VTEP( self, vni, static_vtep, mac ):
+ def rxVXLAN_ARP_from_VTEP( self, vni, vtep, is_static_vtep, mac ):
      """
      Process ARP received from static VTEP to send EVPN MAC route (RT2)
      """
@@ -210,10 +211,10 @@ class EVPNProxy(object):
      # For RD, use the static VTEP's IP, just as would happen when it would
      # advertise the routes itself. This implies we need to create a VRF
      # per static VTEP locally
-     rd = f"{static_vtep}:{evi}"
+     rd = f"{vtep}:{evi}"
 
-     if rd not in self.bgp_vrfs and self.learn_vteps:
-         self._addStaticVTEP( vni, evi, static_vtep )
+     if rd not in self.bgp_vrfs and is_static_vtep and self.learn_vteps:
+         self._addStaticVTEP( vni, evi, vtep )
 
      mac_vrf = self.vni_2_macvrf[ vni ] if vni in self.vni_2_macvrf else {}
      mobility_seq = None # First time: no attribute
@@ -221,8 +222,8 @@ class EVPNProxy(object):
      if mac in mac_vrf:
          cur = mac_vrf[ mac ]
          logging.info( f"MAC {mac} already announced: {cur}, checking for MAC move" )
-         if cur['vtep'] == static_vtep:
-            logging.info( f"VNI {vni}: MAC {mac} already announced with VTEP {static_vtep}" )
+         if cur['vtep'] == vtep:
+            logging.info( f"VNI {vni}: MAC {mac} already announced with static VTEP {vtep}" )
 
             # if cur['ip'] == ip:
             #   return False
@@ -233,17 +234,24 @@ class EVPNProxy(object):
          if cur['vtep'] != "tbd":
             logging.info( f"MAC move - VTEP changed to {cur['vtep']}, withdrawing my route" )
             self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
+            if not is_static_vtep:
+               logging.info( f"MAC move to EVPN VTEP - removing state" )
+               del mac_vrf[ mac ]
+               return False
          else:
             logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
 
          # Could add a timestamp (last seen) + aging
-         logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
+         logging.info( f"VNI {vni}: MAC {mac} moved to {vtep} new mobility_seq={mobility_seq}" )
 
          # Could track 'ip' here too, but complicates the number of corner cases
-         cur.update( { 'vtep' : static_vtep, 'seq' : mobility_seq } )
+         cur.update( { 'vtep' : vtep, 'seq' : mobility_seq } )
+     else if is_static_vtep:
+         logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with static VTEP {vtep}" )
+         mac_vrf.update( { mac : { 'vtep': vtep, 'seq': -1 } } )
      else:
-         logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
-         mac_vrf.update( { mac : { 'vtep': static_vtep, 'seq': -1 } } )
+         logging.info( f"VNI {vni}: MAC {mac} from EVPN VTEP {vtep} - ignoring" )
+         return False
 
      self.vni_2_macvrf[ vni ] = mac_vrf
      logging.info( f"Announcing EVPN MAC route...evpn_vteps={self.evpn_vteps}" )
