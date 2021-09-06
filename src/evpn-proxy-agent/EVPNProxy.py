@@ -246,7 +246,7 @@ class EVPNProxy(object):
 
          # Could track 'ip' here too, but complicates the number of corner cases
          cur.update( { 'vtep' : vtep, 'seq' : mobility_seq } )
-     else if is_static_vtep:
+     elif is_static_vtep:
          logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with static VTEP {vtep}" )
          mac_vrf.update( { mac : { 'vtep': vtep, 'seq': -1 } } )
      else:
