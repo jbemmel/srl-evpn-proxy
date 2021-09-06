@@ -17,7 +17,7 @@ from ryu.services.protocols.bgp.bgpspeaker import (BGPSpeaker,
                                                   EVPN_MAC_IP_ADV_ROUTE,
                                                   RF_L2_EVPN,
                                                   PMSI_TYPE_INGRESS_REP)
-from ryu.lib.packet.bgp import (EvpnNLRI,
+from ryu.lib.packet.bgp import (EvpnNLRI,BGPEvpnMacMobilityExtendedCommunity,
                                 BGP_ATTR_TYPE_ORIGINATOR_ID,
                                 BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
 
@@ -49,14 +49,29 @@ class EVPNProxy(object):
      # Could remove VTEP IP upon withdraw too
      if not event.is_withdraw:
         originator_id = event.path.get_pattr(BGP_ATTR_TYPE_ORIGINATOR_ID)
+        is_from_proxy = originator_id and originator_id.value != event.nexthop
         if event.path.nlri.type == EvpnNLRI.INCLUSIVE_MULTICAST_ETHERNET_TAG:
 
            # SRL EVPN VTEP does not normally include an 'originator' attribute
-           if originator_id and originator_id.value != event.nexthop:
+           if is_from_proxy:
               logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
            else:
               logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}, adding" )
               self.evpn_vteps[ event.nexthop ] = event.remote_as
+        elif hasattr( event.path.nlri, 'vni'):
+          vni = event.path.nlri.vni
+          mac = event.path.nlri.mac_addr
+
+          def GetMACMobility():
+             ext_comms = event.path.get_pattr(BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
+             for c in ext_comms.communities:
+                if isinstance( c, BGPEvpnMacMobilityExtendedCommunity ):
+                    return c.sequence_number
+             return -1 # not present
+
+          return self.rxEVPN_RT2( vni, mac, event.nexthop, is_from_proxy, GetMACMobility() )
+        else:
+          logging.info( "Not multicast and no VNI -> ignoring" )
 
    def peer_up_handler(router_id, remote_as):
      logging.warning( f'Peer UP: {router_id} {remote_as}' )
@@ -90,7 +105,7 @@ class EVPNProxy(object):
       self.bgpSpeaker.shutdown()
 
       # XXX Ryu bug: eventlet.hubs.IOClosed: [Errno 107] Operation on closed file
-  
+
       self.bgpSpeaker = None
 
  def addStaticVTEP( self, vni : int, evi : int, vtep_ip : str ):
@@ -235,8 +250,29 @@ class EVPNProxy(object):
      self.announceEVPNRoute( rd, vni, mac, static_vtep, mobility_seq )
      return True
 
- def rxEVPN_RT2( self, vni, mac, vtep ):
-  pass
+ # Quite some similarities with ARP path
+ def rxEVPN_RT2( self, vni, mac, vtep, is_from_proxy, mac_mobility=-1 ):
+     mac_vrf = self.vni_2_macvrf[ vni ] if vni in self.vni_2_macvrf else {}
+     if mac in mac_vrf:
+         cur = mac_vrf[ mac ]
+         if vni not in self.vni_2_evi:
+            logging.error( f"VNI({vni}): EVI mapping unknown" )
+            return False
+         evi = self.vni_2_evi[vni]
+         if not is_from_proxy:
+             logging.info( f"MAC {mac} moved to EVPN VTEP {vtep}, withdrawing route" )
+             self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
+             del mac_vrf[ mac ]
+         elif cur['vtep'] != vtep and cur['vtep'] != 'tbd':
+
+             # XXX is this really a use case for MAC Mobility Sequence?
+             if mac_mobility > cur['seq']:
+                logging.info( f"Different VTEP and local mobility sequence {cur['seq']} lower than peer proxy {mac_mobility} - withdrawing route" )
+                self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
+                cur['vtep'] = 'tbd' # Keep state, but mark it as withdrawn
+
+         # TODO: Need to update local mobility sequence if peer's is higher?
+
 
  def checkAdvertisedRoute( self, vni, mac ):
     logging.info( f"checkAdvertisedRoute vni={vni} mac={mac} table={self.vni_2_macvrf}" )
