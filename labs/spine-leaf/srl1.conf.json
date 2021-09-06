@@ -1425,6 +1425,10 @@
               },
               "evpn": {
                 "admin-state": "enable"
+              },
+              "route-reflector": {
+                "client": true,
+                "cluster-id": "1.1.1.5"
               }
             }
           ],

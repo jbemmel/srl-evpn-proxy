@@ -1430,6 +1430,12 @@
           ],
           "neighbor": [
             {
+              "peer-address": "1.1.1.6",
+	      "description": "EVPN proxy 2",
+              "admin-state": "enable",
+              "peer-group": "leaves"
+            },
+            {
               "peer-address": "1.1.1.5",
               "admin-state": "enable",
               "peer-group": "leaves",

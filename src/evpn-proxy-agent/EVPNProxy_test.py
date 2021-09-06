@@ -28,7 +28,7 @@ VTEP3 = "1.1.1.5" # SRL1
 VTEP4 = "1.1.1.7" # SRL2
 
 #
-# Run: ip netns exec srbase-default python3 -m unittest EVPNProxy_test.EVPNProxyTestCase -v
+# Run: cd /opt/srlinux/agents/evpn-proxy-agent && ip netns exec srbase-default python3 -m unittest EVPNProxy_test.EVPNProxyTestCase -v
 #
 # Note that Ryu only supports a single BGPSpeaker per Python process, hence we
 # need to create multiple test processes (one per EVPN proxy)
@@ -53,7 +53,11 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    eventlet.sleep(10)
 
    self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP3),
-     "Proxy failed to detect EVPN VTEP" )
+     f"Proxy failed to detect EVPN VTEP {VTEP3}" )
+
+   # Requires VTEP3/VTEP4 to be peered AND VTEP3 as Route Reflector
+   self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP4),
+     f"Proxy failed to detect EVPN VTEP {VTEP4}" )
 
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
@@ -105,5 +109,6 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
 
 if __name__ == '__main__':
   # asyncio.run( unittest.main() ) # Python 3.7+
-  loop = asyncio.get_event_loop()
-  loop.run_until_complete( unittest.main() )
+  # loop = asyncio.get_event_loop()
+  # loop.run_until_complete( unittest.main() )
+  unittest.main()
