@@ -255,7 +255,7 @@ class EVPNProxy(object):
 
      self.vni_2_macvrf[ vni ] = mac_vrf
      logging.info( f"Announcing EVPN MAC route...evpn_vteps={self.evpn_vteps}" )
-     self.announceEVPNRoute( rd, vni, mac, static_vtep, mobility_seq )
+     self.announceEVPNRoute( rd, vni, mac, vtep, mobility_seq )
      return True
 
  # Quite some similarities with ARP path
