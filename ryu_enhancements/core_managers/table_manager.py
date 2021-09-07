@@ -677,7 +677,7 @@ class TableCoreManager(object):
             if route_type == EvpnMacIPAdvertisementNLRI.ROUTE_TYPE_NAME:
                 # MPLS labels will be assigned automatically
                 kwargs['mpls_labels'] = []
-            if route_type == EvpnInclusiveMulticastEthernetTagNLRI.ROUTE_TYPE_NAME:
+            elif route_type == EvpnInclusiveMulticastEthernetTagNLRI.ROUTE_TYPE_NAME:
                 # Inclusive Multicast Ethernet Tag Route does not have "vni",
                 # omit "vni" from "kwargs" here.
                 vni = kwargs.pop('vni', None)

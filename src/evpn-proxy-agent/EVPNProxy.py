@@ -66,8 +66,8 @@ class EVPNProxy(object):
              ext_comms = event.path.get_pattr(BGP_ATTR_TYPE_EXTENDED_COMMUNITIES)
              for c in ext_comms.communities:
                 if isinstance( c, BGPEvpnMacMobilityExtendedCommunity ):
-                    return c.sequence_number
-             return -1 # not present
+                    return c.sequence_number # TODO need static flag too?
+             return 0 # not present
 
           return self.rxEVPN_RT2( vni, mac, event.nexthop, is_from_proxy, GetMACMobility() )
         else:
@@ -221,7 +221,7 @@ class EVPNProxy(object):
 
      if mac in mac_vrf:
          cur = mac_vrf[ mac ]
-         logging.info( f"MAC {mac} already announced: {cur}, checking for MAC move" )
+         logging.info( f"MAC {mac} already known: {cur}, checking for MAC move" )
          if cur['vtep'] == vtep:
             logging.info( f"VNI {vni}: MAC {mac} already announced with static VTEP {vtep}" )
 
@@ -231,6 +231,9 @@ class EVPNProxy(object):
             return False
 
          mobility_seq = cur['seq'] + 1
+         if mobility_seq > 0xffffffff:
+             logging.error( "Mobility sequence wrap-around detected" )
+
          if cur['vtep'] != "tbd":
             logging.info( f"MAC move - VTEP changed to {cur['vtep']}, withdrawing my route" )
             self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
@@ -248,7 +251,7 @@ class EVPNProxy(object):
          cur.update( { 'vtep' : vtep, 'seq' : mobility_seq } )
      elif is_static_vtep:
          logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with static VTEP {vtep}" )
-         mac_vrf.update( { mac : { 'vtep': vtep, 'seq': -1 } } )
+         mac_vrf.update( { mac : { 'vtep': vtep, 'seq': 0 } } )
      else:
          logging.info( f"VNI {vni}: MAC {mac} from EVPN VTEP {vtep} - ignoring" )
          return False
@@ -259,7 +262,7 @@ class EVPNProxy(object):
      return True
 
  # Quite some similarities with ARP path
- def rxEVPN_RT2( self, vni, mac, vtep, is_from_proxy, mac_mobility=-1 ):
+ def rxEVPN_RT2( self, vni, mac, vtep, is_from_proxy, mac_mobility=0 ):
      mac_vrf = self.vni_2_macvrf[ vni ] if vni in self.vni_2_macvrf else {}
      if mac in mac_vrf:
          cur = mac_vrf[ mac ]
@@ -272,15 +275,19 @@ class EVPNProxy(object):
              self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
              del mac_vrf[ mac ]
          elif cur['vtep'] != vtep and cur['vtep'] != 'tbd':
-
-             # XXX is this really a use case for MAC Mobility Sequence?
              if mac_mobility > cur['seq']:
                 logging.info( f"Different VTEP and local mobility sequence {cur['seq']} lower than peer proxy {mac_mobility} - withdrawing route" )
                 self.withdrawEVPNRoute( f"{cur['vtep']}:{evi}", mac )
                 cur['vtep'] = 'tbd' # Keep state, but mark it as withdrawn
-
-         # TODO: Need to update local mobility sequence if peer's is higher?
-
+                cur['seq'] = mac_mobility # In case MAC moves back
+     else:
+        # In order to support a potential future MAC move, keep track of MACs
+        # and their mobility sequence number
+        if vni not in self.vni_2_macvrf:
+           self.vni_2_macvrf[ vni ] = mac_vrf
+        # TODO process static flag too
+        logging.info( f"Unknown MAC {mac}, tracking mobility sequence {mac_mobility}" )
+        mac_vrf.update( { mac : { 'vtep': 'tbd', 'seq': mac_mobility } } )
 
  def checkAdvertisedRoute( self, vni, mac ):
     logging.info( f"checkAdvertisedRoute vni={vni} mac={mac} table={self.vni_2_macvrf}" )

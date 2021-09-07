@@ -1,6 +1,6 @@
 import eventlet
 import unittest
-import aiounittest # until Python 3.8 is available
+# import aiounittest # until Python 3.8 is available
 import logging
 import sys
 import asyncio
@@ -50,7 +50,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    # Cannot 'await'
    self.evpn_proxy.connectBGP_EVPN() # TODO wait for connect event
 
-   eventlet.sleep(5)
+   eventlet.sleep(8)
 
    self.assertTrue( self.evpn_proxy.isEVPNVTEP(VTEP3),
      f"Proxy failed to detect EVPN VTEP {VTEP3}" )
