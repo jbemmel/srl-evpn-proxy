@@ -231,8 +231,8 @@ class EVPNProxy(object):
             return False
 
          mobility_seq = cur['seq'] + 1
-         if mobility_seq > 0xffffffff:
-             logging.error( "Mobility sequence wrap-around detected" )
+         # if mobility_seq > 0xffffffff: # Python has no unsigned int
+         #     logging.error( "Mobility sequence wrap-around detected" )
 
          if cur['vtep'] != "tbd":
             logging.info( f"MAC move - VTEP changed to {cur['vtep']}, withdrawing my route" )

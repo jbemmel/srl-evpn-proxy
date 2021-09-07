@@ -5,6 +5,8 @@ import logging
 import sys
 import asyncio
 
+from dask.distributed import Client, Queue
+
 from ryu.lib import hub
 
 # unittest replaces sys.stdout/sys.stderr
@@ -111,4 +113,17 @@ if __name__ == '__main__':
   # asyncio.run( unittest.main() ) # Python 3.7+
   # loop = asyncio.get_event_loop()
   # loop.run_until_complete( unittest.main() )
-  unittest.main()
+  schedulerAddr = (sys.argv[1]+":8786") if len(sys.argv)>1 else None
+
+  client = Client( address=schedulerAddr, processes=False, n_workers=1, threads_per_worker=1 )  # set up local Dash cluster
+  # if schedulerAddr is not None:
+      # client.cluster.scheduler.broadcast( "start" )
+
+  queue = Queue( name="EVPNProxy_Test", client=client )
+  if schedulerAddr is None:
+      future = queue.get()
+      print( future.result() )
+  else:
+      queue.put( "Message from Proxy2 worker" )
+
+  # unittest.main()
