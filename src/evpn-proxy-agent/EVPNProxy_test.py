@@ -2,12 +2,12 @@ import eventlet
 import unittest
 # import aiounittest # until Python 3.8 is available
 import logging
+import socket
+
 import sys
 import asyncio
 
-from dask.distributed import Client, Queue
-
-from ryu.lib import hub
+# from ryu.lib import hub
 
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
@@ -64,6 +64,14 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
+   # Synchronize client/server
+   if serverAddr is None:
+      sync_msg = sock.recv( bufsize=256 )
+      print( f"Server: sync_msg={sync_msg}")
+   else:
+      print( "Client: sending sync_msg" )
+      sock.sendall("setUp")
+
  def tearDown(self):
    print( "TEARDOWN - shutdown EVPN proxy" )
    self.evpn_proxy.shutdown()
@@ -110,20 +118,24 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
 
 
 if __name__ == '__main__':
+  # 8378 == "TEST" on a phone dialpad
+  serverAddr = (sys.argv[1]+":8378") if len(sys.argv)>1 else None
+
+  # Create a TCP/IP socket
+  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+  if serverAddr is None:
+      sock.bind( ("1.1.1.4",8378) )
+      sock.listen(1)
+      clientsock, clientAddr = sock.accept()
+  else:
+      sock.connect( serverAddr )
+
   # asyncio.run( unittest.main() ) # Python 3.7+
   # loop = asyncio.get_event_loop()
   # loop.run_until_complete( unittest.main() )
-  schedulerAddr = (sys.argv[1]+":8786") if len(sys.argv)>1 else None
-
-  client = Client( address=schedulerAddr, processes=False, n_workers=1, threads_per_worker=1 )  # set up local Dash cluster
-  # if schedulerAddr is not None:
-      # client.cluster.scheduler.broadcast( "start" )
-
-  queue = Queue( name="EVPNProxy_Test", client=client )
-  if schedulerAddr is None:
-      future = queue.get()
-      print( future.result() )
-  else:
-      queue.put( "Message from Proxy2 worker" )
-
-  # unittest.main()
+  try:
+     print( "Starting UnitTest..." )
+     unittest.main()
+  finally:
+     sock.close()

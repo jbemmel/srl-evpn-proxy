@@ -104,6 +104,22 @@
             }
           },
           {
+            "sequence-id": 65,
+            "description": "Accept incoming TEST when the other host initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "destination-port": {
+                "operator": "eq",
+                "value": 8378
+              }
+            }
+          },
+          {
             "sequence-id": 70,
             "description": "Accept incoming SSH when this router initiates the TCP connection",
             "action": {
@@ -116,6 +132,22 @@
               "source-port": {
                 "operator": "eq",
                 "value": 22
+              }
+            }
+          },
+          {
+            "sequence-id": 75,
+            "description": "Accept incoming TEST when this router initiates the TCP connection",
+            "action": {
+              "accept": {
+
+              }
+            },
+            "match": {
+              "protocol": "tcp",
+              "source-port": {
+                "operator": "eq",
+                "value": 8378
               }
             }
           },
