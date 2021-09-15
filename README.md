@@ -322,6 +322,72 @@ In the latter case, when the EVPN proxy receives a MAC update for a MAC it has a
 ## A note on sFlow sampling
 On physical SRL nodes, sFlow sampling could be used to learn MAC/IP routes, instead of eBPF filters. If required and over time, the sampling frequency could be reduced, or a target could be set on the number of VTEPs to discover before transitioning to a forwarding-only mode
 
+# Using BFD for SLA monitoring
+SR Linux supports BFD on static routes, which can be used to monitor VTEP-to-VTEP connectivity (using a configurable interval):
+
+SRL1
+```
+${PEER=1.1.1.7}
+```
+SRL2
+```
+${PEER=1.1.1.5}
+```
+
+```
+enter candidate                        
+/bfd subinterface system0.0 admin-state enable
+/network-instance default static-routes route ${PEER}/32 next-hop-group srl2
+/network-instance default next-hop-groups group srl2 nexthop 0 
+ip-address ${PEER}
+admin-state enable
+failure-detection enable-bfd local-address ${/interface[name=system0]/subinterface[index=0]/ipv4/address/ip-prefix| _.split('/')[0] }
+commit stay
+```
+
+This results in an active BFD session which checks connectivity every [interval] seconds (default 1s):
+```
+A:srl1# info from state /bfd                                                                                                                                                                                       
+    bfd {
+        total-bfd-sessions 1
+        total-unmatched-bfd-packets 31
+        subinterface system0.0 {
+            admin-state enable
+            desired-minimum-transmit-interval 1000000
+            required-minimum-receive 1000000
+            detection-multiplier 3
+            minimum-echo-receive-interval 0
+        }
+        network-instance default {
+            peer 16385 {
+                oper-state up
+                local-address 1.1.1.5
+                remote-address 1.1.1.7
+                remote-discriminator 16386
+                subscribed-protocols STATIC_ROUTE
+                session-state UP
+                remote-session-state UP
+                last-state-transition "12 minutes ago"
+                failure-transitions 0
+                local-diagnostic-code DETECTION_TIMEOUT
+                remote-diagnostic-code NO_DIAGNOSTIC
+                remote-minimum-receive-interval 1000000
+                remote-control-plane-independent false
+                active-transmit-interval 1000000
+                active-receive-interval 1000000
+                remote-multiplier 3
+                async {
+                    last-packet-transmitted "4 seconds ago"
+                    last-packet-received "4 seconds ago"
+                    transmitted-packets 1763
+                    received-packets 1494
+                    up-transitions 2
+                }
+            }
+        }
+    }
+```
+
 ## Other options considered
 I looked into attaching to the loopback TCP connection between the datapath (sr_xdp_lc_1) and the ARP/ND manager process (sr_arp_nd_mgr); there are 3 connections, and one of them received a packet containing the ARP request from a host. However, as neither the VTEP IP nor the VXLAN VNID are available in this message, there appears to be no easy way to associate the source MAC from these ARP packets with the correct service.
 
