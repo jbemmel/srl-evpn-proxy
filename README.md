@@ -337,8 +337,8 @@ ${PEER=1.1.1.5}
 ```
 enter candidate                        
 /bfd subinterface system0.0 admin-state enable
-/network-instance default static-routes route ${PEER}/32 next-hop-group srl2
-/network-instance default next-hop-groups group srl2 nexthop 0 
+/network-instance default static-routes route ${PEER}/32 next-hop-group peer-vtep-${PEER}
+/network-instance default next-hop-groups group peer-vtep-${PEER} nexthop 0 
 ip-address ${PEER}
 admin-state enable
 failure-detection enable-bfd local-address ${/interface[name=system0]/subinterface[index=0]/ipv4/address/ip-prefix| _.split('/')[0] }
