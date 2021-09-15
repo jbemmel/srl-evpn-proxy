@@ -338,7 +338,8 @@ ${PEER=1.1.1.5}
 enter candidate                        
 /bfd subinterface system0.0 admin-state enable
 /network-instance default static-routes 
-route ${PEER}/32 
+route ${PEER}/32
+admin-state enable
 next-hop-group peer-vtep-${PEER}
 /network-instance default next-hop-groups group peer-vtep-${PEER} nexthop 0 
 ip-address ${PEER}
