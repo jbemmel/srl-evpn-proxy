@@ -39,7 +39,7 @@ Using [Containerlab](https://containerlab.srlinux.dev/), the following topology 
 ![plot](images/EVPN_proxy_lab_with_spine.png)
 
 ```
-git clone & make https://github.com/jbemmel/containerlab.git to get a customized containerlab binary with agent support
+bash -c "$(curl -sL https://get-clab.srlinux.dev)" # install Containerlab, version 0.18 or higher
 git clone & make https://github.com/jbemmel/srl-baseimage
 make # to build the custom 'srl/evpn-proxy-agent' Docker container
 cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
