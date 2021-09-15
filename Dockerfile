@@ -29,6 +29,11 @@ RUN cd /tmp && yum install -y git python3-devel && \
 # GRPC_BUILD_WITH_BORING_SSL_ASM="" GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=true GRPC_PYTHON_BUILD_SYSTEM_ZLIB=true
 # GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1 to see errors
 
+# Also build Etherate tool
+RUN cd /tmp && git clone https://github.com/jwbensley/Etherate.git && \
+  yum install -y libtool autoconf automake diffutils file make && \
+  cd Etherate && ./configure.sh && make && make install
+
 FROM target-image AS final
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
@@ -37,6 +42,9 @@ FROM target-image AS final
 
 # Add custom grpc, keep default one /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/grpc too
 COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/grpc /usr/local/lib64/python3.6/site-packages/grpc
+
+# Add custom built etherate tool
+COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
