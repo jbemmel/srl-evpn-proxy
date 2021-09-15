@@ -36,6 +36,9 @@ import lldp_service_pb2
 import config_service_pb2
 import sdk_common_pb2
 
+# Local gNMI connection
+from pygnmi.client import gNMIclient, telemetryParser
+
 # To report state back
 import telemetry_service_pb2
 import telemetry_service_pb2_grpc
@@ -110,6 +113,51 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
+def Configure_BFD(state,remote_evpn_vtep):
+   logging.info(f"Configure_BFD :: remote_evpn_vtep={remote_evpn_vtep}")
+
+   nh_group_name = f"vtep-{remote_evpn_vtep}"
+   static_route = {
+     "static-routes": {
+      "route": [
+       {
+         "prefix": f"{remote_evpn_vtep}/32",
+         "admin-state": "enable",
+         "next-hop-group": nh_group_name
+       }
+      ]
+     },
+     "next-hop-groups": {
+      "group": [
+       {
+        "name": nh_group_name,
+        "nexthop": [
+          {
+            "index": 0,
+            "ip-address": f"{remote_evpn_vtep}",
+            "admin-state": "enable",
+            "failure-detection": {
+              "enable-bfd": {
+                # XXX Need to specify local VTEP IP in config, TODO read this
+                # using c.get( system0.0 IP )
+                "local-address": f"{state.params[ 'peer_address' ]}"
+              }
+            }
+          }
+        ]
+       }
+      ]
+     }
+   }
+
+   updates = [
+     ('/bfd/subinterface[name=system0.0]', { 'admin-state': 'enable' } ),
+     ('/network-instance[name=default]', static_route)
+   ]
+   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+                     username="admin",password="admin",insecure=True) as c:
+      c.set( encoding='json_ietf', update=updates )
+
 def WithdrawRoute( bgp_speaker, vni, rd, mac, ip ):
     bgp_speaker.evpn_prefix_del(
       route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
@@ -155,6 +203,8 @@ def runBGPThread( state ):
             # SRL EVPN VTEP does not normally include an 'originator' attribute
             if originator_id and originator_id.value != event.nexthop:
                logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
+
+
             else:
                logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
                evpn_vteps[ event.nexthop ] = event.remote_as
@@ -246,8 +296,13 @@ def runBGPThread( state ):
        static_vtep = v['value']
        # params['vnis']!='*': enforced by YANG (TODO)
        for vni in state.params['vnis']:
-         rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
-         bgp_vrfs[ rd ] = static_vtep
+
+         # TODO need to map VNI to EVI, currently only supports 1 VNI
+         if rd not in bgp_vrfs:
+           rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
+           bgp_vrfs[ rd ] = static_vtep
+         else:
+           logging.warning( f"Multiple VNIs({vni}) are not yet supported, mapping to EVI missing" )
 
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
      # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
