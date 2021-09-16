@@ -83,16 +83,27 @@ We can enable the EVPN proxy on SRL1 (or SRL2, or both):
 enter candidate
 /network-instance default protocols 
 bgp {
-  group leaves {
+  group vxlan-agent {
+    admin-state enable
+    peer-as 65000 !!! iBGP
+    ipv4-unicast {
+       admin-state disable
+    }
+    ipv6-unicast {
+       admin-state disable
+    }
+    evpn {
+       admin-state enable
+    }
     route-reflector {
       client true
       cluster-id ${/network-instance[name=default]/protocols/bgp/router-id}
     }
   }
   neighbor ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]} {
-    description "Local EVPN proxy agent"
+    description "Local EVPN proxy agent for static VXLAN"
     admin-state enable
-    peer-group leaves
+    peer-group vxlan-agent
   }
   trace-options {
      flag packets {
