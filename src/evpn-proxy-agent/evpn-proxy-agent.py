@@ -614,9 +614,9 @@ def Run():
                 Handle_Notification(obj, state)
                 logging.info(f'Updated state: {state}')
 
-                # Test BFD
-                logging.info( "Test gNMI BFD config" )
-                Configure_BFD(state,"1.2.3.4")
+                # Test BFD - times out
+                # logging.info( "Test gNMI BFD config" )
+                # Configure_BFD(state,"1.2.3.4")
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'GOING TO EXIT NOW: {err}')
