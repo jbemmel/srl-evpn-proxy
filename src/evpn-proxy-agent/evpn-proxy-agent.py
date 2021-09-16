@@ -299,7 +299,7 @@ def runBGPThread( state ):
        for vni in state.params['vnis']:
 
          # TODO need to map VNI to EVI, currently only supports 1 VNI
-         if rd not in bgp_vrfs:
+         if vni == state.params['vnis'][0]:
            rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
            bgp_vrfs[ rd ] = static_vtep
          else:
