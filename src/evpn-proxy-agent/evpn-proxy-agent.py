@@ -258,7 +258,8 @@ def runBGPThread( state ):
 
       # Never remove EVPN VTEP from list, assume once EVPN = always EVPN
     except Exception as ex:
-      logging.error( f"Exception in best_path_change_handler: {ex}" )
+      tb_str = ''.join(traceback.format_tb(ex.__traceback__))
+      logging.error( f"Exception in best_path_change_handler: {ex} ~ {tb_str}" )
 
   def peer_up_handler(router_id, remote_as):
       logging.warning( f'Peer UP: {router_id} {remote_as}' )
