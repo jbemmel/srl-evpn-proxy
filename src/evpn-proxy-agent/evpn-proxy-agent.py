@@ -204,8 +204,9 @@ def runBGPThread( state ):
             if originator_id and originator_id.value != event.nexthop:
                logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
 
-               # TODO if (state.enabled)
-               Configure_BFD(state,originator_id.value)
+               # TODO if (state.enabled), remove upon withdraw
+               # Fails: timeout
+               # Configure_BFD(state,originator_id.value)
             else:
                logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
                evpn_vteps[ event.nexthop ] = event.remote_as
@@ -612,6 +613,10 @@ def Run():
             else:
                 Handle_Notification(obj, state)
                 logging.info(f'Updated state: {state}')
+
+                # Test BFD
+                logging.info( "Test gNMI BFD config" )
+                Configure_BFD(state,"1.2.3.4")
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'GOING TO EXIT NOW: {err}')
