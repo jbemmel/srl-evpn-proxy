@@ -204,7 +204,8 @@ def runBGPThread( state ):
             if originator_id and originator_id.value != event.nexthop:
                logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
 
-
+               # TODO if (state.enabled)
+               Configure_BFD(state,originator_id.value)
             else:
                logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
                evpn_vteps[ event.nexthop ] = event.remote_as
