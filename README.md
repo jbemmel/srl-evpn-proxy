@@ -114,13 +114,12 @@ bgp {
      }
   }
 }
-experimental-bgp-evpn-proxy
+vxlan-agent
   local-as 65000
   peer-as 65000
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
-  vxlan-interface e1-1
+  vxlan-interface [ e1-1 ]
   vnis [ ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni} ]
-  vxlan-remoteips [ 1.1.1.1 ]
   evi 57069
   admin-state enable
 
