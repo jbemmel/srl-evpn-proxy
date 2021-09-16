@@ -119,13 +119,14 @@ vxlan-agent
   peer-as 65000
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   vxlan-arp-learning-interface [ e1-1 ]
-  vnis [ ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni} ]
-  evi 57069
   admin-state enable
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
-  proxy true
-  static-vxlan-remoteips [ 1.1.1.1 ]
+  vxlan-agent
+    admin-state enable
+    static-vxlan-remoteips [ 1.1.1.1 ]
+    evi 57069
+    vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
 
 commit stay
 ```
