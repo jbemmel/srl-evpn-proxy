@@ -1118,12 +1118,12 @@
       "admin-state": "enable",
       "subinterface": [
         {
-          "index": 1,
+          "index": 0,
           "admin-state": "enable",
           "ipv4": {
             "address": [
               {
-                "ip-prefix": "10.10.10.1/24",
+                "ip-prefix": "10.0.0.1/24",
                 "primary": [null]
               }
             ]
@@ -1515,6 +1515,9 @@
       "interface": [
         {
           "name": "ethernet-1/2.0"
+        },
+        {
+          "name": "irb0.0"
         }
       ],
       "vxlan-interface": [
