@@ -266,7 +266,34 @@ echo 'name ~ "e1-*"' > /sys/kernel/debug/tracing/events/net/netif_receive_skb/fi
 
 To track specific packets - like ARP packets for example - we can filter on specific lengths:
 ```
-echo 'name ~ "e1-*" && len == 72' > /sys/kernel/debug/tracing/events/net/netif_receive_skb/filter
+17:46:16.622045 02:a5:e4:ff:00:01 > 02:80:2e:ff:00:03, ethertype IPv4 (0x0800), length 92: (tos 0x0, ttl 255, id 15, offset 0, flags [DF], proto UDP (17), length 78)
+    1.1.1.5.51309 > 1.1.1.1.4789: VXLAN, flags [I] (0x08), vni 11189196
+aa:c1:ab:e1:98:8e > aa:c1:ab:ee:23:c1, ethertype ARP (0x0806), length 42: Ethernet (len 6), IPv4 (len 4), Reply 10.0.0.103 is-at aa:c1:ab:e1:98:8e, length 28
+	0x0000:  4500 004e 000f 4000 ff11 7788 0101 0105  E..N..@...w.....
+	0x0010:  0101 0101 c86d 12b5 003a 0000 0800 0000  .....m...:......
+	0x0020:  aabb cc00 aac1 abee 23c1 aac1 abe1 988e  ........#.......
+	0x0030:  0806 0001 0800 0604 0002 aac1 abe1 988e  ................
+	0x0040:  0a00 0067 aac1 abee 23c1 0a00 0065       ...g....#....e
+17:46:16.626903 02:80:2e:ff:00:03 > 02:a5:e4:ff:00:01, ethertype IPv4 (0x0800), length 92: (tos 0x0, ttl 63, id 54742, offset 0, flags [none], proto UDP (17), length 78)
+    1.1.1.1.39822 > 1.1.1.5.4789: VXLAN, flags [I] (0x08), vni 11189196
+aa:c1:ab:ee:23:c1 > aa:c1:ab:e1:98:8e, ethertype ARP (0x0806), length 42: Ethernet (len 6), IPv4 (len 4), Reply 10.0.0.101 is-at aa:c1:ab:ee:23:c1, length 28
+	0x0000:  4500 004e d5d6 0000 3f11 a1c1 0101 0101  E..N....?.......
+	0x0010:  0101 0105 9b8e 12b5 003a d052 0800 0000  .........:.R....
+	0x0020:  aabb cc00 aac1 abe1 988e aac1 abee 23c1  ..............#.
+	0x0030:  0806 0001 0800 0604 0002 aac1 abee 23c1  ..............#.
+	0x0040:  0a00 0065 aac1 abe1 988e 0a00 0067       ...e.........g
+
+[linuxadmin@srl1 ~]$ sudo tcpdump -i e1-2 -nnveX arp
+tcpdump: listening on e1-2, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+17:53:38.480219 aa:c1:ab:e1:98:8e > aa:c1:ab:ee:23:c1, ethertype ARP (0x0806), length 42: Ethernet (len 6), IPv4 (len 4), Request who-has 10.0.0.101 tell 10.0.0.103, length 28
+	0x0000:  0001 0800 0604 0001 aac1 abe1 988e 0a00  ................
+	0x0010:  0067 0000 0000 0000 0a00 0065            .g.........e
+```
+
+As illustrated, ARP-in-VXLAN packets are (14+78)+(14+28) = 134 bytes; without VXLAN encapsulation, they are 72
+
+```
+echo 'name ~ "e1-*" && (len == 72 || len == 134)' > /sys/kernel/debug/tracing/events/net/netif_receive_skb/filter
 ```
 
 # EVPN MAC Mobility
