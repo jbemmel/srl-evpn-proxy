@@ -1457,6 +1457,20 @@
               },
               "evpn": {
                 "admin-state": "enable"
+              }
+            },
+            {
+              "group-name": "vxlan-agent",
+              "admin-state": "enable",
+              "peer-as": 65000,
+              "ipv4-unicast": {
+                "admin-state": "disable"
+              },
+              "ipv6-unicast": {
+                "admin-state": "disable"
+              },
+              "evpn": {
+                "admin-state": "enable"
               },
               "route-reflector": {
                 "client": true,
@@ -1474,10 +1488,10 @@
               }
             },
             {
-              "description": "Local EVPN proxy agent",
+              "description": "Local EVPN proxy agent for static VXLAN",
               "peer-address": "1.1.1.4",
               "admin-state": "enable",
-              "peer-group": "leaves"
+              "peer-group": "vxlan-agent"
             }
           ]
         }

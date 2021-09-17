@@ -1458,21 +1458,39 @@
               "evpn": {
                 "admin-state": "enable"
               }
+            },
+            {
+              "group-name": "vxlan-agent",
+              "admin-state": "enable",
+              "peer-as": 65000,
+              "ipv4-unicast": {
+                "admin-state": "disable"
+              },
+              "ipv6-unicast": {
+                "admin-state": "disable"
+              },
+              "evpn": {
+                "admin-state": "enable"
+              },
+              "route-reflector": {
+                "client": true,
+                "cluster-id": "1.1.1.7"
+              }
             }
           ],
           "neighbor": [
             {
               "peer-address": "1.1.1.6",
-	      "description": "EVPN proxy 2",
+	            "description": "EVPN proxy 2",
               "admin-state": "enable",
-              "peer-group": "leaves"
+              "peer-group": "vxlan-agent"
             },
             {
               "peer-address": "1.1.1.5",
               "admin-state": "enable",
               "peer-group": "leaves",
               "transport": {
-               "local-address": "1.1.1.7"
+                "local-address": "1.1.1.7"
               }
             }
           ]
