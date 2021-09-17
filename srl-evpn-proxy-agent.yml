@@ -7,7 +7,7 @@ srl_evpn_proxy_agent:
    failure-threshold: 100
    failure-action: wait=forever
    author: 'Nokia'
-   version-command: ' cat build_version'
+   version-command: ' cat /opt/srlinux/agents/evpn-proxy-agent/agent_version'
    yang-modules:
        names:
            - "srl-evpn-proxy-agent"
