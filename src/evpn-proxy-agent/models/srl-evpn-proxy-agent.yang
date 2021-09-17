@@ -60,7 +60,7 @@ module srl-evpn-proxy-agent {
               description "Remote IP to connect to, default localhost";
             }
 
-            leaf-list vxlan-arp-learning-interface {
+            leaf-list vxlan-arp-learning-interfaces {
               type string;
               description "Interface(s) to listen on for VXLAN ARP packets, like 'e1-1'.
                            Leave empty to disable ARP/VTEP learning";

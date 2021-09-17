@@ -563,8 +563,8 @@ def Handle_Notification(obj, state):
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
-                if 'vxlan_arp_learning_interface' in data:
-                    state.params[ "vxlan_interfaces" ] = [ i['value'] for i in data['vxlan_arp_learning_interface'] ]
+                if 'vxlan_arp_learning_interfaces' in data:
+                    state.params[ "vxlan_interfaces" ] = [ i['value'] for i in data['vxlan_arp_learning_interfaces'] ]
 
 
             # cleanup ARP thread always, use link()?
