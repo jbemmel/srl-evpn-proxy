@@ -249,9 +249,25 @@ rtt min/avg/max/mdev = 2.633/2.935/3.238/0.307 ms
 ```
 This could be avoided by running the EVPN proxy on every SRL node.
 
-## TODO
-* EVPN proxy requires VXLAN traffic to be sent to the SRL node, and hence should only be provisioned for mac-vrfs with bgp-evpn that are configured (not arbitrary VNIDs). The YANG model hooks are added (proxy=true), but currently not used; a specific EVI and VNID list must be configured instead.
-* eBPF ARP filter could reduce packets sent to userspace by implementing a hashmap of ARPs already forwarded; the Python userspace could program a list of EVPN VTEPs to ignore
+# Packet tracing using Linux kernel trace events
+The Linux kernel supports trace events, which can be used to track packets as they move through the fabric.
+As root:
+```
+echo 1 > /sys/kernel/debug/tracing/events/net/netif_receive_skb/enable
+cat /sys/kernel/debug/tracing/trace_pipe
+    <idle>-0     [030] ..s. 17429.831685: netif_receive_skb: dev=eth0 skbaddr=ffff99a3b231d600 len=52
+    <idle>-0     [030] .Ns. 17429.831694: netif_receive_skb: dev=eth0 skbaddr=ffff99a3b231d600 len=52
+```
+
+We can filter for SR Linux interfaces only:
+```
+echo 'name ~ "e1-*"' > /sys/kernel/debug/tracing/events/net/netif_receive_skb/filter
+```
+
+To track specific packets - like ARP packets for example - we can filter on specific lengths:
+```
+echo 'name ~ "e1-*" && len == 72' > /sys/kernel/debug/tracing/events/net/netif_receive_skb/filter
+```
 
 # EVPN MAC Mobility
 EVPN MAC Mobility procedures are defined in [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432#section-7.7) and amount to adding a sequence number extended community to RT2 updates. Ryu supports the parsing and generation of these attributes, but the code currently does not use them; a patch was created to change that.
@@ -415,6 +431,8 @@ As an optimization, I considered using a "map of maps" (BPF_MAP_TYPE_HASH_OF_MAP
 However, ARP packets are rare enough to not represent a large burden on the CPU, and a simple VXLAN ARP filter is easier to program.
 
 I tried collecting sFlow samples, but the SR Linux container image only seems to send counter samples, not packet samples.
+
+eBPF ARP filter could reduce packets sent to userspace by implementing a hashmap of ARPs already forwarded; the Python userspace could program a list of EVPN VTEPs to ignore
 
 # Sources used
 
