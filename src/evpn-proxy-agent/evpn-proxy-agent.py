@@ -83,6 +83,12 @@ channel = grpc.insecure_channel('127.0.0.1:50053')
 metadata = [('agent_name', agent_name)]
 stub = sdk_service_pb2_grpc.SdkMgrServiceStub(channel)
 
+# Try global gNMI connection
+#gnmi = gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
+#                  username="admin",password="admin",
+#                  insecure=True, debug=False)
+#gnmi.connect()
+
 ############################################################
 ## Subscribe to required event
 ## This proc handles subscription of: Interface, LLDP,
@@ -154,9 +160,12 @@ def Configure_BFD(state,remote_evpn_vtep):
      ('/bfd/subinterface[name=system0.0]', { 'admin-state': 'enable' } ),
      ('/network-instance[name=default]', static_route)
    ]
+
    with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                     username="admin",password="admin",insecure=True) as c:
+                   username="admin",password="admin",insecure=True) as c:
       c.set( encoding='json_ietf', update=updates )
+   #global gnmi
+   #gnmi.set( encoding='json_ietf', update=updates )
 
 def WithdrawRoute( bgp_speaker, vni, rd, mac, ip ):
     bgp_speaker.evpn_prefix_del(
@@ -167,6 +176,15 @@ def WithdrawRoute( bgp_speaker, vni, rd, mac, ip ):
       mac_addr=mac,
       ip_addr=ip
     )
+
+def UpdateMACVRF( state, name, params ):
+   logging.info( f"UpdateMACVRF name={name} params={params}" )
+
+   # Update VNI to EVI mapping
+   state.vni_2_evi[ params['vni'] ] = params['evi']
+
+   for static_vtep in params['vxlan_vteps']:
+      Add_Static_VTEP( state, state.params, static_vtep, params['vni'] )
 
 #
 # Runs BGP EVPN as a separate thread>, using Ryu hub
@@ -183,13 +201,12 @@ def runBGPThread( state ):
      NEIGHBOR = LOCAL_LOOPBACK
 
   evpn_vteps = {}
-  bgp_vrfs = {} # Set of RDs of VRFs created, one per EVI RD -> { VTEP that created it }
 
   # Since this application only supports single homed endpoints, the ESI=0 and
   # we can organize MAC tables per VXLAN VNI (24-bit)
   # mac_vrfs: { vni: { mac: { vtep, last known ip, sequence_number } AND ip: {mac} } }
   mac_vrfs = {}
-  speaker = None # Created below
+
   def best_path_change_handler(event):
     logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
@@ -215,6 +232,11 @@ def runBGPThread( state ):
          # event.label is reduced to the 20-bit MPLS label
          elif hasattr( event.path.nlri, 'vni'):
            vni = event.path.nlri.vni
+           if vni not in state.vni_2_evi:
+               logging.warning( f"No mapping for VNI: {vni}" )
+               return
+           evi = state.vni_2_evi[ vni ]
+
            if vni in mac_vrfs:
              cur_macs = mac_vrfs[ vni ]
              logging.info( f"Received EVPN route update for VNI {vni}: {cur_macs}" )
@@ -230,7 +252,7 @@ def runBGPThread( state ):
                      if not originator_id or originator_id.value == event.nexthop:
                         logging.info( f"Removing MAC moved to EVPN VTEP {event.nexthop} from EVPN proxy: {mac}" )
                         old_ip = cur['ip'] if state.params['include_ip'] else None
-                        WithdrawRoute( speaker, vni, f"{cur['vtep']}:{state.params['evi']}", mac, old_ip )
+                        WithdrawRoute( state.speaker, vni, f"{cur['vtep']}:{evi}", mac, old_ip )
                         del cur_macs[ mac ]
                      # else (from other EVPN proxy) only withdraw if VTEP IP changed, but don't remove MAC
                      # as we need to keep track of the mobility sequence number
@@ -250,7 +272,7 @@ def runBGPThread( state ):
 
                         logging.info( f"Withdrawing MAC {mac} route announced by other EVPN proxy {originator_id.value} with different VTEP: {event.nexthop}" )
                         old_ip = cur['ip'] if state.params['include_ip'] else None
-                        WithdrawRoute( speaker, vni, f"{cur['vtep']}:{state.params['evi']}", mac, old_ip )
+                        WithdrawRoute( state.speaker, vni, f"{cur['vtep']}:{evi}", mac, old_ip )
                         cur['vtep'] = "tbd" # Mark as withdrawn
                      else:
                         logging.warning( "TODO: Compare/update mobility sequence number, even if same VTEP nexthop?" )
@@ -265,9 +287,11 @@ def runBGPThread( state ):
   def peer_up_handler(router_id, remote_as):
       logging.warning( f'Peer UP: {router_id} {remote_as}' )
       # Start ARP thread if not already
-      if not hasattr(state,'arp_thread') and state.params['vxlan_interface']!="":
-         logging.info( "Starting ARP listener thread..." )
-         state.arp_thread = hub.spawn( ARP_receiver_thread, speaker, state.params, evpn_vteps, bgp_vrfs, mac_vrfs )
+      if not hasattr(state,'arp_threads') and state.params['vxlan_interfaces']!=[]:
+         logging.info( "Starting ARP listener thread(s)..." )
+         state.arp_threads = {}
+         for i in state.params['vxlan_interfaces']:
+            state.arp_threads[i] = hub.spawn( ARP_receiver_thread, state, i, state.params, evpn_vteps, mac_vrfs )
 
   def peer_down_handler(router_id, remote_as):
       logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
@@ -275,6 +299,11 @@ def runBGPThread( state ):
   # Need to connect from loopback IP, not 127.0.0.x
   # Router ID is used as tunnel endpoint in BGP UPDATEs
   # => Code updated to allow any tunnel endpoint IP
+
+  # Wait for gNMI socket to exist
+  # while not os.path.exists('/opt/srlinux/var/run/sr_gnmi_server'):
+  #   logging.info("Waiting for gNMI unix socket to be created...")
+  #   eventlet.sleep(1)
 
   # During system startup, wait for netns to be created
   while not os.path.exists('/var/run/netns/srbase-default'):
@@ -286,30 +315,22 @@ def runBGPThread( state ):
   with netns.NetNS(nsname="srbase-default"):
      logging.info("Starting BGPSpeaker in netns...")
 
-     speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK], bgp_server_port=1179,
-                               as_number=state.params['local_as'],
-                               local_pref=state.params['local_preference'],
-                               router_id=LOCAL_LOOPBACK,
-                               best_path_change_handler=best_path_change_handler,
-                               peer_up_handler=peer_up_handler,
-                               peer_down_handler=peer_down_handler)
+     state.speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK],
+                                bgp_server_port=1179,
+                                as_number=state.params['local_as'],
+                                local_pref=state.params['local_preference'],
+                                router_id=LOCAL_LOOPBACK,
+                                best_path_change_handler=best_path_change_handler,
+                                peer_up_handler=peer_up_handler,
+                                peer_down_handler=peer_down_handler)
 
      # Add any static VTEPs/VNIs, before starting ARP thread
-     for v in state.params['vxlan_remoteips']:
-       static_vtep = v['value']
-       # params['vnis']!='*': enforced by YANG (TODO)
-       for vni in state.params['vnis']:
-
-         # TODO need to map VNI to EVI, currently only supports 1 VNI
-         if vni == state.params['vnis'][0]:
-           rd = Add_Static_VTEP( speaker, state.params, static_vtep, vni )
-           bgp_vrfs[ rd ] = static_vtep
-         else:
-           logging.warning( f"Multiple VNIs({vni}) are not yet supported, mapping to EVI missing" )
+     for mac_vrf,data in enumerate( state.params['mac_vrfs'] ):
+        UpdateMACVRF( state, mac_vrf, data )
 
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
      # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-     speaker.neighbor_add( NEIGHBOR,
+     state.speaker.neighbor_add( NEIGHBOR,
                            remote_as=state.params['peer_as'],
                            local_as=state.params['local_as'],
                            enable_ipv4=False, enable_evpn=True,
@@ -323,18 +344,28 @@ def runBGPThread( state ):
      logging.info( "eventlet sleep loop..." )
      eventlet.sleep(30) # every 30s wake up
 
-def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
-    rd = f"{remote_ip}:{params['evi']}"
-    rt = f"{params['local_as']}:{params['evi']}"
+def Add_Static_VTEP( state, params, remote_ip, vni ):
+
+    if vni not in state.vni_2_evi:
+        logging.warning( f"VNI-2-evi mapping not found: {vni}" )
+        return 0, None
+    evi = state.vni_2_evi[ vni ]
+
+    rd = f"{remote_ip}:{evi}"
+    if rd in state.bgp_vrfs:
+        logging.warning( f"MAC VRF already exists: {rd}" )
+        return evi, rd
+
+    rt = f"{params['local_as']}:{evi}"
     logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
-    bgp_speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+    state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
     logging.info("Adding EVPN multicast route...")
     #
     # For RD use the static VTEP's IP, just like it would do if it was
     # EVPN enabled itself. That way, any proxy will announce the same
     # route
     #
-    bgp_speaker.evpn_prefix_add(
+    state.speaker.evpn_prefix_add(
         route_type=EVPN_MULTICAST_ETAG_ROUTE,
         route_dist=rd,
         # esi=0, # should be ignored
@@ -349,10 +380,11 @@ def Add_Static_VTEP( bgp_speaker, params, remote_ip, vni ):
         # Added via patch
         tunnel_endpoint_ip=remote_ip
     )
-    return rd
+    state.bgp_vrfs[ rd ] = remote_ip
+    return evi, rd
 
-def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
-    logging.info( f"Starting ARP listener params {params}" )
+def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
+    logging.info( f"Starting ARP listener on interface={vxlan_intf} params {params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
@@ -364,7 +396,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
     #create raw socket, bind it to interface
     #attach bpf program to socket created
     with netns.NetNS(nsname="srbase"):
-      BPF.attach_raw_socket(function_arp_filter, params['vxlan_interface'])
+      BPF.attach_raw_socket(function_arp_filter, vxlan_intf)
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
@@ -412,15 +444,14 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
         # For RD, use the static VTEP's IP, just as would happen when it would
         # advertise the routes itself. This implies we need to create a VRF
         # per static VTEP locally
-        rd = f"{static_vtep}:{params['evi']}"
+        # rd = f"{static_vtep}:{params['evi']}"
 
         vni_2_mac_vrf = mac_vrfs[ vni ] if vni in mac_vrfs else {}
         mobility_seq = None # First time: no attribute
 
         # TODO check if other proxy is announcing it
-        if rd not in bgp_vrfs:
-           Add_Static_VTEP( bgp_speaker, params, static_vtep, vni )
-           bgp_vrfs[ rd ] = static_vtep
+        # if rd not in state.bgp_vrfs:
+        evi, rd = Add_Static_VTEP( state, params, static_vtep, vni )
 
         if mac in vni_2_mac_vrf:
             cur = vni_2_mac_vrf[ mac ]
@@ -459,7 +490,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
             if cur['vtep'] != "tbd":
                logging.info( f"IP changed {cur['ip']}->{ip}, withdrawing my route" )
                old_ip = cur['ip'] if params['include_ip'] else None
-               WithdrawRoute(bgp_speaker,vni,f"{cur['vtep']}:{params['evi']}",mac,old_ip)
+               WithdrawRoute(state.speaker,vni,f"{cur['vtep']}:{evi}",mac,old_ip)
                vni_2_mac_vrf.pop( old_ip, None ) # Remove any IP mapping too
             else:
                logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
@@ -473,7 +504,7 @@ def ARP_receiver_thread( bgp_speaker, params, evpn_vteps, bgp_vrfs, mac_vrfs ):
 
         mac_vrfs[ vni ] = vni_2_mac_vrf
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
-        bgp_speaker.evpn_prefix_add(
+        state.speaker.evpn_prefix_add(
             route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
             route_dist=rd,
             esi=0, # Single homed
@@ -502,11 +533,13 @@ def Handle_Notification(obj, state):
     if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
+        json_acceptable_string = obj.config.data.json.replace("'", "\"")
+        data = json.loads(json_acceptable_string)
+
         # net_inst = obj.config.key.keys[0] # always "default"
-        if obj.config.key.js_path == ".network_instance.protocols.experimental_bgp_evpn_proxy":
+        if obj.config.key.js_path == ".network_instance.protocols.vxlan_agent":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
-            state.params = {}
             if obj.config.op == 2:
                 logging.info(f"Delete config scenario")
                 # TODO if this is the last namespace, unregister?
@@ -515,9 +548,6 @@ def Handle_Notification(obj, state):
                 # state = State() # Reset state, works?
                 state.params[ "admin_state" ] = "disable" # Only stop service for this namespace
             else:
-                json_acceptable_string = obj.config.data.json.replace("'", "\"")
-                data = json.loads(json_acceptable_string)
-
                 # JvB there should be a helper for this
                 if 'admin_state' in data:
                     state.params[ "admin_state" ] = data['admin_state'][12:]
@@ -533,21 +563,16 @@ def Handle_Notification(obj, state):
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
-                if 'vxlan_interface' in data:
-                    state.params[ "vxlan_interface" ] = data['vxlan_interface']['value']
+                if 'vxlan_arp_learning_interface' in data:
+                    state.params[ "vxlan_interfaces" ] = [ i['value'] for i in data['vxlan_arp_learning_interface'] ]
 
-                state.params[ "vxlan_remoteips" ] = data['vxlan_remoteips'] if 'vxlan_remoteips' in data else []
-                if 'vnis' in data:
-                    state.params[ "vnis" ] = [ int(e['value']) for e in data['vnis'] ]
-                else:
-                    state.params[ "vnis" ] = '*' # all
-                if 'evi' in data: #TODO use 'proxy' flag instead, lookup using gNMI GET
-                    state.params[ "evi" ] = int( data['evi']['value'] )
 
             # cleanup ARP thread always, use link()?
-            if hasattr( state, 'arp_thread' ):
-               hub.kill( state.arp_thread ) # TODO cleanup eBPF
-               del state.arp_thread
+            if hasattr( state, 'arp_threads' ):
+               logging.info( f"Cleaning up ARP threads: {state.arp_threads}" )
+               for thread in state.arp_threads.values():
+                  hub.kill( thread ) # TODO cleanup eBPF
+               del state.arp_threads
 
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
@@ -565,6 +590,24 @@ def Handle_Notification(obj, state):
         # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
         # Lookup configured EVI using gNMI
 
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent":
+          mac_vrf = obj.config.key.keys[0]
+
+          params = {}
+          if 'admin_state' in data:
+             params[ "admin_state" ] = data['admin_state'][12:]
+          params['vxlan_vteps'] = [ i['value'] for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) ]
+          params['vni'] = int( data['vni']['value'] ) if 'vni' in data else 0
+          params['evi'] = int( data['evi']['value'] ) if 'evi' in data else 0
+
+          if mac_vrf not in state.params[ "mac_vrfs" ]:
+              state.params[ "mac_vrfs" ][ mac_vrf ] = params
+          else:
+              state.params[ "mac_vrfs" ][ mac_vrf ].update( **params )
+
+          if hasattr( state, 'bgpThread' ):
+              UpdateMACVRF( state, mac_vrf, params )
+
     else:
         logging.info(f"Unexpected notification : {obj}")
 
@@ -572,7 +615,11 @@ def Handle_Notification(obj, state):
 
 class State(object):
     def __init__(self):
-        self.params = {}       # Set through config
+        self.params = {
+          "mac_vrfs" : {} # Map per mac-vrf
+        }       # Set through config
+        bgp_vrfs = {}
+        vni_2_evi = {}  # Mapping of VNI to EVI
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
@@ -613,10 +660,6 @@ def Run():
             else:
                 Handle_Notification(obj, state)
                 logging.info(f'Updated state: {state}')
-
-                # Test BFD - times out
-                # logging.info( "Test gNMI BFD config" )
-                # Configure_BFD(state,"1.2.3.4")
 
     except grpc._channel._Rendezvous as err:
         logging.info(f'GOING TO EXIT NOW: {err}')

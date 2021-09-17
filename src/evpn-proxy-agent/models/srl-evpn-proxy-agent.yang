@@ -3,6 +3,8 @@ module srl-evpn-proxy-agent {
     yang-version "1";
 
     namespace "urn:srl_nokia_demo/evpn-proxy";
+    // Put it in the same namespace, so we can read EVI config? Does not work
+    // namespace "urn:srl_nokia/network-instance/protocols/bgp-evpn";
 
     prefix "demo_evpn_proxy";
 
@@ -33,10 +35,10 @@ module srl-evpn-proxy-agent {
     grouping evpn-proxy-protocol {
         description "Configure EVPN Proxy";
 
-        container experimental-bgp-evpn-proxy {
-            presence "Configure BGP EVPN proxy";
+        container vxlan-agent {
+            presence "Configure BGP EVPN proxy agent for static VXLAN integration";
             must "../../srl_nokia-netinst:type = 'srl_nokia-netinst:default'" {
-              error-message "EVPN proxy must be configured in the default network instance";
+              error-message "VXLAN agent must be configured in the default network instance";
             }
 
             leaf admin-state {
@@ -58,21 +60,10 @@ module srl-evpn-proxy-agent {
               description "Remote IP to connect to, default localhost";
             }
 
-            leaf vxlan-interface {
+            leaf-list vxlan-arp-learning-interface {
               type string;
-              default "e1-1";
-              description "Interface to listen on for VXLAN ARP packets, default e1-1.
-                           Set to empty string to disable ARP/VTEP learning";
-            }
-
-            leaf-list vxlan-remoteips {
-              type srl_nokia-comm:ipv4-address;
-              description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
-
-              // count() function not supported
-              // must "count( ../vnis ) > 0" {
-              //  error-message "Must provision a static list of VNIs for static VTEP IP(s)";
-              // }
+              description "Interface(s) to listen on for VXLAN ARP packets, like 'e1-1'.
+                           Leave empty to disable ARP/VTEP learning";
             }
 
             leaf local-as {
@@ -101,21 +92,6 @@ module srl-evpn-proxy-agent {
               type boolean;
               default true;
               description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
-            }
-
-            leaf-list vnis {
-              description "Optional list of VNIs to proxy for, defaults to any detected";
-              type uint32 {
-                range "1..16777215";
-              }
-            }
-
-            leaf evi {
-              type uint32 {
-                range "1..65535";
-              }
-              mandatory true;
-              description "Ethernet Virtual Identifier to use for auto-generating RT and RD; TODO lookup in config";
             }
 
             leaf oper-state {
@@ -174,12 +150,60 @@ module srl-evpn-proxy-agent {
 
     // Need to get the evi value for generating correct auto RD/RT
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-netinst:bgp-evpn/srl_nokia-bgp-evpn:bgp-instance" {
-        leaf proxy {
-          description "Enable learning and advertisement of proxy EVPN routes for this instance";
-          type boolean;
+        container vxlan-agent {
+          presence "VXLAN agent configuration";
 
-          must ". = false() or ../../../../srl_nokia-netinst:type = 'srl_nokia-netinst:mac-vrf'" {
-            error-message "EVPN proxy can only be enabled for L2 mac-vrf";
+          description "Enable learning and advertisement of proxy EVPN routes for this instance";
+
+          must "../../../../srl_nokia-netinst:type = 'srl_nokia-netinst:mac-vrf'" {
+            error-message "VXLAN agent can only be enabled for L2 mac-vrf";
+          }
+
+          leaf admin-state {
+              type srl_nokia-comm:admin-state;
+              default "enable";
+
+              description "Administratively enable or disable VXLAN agent functionality for this mac-vrf";
+          }
+
+          leaf-list static-vxlan-remoteips {
+            type srl_nokia-comm:ipv4-address;
+            description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
+
+            // count() function not supported
+            // must "count( ../vnis ) > 0" {
+            //  error-message "Must provision a static list of VNIs for static VTEP IP(s)";
+            // }
+          }
+
+          // Best way I could find to reference existing vni value from config
+          leaf evi {
+             description "Copy of the EVI for this mac-vrf, used for auto-RD/RT";
+
+             type uint32 {
+               range "1..65535";
+             }
+
+             // leafref crashes SRL mgr
+             //type leafref {
+             // path "../../srl_nokia-bgp-evpn:evi";
+               // require-instance "true"; // YANG 1.1 feature
+             // }
+             // when "../srl_nokia-bgp-evpn:evi";
+             // mandatory true;
+
+             must ". = ../../srl_nokia-bgp-evpn:evi" {
+               error-message "EVI for agent must match config";
+             }
+          }
+
+          leaf vni {
+            description "Copy of the VNI for this service";
+            type uint32 {
+              range "1..16777215";
+            }
+
+            // TODO leafref /tunnel-interface/vxlan-interface/ingress/vni
           }
         }
     }
