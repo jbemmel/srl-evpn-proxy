@@ -618,8 +618,8 @@ class State(object):
         self.params = {
           "mac_vrfs" : {} # Map per mac-vrf
         }       # Set through config
-        bgp_vrfs = {}
-        vni_2_evi = {}  # Mapping of VNI to EVI
+        self.bgp_vrfs = {}
+        self.vni_2_evi = {}  # Mapping of VNI to EVI
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
