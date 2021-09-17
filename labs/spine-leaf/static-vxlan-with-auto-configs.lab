@@ -1,0 +1,77 @@
+#
+# The original lab topology with 2x2 leaves is connected in an unconventional way;
+# SRL1 would normally not receive all VXLAN packets destined for SRL2
+#
+# This is a more typical topology, with a spine connecting all leaves
+#
+name: static-vxlan-auto-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # image: srl/custombase:latest
+      image: srl/evpn-proxy-agent:latest
+      extras:
+        srl-agents: [ ../../srl-evpn-proxy-agent.yml, ../../../srl-self-organizing/auto-config-agent.yml ]
+      binds:
+        - /lib/modules:/lib/modules:ro
+        - /usr/src:/usr/src
+        - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+
+    cvx:
+      image: networkop/cx:4.4.0
+      binds:
+        - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+    linux:
+      # image: networkop/host:ifreload
+      image: frr-with-lldp:latest
+      # cmd: 2 # wait for 2 interfaces to be connected: eth0 + eth1
+
+  nodes:
+    spine1:
+      kind: srl
+      group: evpn-fabric
+      # startup-config: spine1.conf.json
+      startup-config: auto-spine.cfg.json
+    cumulus1:
+      kind: cvx
+      group: static-fabric
+      binds:
+        - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
+    cumulus2:
+      kind: cvx
+      group: static-fabric
+      binds:
+        - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
+    srl1:
+      kind: srl
+      group: evpn-fabric
+      # startup-config: srl1.conf.json
+      # startup-config: srl1-with-evpn-proxy.conf.json
+      startup-config: auto-leaf.cfg.json
+    srl2:
+      kind: srl
+      group: evpn-fabric
+      # startup-config: srl2.conf.json
+      # startup-config: srl2-with-evpn-proxy.conf.json
+      startup-config: auto-leaf.cfg.json
+
+    h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ ../h3_interfaces:/etc/network/interfaces ] }
+    h4: { kind: linux, group: evpn-hosts,   binds: [ ../h4_interfaces:/etc/network/interfaces ] }
+
+  links:
+    # Spine connected to e1-1 on each leaf
+    - endpoints: ["spine1:e1-1", "cumulus1:e1-1"]
+    - endpoints: ["spine1:e1-2", "cumulus2:e1-1"]
+    - endpoints: ["spine1:e1-3", "srl1:e1-1"]
+    - endpoints: ["spine1:e1-4", "srl2:e1-1"]
+
+    # A host connected to each switch on e1-2
+    - endpoints: ["cumulus1:e1-2", "h1:eth1"]
+    - endpoints: ["cumulus2:e1-2", "h2:eth1"]
+    - endpoints: ["srl1:e1-2", "h3:eth1"]
+    - endpoints: ["srl2:e1-2", "h4:eth1"]
