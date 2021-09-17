@@ -184,7 +184,7 @@ def UpdateMACVRF( state, name, params ):
    state.vni_2_evi[ params['vni'] ] = params['evi']
 
    for static_vtep in params['vxlan_vteps']:
-      Add_Static_VTEP( state, state.params, static_vtep, params['vni'] )
+      Add_Static_VTEP( state, static_vtep, params['vni'] )
 
 #
 # Runs BGP EVPN as a separate thread>, using Ryu hub
@@ -291,7 +291,7 @@ def runBGPThread( state ):
          logging.info( "Starting ARP listener thread(s)..." )
          state.arp_threads = {}
          for i in state.params['vxlan_interfaces']:
-            state.arp_threads[i] = hub.spawn( ARP_receiver_thread, state, i, state.params, evpn_vteps, mac_vrfs )
+            state.arp_threads[i] = hub.spawn( ARP_receiver_thread, state, i, evpn_vteps, mac_vrfs )
 
   def peer_down_handler(router_id, remote_as):
       logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
@@ -344,7 +344,7 @@ def runBGPThread( state ):
      logging.info( "eventlet sleep loop..." )
      eventlet.sleep(30) # every 30s wake up
 
-def Add_Static_VTEP( state, params, remote_ip, vni ):
+def Add_Static_VTEP( state, remote_ip, vni ):
 
     if vni not in state.vni_2_evi:
         logging.warning( f"VNI-2-evi mapping not found: {vni}" )
@@ -356,7 +356,7 @@ def Add_Static_VTEP( state, params, remote_ip, vni ):
         logging.warning( f"MAC VRF already exists: {rd}" )
         return evi, rd
 
-    rt = f"{params['local_as']}:{evi}"
+    rt = f"{state.params['local_as']}:{evi}"
     logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
     state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
     logging.info("Adding EVPN multicast route...")
@@ -371,7 +371,7 @@ def Add_Static_VTEP( state, params, remote_ip, vni ):
         # esi=0, # should be ignored
         ethernet_tag_id=0,
         # mac_addr='00:11:22:33:44:55', # not relevant for MC route
-        ip_addr=params['source_address'], # originator == proxy IP
+        ip_addr=state.params['source_address'], # originator == proxy IP
         tunnel_type='vxlan',
         vni=vni, # Not sent in advertisement
         gw_ip_addr=remote_ip,
@@ -383,8 +383,8 @@ def Add_Static_VTEP( state, params, remote_ip, vni ):
     state.bgp_vrfs[ rd ] = remote_ip
     return evi, rd
 
-def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
-    logging.info( f"Starting ARP listener on interface={vxlan_intf} params {params}" )
+def ARP_receiver_thread( state, vxlan_intf, evpn_vteps, mac_vrfs ):
+    logging.info( f"Starting ARP listener on interface={vxlan_intf} params {state.params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
     bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
@@ -424,7 +424,7 @@ def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
         _vxlan = pkt.get_protocol( vxlan.vxlan )
         _arp = pkt.get_protocol( arp.arp )
         vni = _vxlan.vni
-        if params['vnis']!='*' and vni not in params['vnis']:
+        if vni not in state.vni_2_evi:
             logging.info( f"VNI not enabled for proxy EVPN: {vni}" )
             continue;
         if _ip.src in evpn_vteps:
@@ -451,7 +451,7 @@ def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
 
         # TODO check if other proxy is announcing it
         # if rd not in state.bgp_vrfs:
-        evi, rd = Add_Static_VTEP( state, params, static_vtep, vni )
+        evi, rd = Add_Static_VTEP( state, static_vtep, vni )
 
         if mac in vni_2_mac_vrf:
             cur = vni_2_mac_vrf[ mac ]
@@ -489,7 +489,7 @@ def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
             #
             if cur['vtep'] != "tbd":
                logging.info( f"IP changed {cur['ip']}->{ip}, withdrawing my route" )
-               old_ip = cur['ip'] if params['include_ip'] else None
+               old_ip = cur['ip'] if state.params['include_ip'] else None
                WithdrawRoute(state.speaker,vni,f"{cur['vtep']}:{evi}",mac,old_ip)
                vni_2_mac_vrf.pop( old_ip, None ) # Remove any IP mapping too
             else:
@@ -510,14 +510,14 @@ def ARP_receiver_thread( state, vxlan_intf, params, evpn_vteps, mac_vrfs ):
             esi=0, # Single homed
             ethernet_tag_id=0,
             mac_addr=mac,
-            ip_addr=ip if params['include_ip'] else None, # Enables remote peers to perform proxy ARP
+            ip_addr=ip if state.params['include_ip'] else None, # Enables remote peers to perform proxy ARP
             next_hop=static_vtep, # on behalf of remote VTEP
             tunnel_type='vxlan',
             vni=vni,
             gw_ip_addr=static_vtep,
             mac_mobility=mobility_seq # Sequence number for MAC mobility
         )
-        if params['include_ip']:
+        if state.params['include_ip']:
            vni_2_mac_vrf.update( { ip: { 'mac' : mac, 'vtep' : static_vtep } } ) # Also track IP mobility
       except Exception as e:
         logging.error( f"Error processing ARP: {e}" )
