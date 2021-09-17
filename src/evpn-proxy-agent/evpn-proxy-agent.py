@@ -334,6 +334,7 @@ def runBGPThread( state ):
                            remote_as=state.params['peer_as'],
                            local_as=state.params['local_as'],
                            enable_ipv4=False, enable_evpn=True,
+                           multi_exit_disc=0, # avoid Ryu assertion bug
                            connect_mode='active') # iBGP with SRL
 
      # After connecting to BGP peer, start ARP thread (in different netns)

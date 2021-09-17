@@ -9,65 +9,6 @@
         "host-subnet-size": 30
     }
   },
-  "docter-agent:docter-agent": {
-   "intensive-care": {
-      "startup-delay": 60,
-      "observe": [
-        {
-         "name": "route-propagation",
-         "report": [
-           "/platform/linecard[slot=1]/forwarding-complex[name=0]/datapath/asic/resource[name=*]/used-entries",
-           "/network-instance[name=default]/protocols/bgp/evpn/received-routes"
-         ],
-         "conditions": [
-           {
-             "gnmi-path": "/network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-out-post/ip-prefix-routes[ip-prefix=8.8.8.8/32]",
-	           "update-path-match": "/network-instance\\[name=default\\]/bgp-rib/evpn/rib-in-out/rib-out-post/ip-prefix-routes\\[.*\\]/next-hop",
-	           "sample-period": 10,
-	           "history-window": 100,
-	           "thresholds": [ "availability", "50", "80", "90" ]
-           }
-          ]
-        },
-        {
-          "name": "Changes in BGP path counts",
-          "conditions": [
-             {
-               "gnmi-path": "/network-instance[name=default]/protocols/bgp/statistics/total-paths",
-               "metric": "CONTROL_PLANE",
-               "reset": 30,
-               "value": "abs( max_in_history() - int(_) )",
-               "metric": "CONTROL_PLANE",
-               "thresholds": [ 0, 2, 8, 15 ]
-             }
-           ]
-        },
-        {
-          "name": "BGP peering sessions",
-          "conditions": [
-             {
-               "gnmi-path": "/network-instance[name=default]/protocols/bgp/neighbor[peer-address=*]/session-state",
-               "metric": "CONTROL_PLANE",
-               "thresholds": [ "red-to-green", "connect", "opensent", "openconfirm", "established" ]
-             }
-           ]
-        },
-        {
-          "name": "BFD sessions (on OSPF)",
-          "report": [
-            "/bfd/network-instance[name=default]/peer[local-discriminator={local-discriminator}]"
-          ],
-          "conditions": [
-            {
-              "gnmi-path": "/bfd/network-instance[name=default]/peer[local-discriminator=*]/oper-state",
-              "metric": "CONTROL_PLANE",
-              "thresholds": [ "up" ]
-            }
-          ]
-         }
-      ]
-    }
-  },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
       "ipv4-filter": {
