@@ -43,7 +43,8 @@ struct arphdr
 */
 int vxlan_arp_filter(struct __sk_buff *skb) {
 	// Shows up in: cat /sys/kernel/debug/tracing/trace_pipe
-  bpf_trace_printk("vxlan_arp_filter got a packet\n");
+  bpf_trace_printk("vxlan_arp_filter got a packet len=%u\n",
+    ((void *)(long)skb->data_end) - ((void *)(long)skb->data) );
 	u8 *cursor = 0;
 
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
