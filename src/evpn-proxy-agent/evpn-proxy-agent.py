@@ -325,7 +325,7 @@ def runBGPThread( state ):
                                 peer_down_handler=peer_down_handler)
 
      # Add any static VTEPs/VNIs, before starting ARP thread
-     for mac_vrf,data in enumerate( state.params['mac_vrfs'] ):
+     for mac_vrf,data in state.params['mac_vrfs'].items():
         UpdateMACVRF( state, mac_vrf, data )
 
      logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
@@ -605,7 +605,7 @@ def Handle_Notification(obj, state):
           else:
               state.params[ "mac_vrfs" ][ mac_vrf ].update( **params )
 
-          if hasattr( state, 'bgpThread' ):
+          if hasattr( state, 'speaker' ): # BGP running?
               UpdateMACVRF( state, mac_vrf, params )
 
     else:
