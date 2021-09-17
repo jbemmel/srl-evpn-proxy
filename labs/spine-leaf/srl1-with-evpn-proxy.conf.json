@@ -1425,6 +1425,20 @@
               },
               "evpn": {
                 "admin-state": "enable"
+              }
+            },
+            {
+              "group-name": "vxlan-agent",
+              "admin-state": "enable",
+              "peer-as": 65000,
+              "ipv4-unicast": {
+                "admin-state": "disable"
+              },
+              "ipv6-unicast": {
+                "admin-state": "disable"
+              },
+              "evpn": {
+                "admin-state": "enable"
               },
               "route-reflector": {
                 "client": true,
@@ -1437,7 +1451,7 @@
               "peer-address": "1.1.1.4",
               "admin-state": "enable",
               "description": "Local EVPN proxy agent",
-              "peer-group": "leaves"
+              "peer-group": "vxlan-agent"
             },
             {
               "peer-address": "1.1.1.7",
@@ -1461,20 +1475,13 @@
             ]
           }
         },
-        "srl-evpn-proxy-agent:experimental-bgp-evpn-proxy": {
+        "srl-evpn-proxy-agent:vxlan-agent": {
           "admin-state": "enable",
           "source-address": "1.1.1.4",
-          "vxlan-interface": "e1-1",
+          "vxlan-arp-learning-interfaces": [ "e1-1" ],
 	        "include-ip": true,
           "local-as": 65000,
-          "peer-as": 65000,
-          "evi": 57069,
-          "vxlan-remoteips": [
-            "1.1.1.1"
-          ],
-          "vnis": [
-            11189196
-          ]
+          "peer-as": 65000
         }
       },
       "srl_nokia-static-routes:static-routes": {
@@ -1524,7 +1531,14 @@
               "vxlan-interface": "vxlan0.0",
               "evi": 57069,
               "ecmp": 8,
-              "srl-evpn-proxy-agent:proxy": true
+              "srl-evpn-proxy-agent:vxlan-proxy" {
+                "admin-state": "enable",
+                "evi": 57069,
+                "vni": 11189196,
+                "static-vxlan-remoteips": [
+                  "1.1.1.1"
+                ]
+              }
             }
           ]
         },
