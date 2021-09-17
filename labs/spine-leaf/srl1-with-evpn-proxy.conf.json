@@ -1531,7 +1531,7 @@
               "vxlan-interface": "vxlan0.0",
               "evi": 57069,
               "ecmp": 8,
-              "srl-evpn-proxy-agent:vxlan-proxy" {
+              "srl-evpn-proxy-agent:vxlan-agent": {
                 "admin-state": "enable",
                 "evi": 57069,
                 "vni": 11189196,
