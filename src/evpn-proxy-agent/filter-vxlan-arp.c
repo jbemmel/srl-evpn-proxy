@@ -42,6 +42,7 @@ struct arphdr
 	TODO VXLAN ARP packets have specific sizes - could filter on that too
 */
 int vxlan_arp_filter(struct __sk_buff *skb) {
+	// Shows up in: cat /sys/kernel/debug/tracing/trace_pipe
   bpf_trace_printk("vxlan_arp_filter got a packet\n");
 	u8 *cursor = 0;
 
@@ -74,15 +75,23 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 	// Calculate payload offset and length
 	// u32 vxlan_offset = ETH_HLEN + ip_header_length + sizeof(*udp);
 	u32 vxlan_length = ip->tlen - ip_header_length - sizeof(*udp);
-	if (vxlan_length < (ETH_HLEN+sizeof(struct arphdr))) return DROP;
+	if (vxlan_length < (ETH_HLEN+sizeof(struct arphdr))) {
+		bpf_trace_printk("VXLAN length too short to be ARP: %u\n", vxlan_length );
+		return DROP;
+	}
 
   // skip VXLAN header
   _ = cursor_advance(cursor, sizeof(struct vxlan_t));
 	struct ethernet_t *inner = cursor_advance(cursor, sizeof(*inner));
 
 	// filter ARP packets (ethernet type = 0x0806)
-	if (inner->type != 0x0806) return DROP;
+	if (inner->type != 0x0806) {
+		bpf_trace_printk("vxlan_arp_filter: Not ARP but ethertype %04x, dropping\n", inner->type );
+		return DROP;
+	}
 
 	// keep the packet and send it to userspace returning -1
+	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(IP+VXLAN=%u ARP=%u) to userspace\n",
+	                  ip->tlen, vxlan_length );
 	return KEEP;
 }
