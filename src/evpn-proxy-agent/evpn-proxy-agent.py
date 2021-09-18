@@ -465,6 +465,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
            else:
              logging.info( f"Dynamically adding auto-discovered VTEP {static_vtep}" )
              Add_Static_VTEP( state, static_vtep, vni )
+             mac_vrf['vxlan_vteps'][ static_vtep ] = "dynamic-from-arp"
 
         # Announce EVPN route(s)
 
@@ -608,7 +609,7 @@ def Handle_Notification(obj, state):
           if 'admin_state' in data:
              # TODO use this param
              mac_vrf[ "admin_state" ] = data['admin_state'][12:]
-          mac_vrf['vxlan_vteps'] = [ i['value'] for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) ]
+          mac_vrf['vxlan_vteps'] = { i['value'] : "static" for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) }
           mac_vrf['vni'] = int( data['vni']['value'] ) if 'vni' in data else None
           mac_vrf['evi'] = int( data['evi']['value'] ) if 'evi' in data else None
 
