@@ -50,7 +50,15 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
 	// filter IPv4 packets (ethernet type = 0x0800), TODO support VLANs
 	if (ethernet->type != 0x0800) {
-		bpf_trace_printk("vxlan_arp_filter: not IPv4 but %x\n", ethernet->type );
+		if (ethernet->type == 0x0806) {
+			struct arphdr *arp = cursor_advance(cursor, sizeof(*arp));
+			bpf_trace_printk("vxlan_arp_filter: Plain ARP(MAC=%x:%x IP=%x) dropped\n",
+			                  (arp->ar_sha[0]<<16) + (arp->ar_sha[1]<<8) + arp->ar_sha[2],
+												(arp->ar_sha[3]<<16) + (arp->ar_sha[4]<<8) + arp->ar_sha[5],
+												htonl(arp->ar_sip) );
+		} else {
+		   bpf_trace_printk("vxlan_arp_filter: not IPv4 but %x\n", ethernet->type );
+		}
 		return DROP;
 	}
 
@@ -100,12 +108,12 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 		return DROP;
 	}
 
-  struct arphdr *arp = cursor_advance(cursor, sizeof(struct arphdr));
+  struct arphdr *arp = cursor_advance(cursor, sizeof(*arp));
 	// keep the packet and send it to userspace returning -1
-	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(MAC=%x:%x:%x IP=%x) to userspace\n",
-	                  (arp->ar_sha[0]<<8) + arp->ar_sha[1],
-										(arp->ar_sha[2]<<8) + arp->ar_sha[3],
-										(arp->ar_sha[4]<<8) + arp->ar_sha[5],
+	// Limit is 3 variables
+	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(MAC=%x:%x IP=%x) to userspace\n",
+	                  (arp->ar_sha[0]<<16) + (arp->ar_sha[1]<<8) + arp->ar_sha[2],
+										(arp->ar_sha[3]<<16) + (arp->ar_sha[4]<<8) + arp->ar_sha[5],
 										htonl(arp->ar_sip) );
 	return KEEP;
 }
