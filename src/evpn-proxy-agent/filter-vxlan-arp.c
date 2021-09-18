@@ -100,8 +100,12 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 		return DROP;
 	}
 
+  struct arphdr *arp = cursor_advance(cursor, sizeof(struct arphdr));
 	// keep the packet and send it to userspace returning -1
-	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(IP+VXLAN=%u ARP=%u) to userspace\n",
-	                  ip->tlen, vxlan_length );
+	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(MAC=%x:%x:%x IP=%x) to userspace\n",
+	                  (arp->ar_sha[0]<<8) + arp->ar_sha[1],
+										(arp->ar_sha[2]<<8) + arp->ar_sha[3],
+										(arp->ar_sha[4]<<8) + arp->ar_sha[5],
+										htonl(arp->ar_sip) );
 	return KEEP;
 }
