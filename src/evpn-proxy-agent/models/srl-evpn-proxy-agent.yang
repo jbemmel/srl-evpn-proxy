@@ -86,6 +86,7 @@ module srl-evpn-proxy-agent {
             }
 
             container proof-of-concept {
+              srl_nokia-ext:show-importance high; // affects info | as table
               presence "Configure Proof-of-Concept features";
               description "Set of features intended as Proof-of-Concept (only)";
 
@@ -104,7 +105,7 @@ module srl-evpn-proxy-agent {
               leaf auto-discover-static-vteps {
                 type boolean;
                 default true;
-                description "Whether to accept VXLAN and announce EVPN routes for VTEPs that are not explicitly configured";
+                description "Whether to announce EVPN routes for static VTEPs that are not explicitly configured";
               }
             }
 

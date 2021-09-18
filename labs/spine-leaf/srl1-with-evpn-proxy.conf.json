@@ -1490,7 +1490,8 @@
           "peer-as": 65000,
           "proof-of-concept": {
             "vxlan-arp-learning-interfaces": [ "e1-1" ],
-            "include-ip": true
+            "include-ip": true,
+            "auto-discover-static-vteps": true
           }
         }
       },
