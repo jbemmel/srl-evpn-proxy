@@ -192,8 +192,13 @@ def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip ):
       ip_addr=ip if state.params['include_ip'] else None
     )
 
-def UpdateMACVRF( state, mac_vrf ):
+def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
    logging.info( f"UpdateMACVRF mac_vrf={mac_vrf}" )
+
+   # Clean up old VTEPs
+   if previous_vteps:
+      for static_vtep in previous_vteps:
+         Remove_Static_VTEP( state, static_vtep, mac_vrf['vni'] )
 
    # Make sure all VTEPs exist
    if mac_vrf['admin_state'] == "enable":
@@ -364,7 +369,7 @@ def Add_Static_VTEP( state, remote_ip, vni ):
 
     if vni not in state.mac_vrfs:
         logging.warning( f"mac-vrf not found for VNI {vni}" )
-        return 0, None
+        return False
     mac_vrf = state.mac_vrfs[ vni ]
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
     if rd in state.bgp_vrfs:
@@ -396,6 +401,25 @@ def Add_Static_VTEP( state, remote_ip, vni ):
         tunnel_endpoint_ip=remote_ip
     )
     state.bgp_vrfs[ rd ] = remote_ip
+    return True
+
+def Remove_Static_VTEP( state, remote_ip, vni ):
+
+    if vni not in state.mac_vrfs:
+        logging.warning( f"mac-vrf not found for VNI {vni}" )
+        return False
+    mac_vrf = state.mac_vrfs[ vni ]
+    rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
+    if rd not in state.bgp_vrfs:
+        logging.warning( f"BGP MAC VRF does not exists: {rd}" )
+        return False
+
+    logging.info(f"Remove_Static_VTEP: Removing VRF...RD={rd}")
+
+    # This should withdraw all routes too
+    state.speaker.vrf_del(route_dist=rd)
+
+    del state.bgp_vrfs[ rd ]
     return True
 
 def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
@@ -615,13 +639,15 @@ def Handle_Notification(obj, state):
 
           # Index by VNI
           if mac_vrf['vni']:
+            previous_vteps = {}
             if mac_vrf['vni'] not in state.mac_vrfs:
               state.mac_vrfs[ mac_vrf['vni'] ] = { **mac_vrf, 'macs': {}, 'ips': {} }
             else:
+              previous_vteps = state.mac_vrfs[ mac_vrf['vni'] ][ 'vxlan_vteps' ]
               state.mac_vrfs[ mac_vrf['vni'] ].update( **mac_vrf )
 
             if hasattr( state, 'speaker' ): # BGP running?
-              UpdateMACVRF( state, mac_vrf )
+              UpdateMACVRF( state, mac_vrf, previous_vteps )
             else:
               logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
 
