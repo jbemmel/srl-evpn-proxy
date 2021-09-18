@@ -60,12 +60,6 @@ module srl-evpn-proxy-agent {
               description "Remote IP to connect to, default localhost";
             }
 
-            leaf-list vxlan-arp-learning-interfaces {
-              type string;
-              description "Interface(s) to listen on for VXLAN ARP packets, like 'e1-1'.
-                           Leave empty to disable ARP/VTEP learning";
-            }
-
             leaf local-as {
               type uint32 {
                 range "1..4294967295";
@@ -88,17 +82,28 @@ module srl-evpn-proxy-agent {
               description "Local preference to use for advertising EVPN MAC routes, default 100";
             }
 
-            leaf include-ip {
-              type boolean;
-              default true;
-              description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
+            container proof-of-concept {
+              presence "Configure Proof-of-Concept features";
+              description "Set of features intended as Proof-of-Concept (only)";
+
+              leaf-list vxlan-arp-learning-interfaces {
+                type string;
+                description "Interface(s) to listen on for VXLAN ARP packets, like 'e1-1'.
+                             Leave empty to disable ARP/VTEP learning";
+
+              }
+              leaf include-ip {
+                type boolean;
+                default true;
+                description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
+              }
             }
 
             leaf oper-state {
               config false;
               srl_nokia-ext:show-importance "high";
               type srl_nokia-comm:oper-state;
-              description "This leaf contains the operational state of EVPN proxy";
+              description "This leaf contains the operational state of this VXLAN proxy agent";
             }
         }
     }

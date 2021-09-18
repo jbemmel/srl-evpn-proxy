@@ -1132,7 +1132,12 @@
             }
           },
           "ipv6": {
-
+            "address": [
+              {
+                "ip-prefix": "2001::10.0.0.1/64",
+                "primary": [null]
+              }
+            ]
           }
         }
       ]
@@ -1481,10 +1486,12 @@
         "srl-evpn-proxy-agent:vxlan-agent": {
           "admin-state": "enable",
           "source-address": "1.1.1.6",
-          "vxlan-arp-learning-interfaces": [ "e1-1" ],
-	        "include-ip": true,
           "local-as": 65000,
-          "peer-as": 65000
+          "peer-as": 65000,
+          "proof-of-concept": {
+            "vxlan-arp-learning-interfaces": [ "e1-1" ],
+            "include-ip": true
+          }
         }
       },
       "srl_nokia-static-routes:static-routes": {

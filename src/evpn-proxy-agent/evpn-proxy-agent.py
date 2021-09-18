@@ -557,15 +557,19 @@ def Handle_Notification(obj, state):
                     state.params[ "peer_as" ] = int( data['peer_as']['value'] )
                 if 'local_preference' in data:
                     state.params[ "local_preference" ] = int( data['local_preference']['value'] )
-                if 'include_ip' in data:
-                    state.params[ "include_ip" ] = bool( data['include_ip']['value'] )
                 if 'source_address' in data:
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
-                if 'vxlan_arp_learning_interfaces' in data:
-                    state.params[ "vxlan_interfaces" ] = [ i['value'] for i in data['vxlan_arp_learning_interfaces'] ]
-
+                if 'proof_of_concept' in data:
+                    poc = data['proof_of_concept']
+                    if 'vxlan_arp_learning_interfaces' in poc:
+                       state.params[ "vxlan_interfaces" ] = [ i['value'] for i in poc['vxlan_arp_learning_interfaces'] ]
+                    if 'include_ip' in poc:
+                       state.params[ "include_ip" ] = bool( poc['include_ip']['value'] )
+                else:
+                    state.params[ "vxlan_interfaces" ] = []
+                    state.params[ "include_ip" ] = False
 
             # cleanup ARP thread always, use link()?
             if hasattr( state, 'arp_threads' ):
