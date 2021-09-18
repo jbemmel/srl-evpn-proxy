@@ -1571,6 +1571,16 @@
           "export-neighbors": true
         }
       }
+    },
+    {
+      "name": "overlay",
+      "type": "srl_nokia-network-instance:ip-vrf",
+      "admin-state": "enable",
+      "interface": [
+        {
+          "name": "irb0.0"
+        }
+      ]
     }
   ],
   "srl_nokia-routing-policy:routing-policy": {
