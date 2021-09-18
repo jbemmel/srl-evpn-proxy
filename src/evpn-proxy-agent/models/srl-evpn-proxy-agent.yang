@@ -199,9 +199,9 @@ module srl-evpn-proxy-agent {
              // }
              // when "../srl_nokia-bgp-evpn:evi";
              // mandatory true;
-
+             mandatory true;
              must ". = ../../srl_nokia-bgp-evpn:evi" {
-               error-message "EVI for agent must match config";
+               error-message "EVI must match bgp-evpn config";
              }
           }
 
@@ -210,7 +210,7 @@ module srl-evpn-proxy-agent {
             type uint32 {
               range "1..16777215";
             }
-
+            mandatory true;
             must ". = /srl_nokia-tun:tunnel-interface[srl_nokia-tun:name=substring-before(../../srl_nokia-bgp-evpn:vxlan-interface, '.')]/srl_nokia-tun:vxlan-interface[srl_nokia-tun:index=substring-after(../../srl_nokia-tun:vxlan-interface, '.')]/srl_nokia-tun:ingress/srl_nokia-tun:vni" {
               error-message "VNI must match ingress vni on the vxlan-interface";
             }
