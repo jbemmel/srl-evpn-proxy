@@ -15,3 +15,4 @@ srl_evpn_proxy_agent:
            - "/opt/srlinux/agents/evpn-proxy-agent/models/"
            - "/opt/srlinux/models/srl_nokia/models/common/"
            - "/opt/srlinux/models/srl_nokia/models/network-instance/"
+           - "/opt/srlinux/models/srl_nokia/models/tunnel/"

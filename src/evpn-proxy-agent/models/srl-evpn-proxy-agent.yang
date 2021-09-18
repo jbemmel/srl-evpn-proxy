@@ -26,6 +26,9 @@ module srl-evpn-proxy-agent {
     import srl_nokia-extensions {
         prefix srl_nokia-ext;
     }
+    import srl_nokia-tunnel-interfaces {
+        prefix srl_nokia-tun;
+    }
 
     revision "2021-08-21" {
         description "Initial revision";
@@ -208,7 +211,9 @@ module srl-evpn-proxy-agent {
               range "1..16777215";
             }
 
-            // TODO leafref /tunnel-interface/vxlan-interface/ingress/vni
+            must ". = /srl_nokia-tun:tunnel-interface[srl_nokia-tun:name=substring-before(../../srl_nokia-bgp-evpn:vxlan-interface, '.')]/srl_nokia-tun:vxlan-interface[srl_nokia-tun:index=substring-after(../../srl_nokia-tun:vxlan-interface, '.')]/srl_nokia-tun:ingress/srl_nokia-tun:vni" {
+              error-message "VNI must match ingress vni on the vxlan-interface";
+            }
           }
         }
     }
