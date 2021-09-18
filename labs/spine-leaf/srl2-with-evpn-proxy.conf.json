@@ -1126,7 +1126,10 @@
                 "ip-prefix": "10.0.0.1/24",
                 "primary": [null]
               }
-            ]
+            ],
+            "srl_nokia-interfaces-nbr:arp": {
+              "duplicate-address-detection": false
+            }
           },
           "ipv6": {
 
