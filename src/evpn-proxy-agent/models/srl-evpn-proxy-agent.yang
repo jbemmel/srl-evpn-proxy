@@ -100,6 +100,12 @@ module srl-evpn-proxy-agent {
                 default true;
                 description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
               }
+
+              leaf auto-discover-static-vteps {
+                type boolean;
+                default true;
+                description "Whether to accept VXLAN and announce EVPN routes for VTEPs that are not explicitly configured";
+              }
             }
 
             leaf oper-state {

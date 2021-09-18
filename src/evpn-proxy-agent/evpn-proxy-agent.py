@@ -459,8 +459,12 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         # Check that the static VTEP is configured. Could dynamically add VTEPs
         # upon discovery (but requires ARP snooping)
         if static_vtep not in mac_vrf['vxlan_vteps']:
-           logging.info( f"VTEP {static_vtep} not configured in mac-vrf" )
-           continue
+           if not state.params[ "auto_discover_static_vteps" ]:
+             logging.info( f"VTEP {static_vtep} not configured in mac-vrf and auto-discovery disabled" )
+             continue
+           else:
+             logging.info( f"Dynamically adding auto-discovered VTEP {static_vtep}" )
+             Add_Static_VTEP( state, static_vtep, vni )
 
         # Announce EVPN route(s)
 
@@ -566,9 +570,13 @@ def Handle_Notification(obj, state):
                        state.params[ "vxlan_interfaces" ] = [ i['value'] for i in poc['vxlan_arp_learning_interfaces'] ]
                     if 'include_ip' in poc:
                        state.params[ "include_ip" ] = bool( poc['include_ip']['value'] )
+                    if 'auto_discover_static_vteps' in poc:
+                       state.params[ "auto_discover_static_vteps" ] = bool( poc['auto_discover_static_vteps']['value'] )
+
                 else:
                     state.params[ "vxlan_interfaces" ] = []
                     state.params[ "include_ip" ] = False
+                    state.params[ "auto_discover_static_vteps" ] = False
 
             # cleanup ARP thread always, use link()?
             if hasattr( state, 'arp_threads' ):
