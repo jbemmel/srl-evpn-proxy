@@ -13,23 +13,23 @@
 #define DROP 0  // drop the packet
 #define KEEP -1 // keep the packet and send it to userspace returning -1
 
-// From linux/if_arp.h, just used for size calculation
+// From linux/if_arp.h, not used
+/*
 struct arphdr
 {
-	__be16		ar_hrd;		/* format of hardware address	*/
-	__be16		ar_pro;		/* format of protocol address	*/
-	unsigned char	ar_hln;		/* length of hardware address	*/
-	unsigned char	ar_pln;		/* length of protocol address	*/
-	__be16		ar_op;		/* ARP opcode (command)		*/
+	__be16		ar_hrd;		// format of hardware address
+	__be16		ar_pro;		// format of protocol address
+	unsigned char	ar_hln;		// length of hardware address
+	unsigned char	ar_pln;		// length of protocol address
+	__be16		ar_op;		// ARP opcode (command)
 
-	 /*
-	  *	 Ethernet looks like this : This bit is variable sized however...
-	  */
-	unsigned char		ar_sha[6];	  /* sender hardware address	*/
-	__be32 ar_sip;		            /* sender IP address		*/
-	unsigned char		ar_tha[6];	  /* target hardware address	*/
-	__be32 ar_tip;		            /* target IP address		*/
+	// Ethernet looks like this : This bit is variable sized however...
+	unsigned char		ar_sha[6];	  // sender hardware address
+	__be32 ar_sip;		            // sender IP address
+	unsigned char		ar_tha[6];	  // target hardware address
+	__be32 ar_tip;		            // target IP address
 } __packed;
+*/
 
 #define IP_UDP 	 17
 #define ETH_HLEN 14
@@ -51,11 +51,9 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 	// filter IPv4 packets (ethernet type = 0x0800), TODO support VLANs
 	if (ethernet->type != 0x0800) {
 		if (ethernet->type == 0x0806) {
-			struct arphdr *arp = cursor_advance(cursor, sizeof(*arp));
-			bpf_trace_printk("vxlan_arp_filter: Plain ARP(MAC=%x:%x IP=%x) dropped\n",
-			                  (arp->ar_sha[0]<<16) + (arp->ar_sha[1]<<8) + arp->ar_sha[2],
-												(arp->ar_sha[3]<<16) + (arp->ar_sha[4]<<8) + arp->ar_sha[5],
-												htonl(arp->ar_sip) );
+			struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
+			bpf_trace_printk("vxlan_arp_filter: Plain ARP(MAC=%llx) dropped\n",
+			                  arp->sha /* ,htonl(arp->spa) */ );
 		} else {
 		   bpf_trace_printk("vxlan_arp_filter: not IPv4 but %x\n", ethernet->type );
 		}
@@ -93,7 +91,7 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 	// Calculate payload offset and length
 	// u32 vxlan_offset = ETH_HLEN + ip_header_length + sizeof(*udp);
 	u32 vxlan_length = ip->tlen - ip_header_length - sizeof(*udp);
-	if (vxlan_length < (ETH_HLEN+sizeof(struct arphdr))) {
+	if (vxlan_length < (ETH_HLEN+sizeof(struct arp_t))) {
 		bpf_trace_printk("vxlan_arp_filter: VXLAN length too short to be ARP: %u\n", vxlan_length );
 		return DROP;
 	}
@@ -108,12 +106,10 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 		return DROP;
 	}
 
-  struct arphdr *arp = cursor_advance(cursor, sizeof(*arp));
+  struct arp_t *arp = cursor_advance(cursor, sizeof(*arp));
 	// keep the packet and send it to userspace returning -1
 	// Limit is 3 variables
-	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(MAC=%x:%x IP=%x) to userspace\n",
-	                  (arp->ar_sha[0]<<16) + (arp->ar_sha[1]<<8) + arp->ar_sha[2],
-										(arp->ar_sha[3]<<16) + (arp->ar_sha[4]<<8) + arp->ar_sha[5],
-										htonl(arp->ar_sip) );
+	bpf_trace_printk("vxlan_arp_filter: Sending ARP-in-VXLAN(MAC=%llx) to userspace\n",
+	                  arp->sha /*,	htonl(arp->spa) */ );
 	return KEEP;
 }
