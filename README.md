@@ -1,4 +1,4 @@
-# VXLAN data plane learning using eBPF: Using SR Linux as an EVPN proxy
+# Evolving from static VXLAN: Using SR Linux as an EVPN proxy (featuring eBPF based data plane ARP learning)
 Some traditional data center designs lack an EVPN control plane, but we can extend SRL to function as a proxy while transitioning to a fully dynamic EVPN fabric
 ![plot](images/EVPN_Agent.png)
 
