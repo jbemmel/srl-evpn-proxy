@@ -244,6 +244,13 @@ def validate_local_pref(local_pref):
                                     local_pref))
     return local_pref
 
+@validate(name=NET_NS)
+def validate_net_ns(net_ns):
+    if not isinstance(net_ns, str) or net_ns=="":
+        raise ConfigTypeError(desc=('Invalid net_ns'
+                                    ' configuration value %s' %
+                                    net_ns))
+    return net_ns
 
 class CommonConf(BaseConf):
     """Encapsulates configurations applicable to all peer sessions.
