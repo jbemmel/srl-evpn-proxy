@@ -340,7 +340,7 @@ def runBGPThread( state ):
 
   # Add any static VTEPs/VNIs, before starting ARP thread
   for vni,mac_vrf in state.mac_vrfs.items():
-  UpdateMACVRF( state, mac_vrf )
+     UpdateMACVRF( state, mac_vrf )
 
   logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
   # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
