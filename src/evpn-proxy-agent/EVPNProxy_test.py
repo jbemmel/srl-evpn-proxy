@@ -29,6 +29,10 @@ VTEP2 = "1.1.1.2"
 VTEP3 = "1.1.1.5" # SRL1
 VTEP4 = "1.1.1.7" # SRL2
 
+# Global variables
+serverAddr = None
+sock = None
+
 #
 # Run: cd /opt/srlinux/agents/evpn-proxy-agent && ip netns exec srbase-default python3 -m unittest EVPNProxy_test.EVPNProxyTestCase -v
 #
@@ -65,15 +69,16 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
    # Synchronize client/server
+   global serverAddr, sock
    if serverAddr is None:
       sync_msg = sock.recv( bufsize=256 )
-      print( f"Server: sync_msg={sync_msg}")
+      logger.info( f"Server: sync_msg={sync_msg}")
    else:
-      print( "Client: sending sync_msg" )
+      logger.info( "Client: sending sync_msg" )
       sock.sendall("setUp")
 
  def tearDown(self):
-   print( "TEARDOWN - shutdown EVPN proxy" )
+   logger.info( "TEARDOWN - shutdown EVPN proxy" )
    self.evpn_proxy.shutdown()
    eventlet.sleep(1)
 
@@ -123,7 +128,7 @@ if __name__ == '__main__':
 
   # Create a TCP/IP socket
   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+  logger.info( f"Opening socket server={serverAddr}" )
   if serverAddr is None:
       sock.bind( ("1.1.1.4",8378) )
       sock.listen(1)
@@ -135,7 +140,7 @@ if __name__ == '__main__':
   # loop = asyncio.get_event_loop()
   # loop.run_until_complete( unittest.main() )
   try:
-     print( "Starting UnitTest..." )
+     logger.info( "Starting UnitTest..." )
      unittest.main()
   finally:
      sock.close()

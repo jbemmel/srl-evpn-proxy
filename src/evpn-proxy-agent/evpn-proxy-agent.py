@@ -324,32 +324,34 @@ def runBGPThread( state ):
 
   logging.info("Starting BGP thread in srbase-default netns...")
   # Requires root permissions
-  with netns.NetNS(nsname="srbase-default"):
-     logging.info("Starting BGPSpeaker in netns...")
+  # Ryu modified to support net_ns parameter, needed for reconnections
+  # with netns.NetNS(nsname="srbase-default"):
+  logging.info("Starting BGPSpeaker in netns...")
 
-     state.speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK],
-                                bgp_server_port=1179,
-                                as_number=state.params['local_as'],
-                                local_pref=state.params['local_preference'],
-                                router_id=LOCAL_LOOPBACK,
-                                best_path_change_handler=best_path_change_handler,
-                                peer_up_handler=peer_up_handler,
-                                peer_down_handler=peer_down_handler)
+  state.speaker = BGPSpeaker(bgp_server_hosts=[LOCAL_LOOPBACK],
+                             bgp_server_port=1179,
+                             net_ns="srbase-default", # custom addition
+                             as_number=state.params['local_as'],
+                             local_pref=state.params['local_preference'],
+                             router_id=LOCAL_LOOPBACK,
+                             best_path_change_handler=best_path_change_handler,
+                             peer_up_handler=peer_up_handler,
+                             peer_down_handler=peer_down_handler)
 
-     # Add any static VTEPs/VNIs, before starting ARP thread
-     for vni,mac_vrf in state.mac_vrfs.items():
-        UpdateMACVRF( state, mac_vrf )
+  # Add any static VTEPs/VNIs, before starting ARP thread
+  for vni,mac_vrf in state.mac_vrfs.items():
+  UpdateMACVRF( state, mac_vrf )
 
-     logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
-     # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
-     state.speaker.neighbor_add( NEIGHBOR,
-                           remote_as=state.params['peer_as'],
-                           local_as=state.params['local_as'],
-                           enable_ipv4=False, enable_evpn=True,
-                           connect_mode='active') # iBGP with SRL
+  logging.info( f"Connecting to neighbor {NEIGHBOR}..." )
+  # TODO enable_four_octet_as_number=True, enable_enhanced_refresh=True
+  state.speaker.neighbor_add( NEIGHBOR,
+                              remote_as=state.params['peer_as'],
+                              local_as=state.params['local_as'],
+                              enable_ipv4=False, enable_evpn=True,
+                              connect_mode='active') # iBGP with SRL
 
-     # After connecting to BGP peer, start ARP thread (in different netns)
-     eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
+  # After connecting to BGP peer, start ARP thread (in different netns)
+  eventlet.sleep(10) # Wait for peer_up event using peer_up_handler
   # hub.spawn( ARP_receiver_thread, speaker, params, evpn_vteps )
 
   while True:

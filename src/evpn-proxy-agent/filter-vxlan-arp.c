@@ -43,7 +43,7 @@ struct arphdr
 */
 int vxlan_arp_filter(struct __sk_buff *skb) {
 	// Shows up in: cat /sys/kernel/debug/tracing/trace_pipe
-  // Cannot access skb->wire_len directly here
+  // Cannot access skb->wire_len directly here. Could use load_word?
   bpf_trace_printk("vxlan_arp_filter got a packet ingress_ifindex=%u ifindex=%u\n",
                     skb->ingress_ifindex, skb->ifindex );
 

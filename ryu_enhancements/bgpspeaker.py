@@ -84,6 +84,7 @@ from ryu.services.protocols.bgp.rtconf.common import REFRESH_STALEPATH_TIME
 from ryu.services.protocols.bgp.rtconf.common import LABEL_RANGE
 from ryu.services.protocols.bgp.rtconf.common import ALLOW_LOCAL_AS_IN_COUNT
 from ryu.services.protocols.bgp.rtconf.common import LOCAL_PREF
+from ryu.services.protocols.bgp.rtconf.common import NET_NS
 from ryu.services.protocols.bgp.rtconf.common import DEFAULT_LOCAL_PREF
 from ryu.services.protocols.bgp.rtconf import neighbors
 from ryu.services.protocols.bgp.rtconf import vrfs
@@ -306,6 +307,7 @@ class BGPSpeaker(object):
                  label_range=DEFAULT_LABEL_RANGE,
                  allow_local_as_in_count=0,
                  cluster_id=None,
+                 net_ns=None, # JvB added
                  local_pref=DEFAULT_LOCAL_PREF):
         super(BGPSpeaker, self).__init__()
 
@@ -320,6 +322,7 @@ class BGPSpeaker(object):
             ALLOW_LOCAL_AS_IN_COUNT: allow_local_as_in_count,
             CLUSTER_ID: cluster_id,
             LOCAL_PREF: local_pref,
+            NET_NS: net_ns, # JvB added
         }
         self._core_start(settings)
         self._init_signal_listeners()
