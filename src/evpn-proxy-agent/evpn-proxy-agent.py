@@ -303,7 +303,8 @@ def runBGPThread( state ):
          logging.info( "Starting ARP listener thread(s)..." )
          state.arp_threads = {}
          for i in state.params['vxlan_interfaces']:
-            state.arp_threads[i] = hub.spawn( ARP_receiver_thread, state, i, evpn_vteps )
+            state.arp_threads[i] = {}
+            state.arp_threads[i]['thread'] = hub.spawn( ARP_receiver_thread, state, i, evpn_vteps )
 
   def peer_down_handler(router_id, remote_as):
       logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
@@ -427,7 +428,8 @@ def Remove_Static_VTEP( state, remote_ip, vni ):
 def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     logging.info( f"Starting ARP listener on interface={vxlan_intf} params {state.params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
-    bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
+    _self = state.arp_threads[vxlan_intf]
+    _self['bpf'] = bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
 
     #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
     #more info about eBPF program types
@@ -441,7 +443,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
-    while 1:
+    _self['socket'] = sock # Used for close()
+    try:
+     while 1:
       packet_str = os.read(socket_fd,2048)
       packet_bytearray = bytearray(packet_str)
       try:
@@ -554,6 +558,11 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
           # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
         # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
         # print( f'trace_fields: {msg}' )
+    except Exception as ex:
+       logging.error( f"Exiting ARP socket while loop: {ex}" )
+
+    # Doesn't happen
+    bpf.cleanup()
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -607,19 +616,25 @@ def Handle_Notification(obj, state):
 
             # cleanup ARP thread always, use link()?
             if hasattr( state, 'arp_threads' ):
-               logging.info( f"Cleaning up ARP threads: {state.arp_threads}" )
-               for thread in state.arp_threads.values():
-                  hub.kill( thread ) # TODO cleanup eBPF
+               logging.info( f"Cleaning up ARP threads and sockets: {state.arp_threads}" )
+               for t in state.arp_threads.values():
+                  t['socket'].close() # This ends the thread and cleans up bpf? Nope
+                  t['bpf'].cleanup()
+                  t['thread'].kill()
                del state.arp_threads
 
             # if enabled, start separate thread for BGP EVPN interactions
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
                if hasattr( state, 'bgpThread' ):
+                   state.speaker.shutdown()
+                   state.bgp_vrfs = {} # Reset
+                   # state.mac_vrfs = {} do not clean this
                    hub.kill( state.bgpThread )
 
                state.bgpThread = hub.spawn( runBGPThread, state )
             elif hasattr( state, 'bgpThread' ):
+               state.speaker.shutdown()
                hub.kill( state.bgpThread )
                del state.bgpThread
 
