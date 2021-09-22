@@ -648,7 +648,6 @@ def Handle_Notification(obj, state):
 
           mac_vrf = { 'name' : mac_vrf_name }
           if 'admin_state' in data:
-             # TODO use this param
              mac_vrf[ "admin_state" ] = data['admin_state'][12:]
           mac_vrf['vxlan_vteps'] = { i['value'] : "static" for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) }
           mac_vrf['vni'] = int( data['vni']['value'] ) if 'vni' in data else None
@@ -656,17 +655,23 @@ def Handle_Notification(obj, state):
 
           # Index by VNI
           if mac_vrf['vni']:
-            previous_vteps = {}
-            if mac_vrf['vni'] not in state.mac_vrfs:
-              state.mac_vrfs[ mac_vrf['vni'] ] = { **mac_vrf, 'macs': {}, 'ips': {} }
-            else:
-              previous_vteps = state.mac_vrfs[ mac_vrf['vni'] ][ 'vxlan_vteps' ]
-              state.mac_vrfs[ mac_vrf['vni'] ].update( **mac_vrf )
+            if mac_vrf[ "admin_state" ] == "enable":
+               previous_vteps = {}
+               if mac_vrf['vni'] not in state.mac_vrfs:
+                 state.mac_vrfs[ mac_vrf['vni'] ] = { **mac_vrf, 'macs': {}, 'ips': {} }
+               else:
+                 previous_vteps = state.mac_vrfs[ mac_vrf['vni'] ][ 'vxlan_vteps' ]
+                 state.mac_vrfs[ mac_vrf['vni'] ].update( **mac_vrf )
 
-            if hasattr( state, 'speaker' ): # BGP running?
-              UpdateMACVRF( state, mac_vrf, previous_vteps )
+               if hasattr( state, 'speaker' ): # BGP running?
+                 UpdateMACVRF( state, mac_vrf, previous_vteps )
+               else:
+                 logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
             else:
-              logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
+               logging.info( f"mac-vrf {mac_vrf} disabled, removing state" )
+               old_vrf = state.mac_vrfs.pop( mac_vrf['vni'], None )
+               if old_vrf:
+                 UpdateMACVRF(state, old_vrf, old_vrf['vxlan_vteps'])
 
     else:
         logging.info(f"Unexpected notification : {obj}")
