@@ -115,17 +115,21 @@ bgp {
   }
 }
 vxlan-agent
+  admin-state enable
+  source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
   peer-as 65000
-  source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
-  vxlan-arp-learning-interfaces [ e1-1 ]
-  admin-state enable
+  proof-of-concept {
+    include-ip true
+    auto-discover-static-vteps true
+    vxlan-arp-learning-interfaces [ e1-1 ]
+  }
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
   vxlan-agent
     admin-state enable
     static-vxlan-remoteips [ 1.1.1.1 ]
-    evi 57069
+    evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
 
 commit stay
