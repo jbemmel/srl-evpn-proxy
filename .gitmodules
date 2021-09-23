@@ -1,0 +1,3 @@
+[submodule "srl-baseimage"]
+	path = srl-baseimage
+	url = https://github.com/jbemmel/srl-baseimage.git
