@@ -7,9 +7,9 @@ Most data center designs start small before they evolve. At small scale, it may 
 
 The internet and most modern large scale data center designs use dynamic control plane protocols and volatile in-memory configuration to configure packet forwarding. BGP is a popular choice, and the Ethernet VPN address family (EVPN [RFC8365](https://datatracker.ietf.org/doc/html/rfc8365)) can support both L2 and L3 overlay services. However, legacy fabrics continue to support business critical applications, and there is a desire to keep doing so without service interruptions, and with minimal changes. So how can we move to the new dynamic world of EVPN based data center fabrics, while transitioning gradually and smoothly from these static configurations?
 
-## Option 1: SRL nodes as EVPN proxies
-By configuring an SRL node with the same VTEP tunnel IP and announcing a type 3 EVPN multicast route, we can send return traffic to static VXLAN endpoints.
-However, as there is no data plane MAC learning, all MACs residing on such endpoints are effectively "unknown" as far as SRL is concerned, hence every packet to such MACs gets flooded to every VTEP in the fabric. This may be acceptible for point-to-point connections, but for point-to-multipoint this quickly becomes inefficient.
+## Announcing EVPN multicast routes on behalf of static VXLAN VTEPs
+By configuring an SRL node to announce type 3 EVPN multicast routes for each L2 service and each remote VTEP, we can send return traffic to static VXLAN endpoints.
+Without dataplane MAC learning, all MACs residing on such endpoints are effectively "unknown" as far as SRL is concerned, hence every packet to such MACs gets flooded to every VTEP in the fabric. This may be acceptible for point-to-point connections, but for point-to-multipoint this quickly becomes inefficient.
 
 # Dynamic learning solution: An EVPN proxy agent
 By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
