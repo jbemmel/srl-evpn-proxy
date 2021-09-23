@@ -131,8 +131,7 @@ module srl-evpn-proxy-agent {
 
       container vxlan-proxy {
         // Only supported on SRL platforms that have both VXLAN and EVPN
-        if-feature "srl-feat:vxlan";
-        if-feature "srl-feat:evpn";
+        if-feature "srl-feat:vxlan and srl-feat:evpn";
 
         presence "BGP EVPN proxy state";
         config false;
@@ -200,8 +199,7 @@ module srl-evpn-proxy-agent {
     // Need to get the evi value for generating correct auto RD/RT
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-netinst:bgp-evpn/srl_nokia-bgp-evpn:bgp-instance" {
         container vxlan-agent {
-          if-feature "srl-feat:vxlan";
-          if-feature "srl-feat:evpn";
+          if-feature "srl-feat:vxlan and srl-feat:evpn";
           presence "VXLAN agent configuration";
 
           description "Enable learning and advertisement of proxy EVPN routes for this instance";
