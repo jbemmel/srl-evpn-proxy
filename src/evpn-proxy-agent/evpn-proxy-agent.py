@@ -224,7 +224,7 @@ def runBGPThread( state ):
   evpn_vteps = {}
 
   def best_path_change_handler(event):
-    logging.info( f'The best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
+    logging.info( f'BGP best path changed: {event.path} prefix={event.prefix} NLRI={event.path.nlri}' )
         # event.remote_as, event.prefix, event.nexthop, event.is_withdraw, event.path )
 
     try:
@@ -249,7 +249,7 @@ def runBGPThread( state ):
          elif hasattr( event.path.nlri, 'vni'):
            vni = event.path.nlri.vni
            if vni not in state.mac_vrfs:
-               logging.warning( f"No mac-vrf mapping for VNI: {vni}" )
+               logging.warning( f"BGP: No mac-vrf mapping for VNI: {vni}" )
                return
            mac_vrf = state.mac_vrfs[ vni ]
 
@@ -371,7 +371,7 @@ def AutoRouteTarget( state, mac_vrf ):
 def Add_Static_VTEP( state, remote_ip, vni ):
 
     if vni not in state.mac_vrfs:
-        logging.warning( f"mac-vrf not found for VNI {vni}" )
+        logging.warning( f"Add_Static_VTEP({remote_ip}): mac-vrf not found for VNI {vni}" )
         return False
     mac_vrf = state.mac_vrfs[ vni ]
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
@@ -669,9 +669,11 @@ def Handle_Notification(obj, state):
                  logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
             else:
                logging.info( f"mac-vrf {mac_vrf} disabled, removing state" )
-               old_vrf = state.mac_vrfs.pop( mac_vrf['vni'], None )
-               if old_vrf:
-                 UpdateMACVRF(state, old_vrf, old_vrf['vxlan_vteps'])
+               if mac_vrf['vni'] in state.mac_vrfs:
+                   old_vrf = state.mac_vrfs[ mac_vrf['vni'] ]
+                   old_vrf[ "admin_state" ] = "disable"
+                   UpdateMACVRF(state, old_vrf, old_vrf['vxlan_vteps'])
+                   state.mac_vrfs.pop( mac_vrf['vni'], None )
 
     else:
         logging.info(f"Unexpected notification : {obj}")
