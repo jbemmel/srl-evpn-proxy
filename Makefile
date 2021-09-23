@@ -18,5 +18,10 @@ build:
 	                  -f ./Dockerfile -t ${IMG} .
 	sudo docker tag ${IMG} ${LATEST}
 
+build-submodules:
+	make -C srl-baseimage
+
+all: build-submodules build
+
 grpc_eventlet:
 	sudo docker build -f ./Dockerfile.grpc_with_eventlet -t srl/grpc-with-eventlet:latest .
