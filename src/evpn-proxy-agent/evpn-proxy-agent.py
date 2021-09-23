@@ -132,7 +132,8 @@ def Add_Telemetry(js_path, js_obj):
 def Remove_Telemetry(js_path):
     telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
     telemetry_del_request = telemetry_service_pb2.TelemetryDeleteRequest()
-    telemetry_del_request.key.js_path = js_path
+    telemetry_key = telemetry_del_request.key.add()
+    telemetry_key.js_path = js_path
     logging.info(f"Telemetry_Delete_Request :: {telemetry_del_request}")
     telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_del_request, metadata=metadata)
     return telemetry_response
@@ -510,9 +511,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         # 5: ARP                 -> MAC, IP
         #
         for p in pkt:
-            logging.info( f"ARP packet:{p.protocol_name}={p}" )
+            logging.debug( f"ARP packet:{p.protocol_name}={p}" )
             if p.protocol_name == 'vlan':
-                logging.info( f'vlan id = {p.vid}' )
+                logging.debug( f'vlan id = {p.vid}' )
             elif p.protocol_name == 'vxlan':
                 logging.info( f'vni = {p.vni}' )
         _ip = pkt.get_protocol( ipv4.ipv4 )
@@ -612,7 +613,8 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         if state.params['include_ip']:
            mac_vrf['ips'].update( { ip: { 'mac' : mac, 'vtep' : static_vtep } } ) # Also track IP mobility
       except Exception as e:
-        logging.error( f"Error processing ARP: {e}" )
+        tb_str = ''.join(traceback.format_tb(e.__traceback__))
+        logging.error( f"Error processing ARP: {e} ~ {tb_str}" )
           # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
         # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
         # print( f'trace_fields: {msg}' )
@@ -694,6 +696,7 @@ def Handle_Notification(obj, state):
                state.speaker.shutdown()
                hub.kill( state.bgpThread )
                del state.bgpThread
+               Remove_Telemetry( ".vxlan_proxy" )
 
             return True
 
@@ -831,7 +834,7 @@ if __name__ == '__main__':
     logging.basicConfig(
       handlers=[RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)],
       format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
-      datefmt='%H:%M:%S', level=logging.DEBUG)
+      datefmt='%H:%M:%S', level=logging.INFO)
     logging.info("START TIME :: {}".format(datetime.now()))
     if Run():
         logging.info('Agent unregistered and BGP shutdown')
