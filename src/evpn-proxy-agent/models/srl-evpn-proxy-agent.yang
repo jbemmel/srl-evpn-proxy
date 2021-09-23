@@ -35,6 +35,10 @@ module srl-evpn-proxy-agent {
         reference "TBD";
     }
 
+    feature "dataplane-learning" {
+      description "Use ARP snooping based on eBPF to learn MAC addresses and static VTEP IPs";
+    }
+
     grouping evpn-proxy-protocol {
         description "Configure EVPN Proxy";
 
@@ -86,6 +90,7 @@ module srl-evpn-proxy-agent {
             }
 
             container proof-of-concept {
+              // if-feature dataplane-learning;
               srl_nokia-ext:show-importance high; // affects info | as table
               presence "Configure Proof-of-Concept features";
               description "Set of features intended as Proof-of-Concept (only)";
@@ -183,29 +188,17 @@ module srl-evpn-proxy-agent {
 
           leaf-list static-vxlan-remoteips {
             type srl_nokia-comm:ipv4-address;
-            description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
 
-            // count() function not supported
-            // must "count( ../vnis ) > 0" {
-            //  error-message "Must provision a static list of VNIs for static VTEP IP(s)";
-            // }
+            description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
           }
 
-          // Best way I could find to reference existing vni value from config
+          // Best way I could find to reference existing evi value from config
           leaf evi {
              description "Copy of the EVI for this mac-vrf, used for auto-RD/RT";
 
              type uint32 {
                range "1..65535";
              }
-
-             // leafref crashes SRL mgr
-             //type leafref {
-             // path "../../srl_nokia-bgp-evpn:evi";
-               // require-instance "true"; // YANG 1.1 feature
-             // }
-             // when "../srl_nokia-bgp-evpn:evi";
-             // mandatory true;
              mandatory true;
              must ". = ../../srl_nokia-bgp-evpn:evi" {
                error-message "EVI must match bgp-evpn config";
