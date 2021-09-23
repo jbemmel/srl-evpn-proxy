@@ -10,6 +10,7 @@ cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
 ```
 
 This results in a setup containing 2 Cumulus nodes with static VXLAN configuration, and 2 SR Linux nodes with dynamic EVPN VXLAN.
+Both CVX1 and CVX2 have the EVPN VTEPs SRL1 and SRL2 listed in their config, but the reverse path is disabled.
 
 ## Baseline validation
 H1 (on CVX1) can ping H2 (on CVX2) and H3(on SRL1) can ping H4(on SRL2), but no other flows work.
