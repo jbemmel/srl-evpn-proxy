@@ -110,9 +110,7 @@ Once we enable the agent for a particular L2 EVPN service, it starts to advertis
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
   vxlan-agent
     admin-state enable
-    static-vxlan-remoteips [ 
-      1.1.1.1 # CVX1 VTEP
-    ]
+    static-vxlan-remoteips [ 1.1.1.1 ] # CVX1 VTEP (only)
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
 commit stay
