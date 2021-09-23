@@ -585,7 +585,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
             # and withdraw the multicast route? (for dynamically added VRFs)
             #
             if cur['vtep'] != "tbd":
-               logging.info( f"IP changed {cur['ip']}->{ip}, withdrawing my route" )
+               logging.info( f"VTEP changed {cur['vtep']}->{static_vtep}, withdrawing my route" )
                WithdrawRoute( state, mac_vrf, cur['vtep'], mac, cur['ip'] )
                mac_vrf['ips'].pop( cur['ip'], None ) # Remove any IP mapping too
             else:
