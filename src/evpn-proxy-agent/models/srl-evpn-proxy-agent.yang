@@ -126,7 +126,7 @@ module srl-evpn-proxy-agent {
     grouping evpn-proxy-state {
       description "Operational state for EVPN proxy";
 
-      container evpn-proxy {
+      container vxlan-proxy {
         presence "BGP EVPN proxy state";
         config false;
 
@@ -145,7 +145,7 @@ module srl-evpn-proxy-agent {
                 range "1..16777215";
               }
               srl_nokia-ext:show-importance "high";
-              description "VXLAN Network Identifier learnt for this VTEP.";
+              description "VXLAN Network Identifier enabled for this VTEP.";
             }
             list mac {
               key "address";
