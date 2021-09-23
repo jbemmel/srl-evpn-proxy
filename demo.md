@@ -1,4 +1,4 @@
-# VXLAN Agent demo scenario
+# VXLAN Agent EVPN control plane demo scenario
 ![plot](images/EVPN_proxy_lab_with_spine.png)
 ## Installation
 ```
