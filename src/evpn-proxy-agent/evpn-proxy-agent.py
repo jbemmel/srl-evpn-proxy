@@ -167,6 +167,31 @@ def Configure_BFD(state,remote_evpn_vtep):
    #global gnmi
    #gnmi.set( encoding='json_ietf', update=updates )
 
+def AnnounceMulticastRoute( state, rd, vtep_ip, vni ):
+   state.speaker.evpn_prefix_add(
+       route_type=EVPN_MULTICAST_ETAG_ROUTE,
+       route_dist=rd,
+       # esi=0, # should be ignored
+       ethernet_tag_id=0,
+       # mac_addr='00:11:22:33:44:55', # not relevant for MC route
+       ip_addr=state.params['source_address'], # originator == proxy IP
+       tunnel_type='vxlan',
+       vni=vni, # Sent as label
+       gw_ip_addr=vtep_ip,
+       next_hop=vtep_ip, # on behalf of remote VTEP
+       pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
+       # Added via patch
+       tunnel_endpoint_ip=vtep_ip
+)
+
+def WithdrawMulticastRoute( state, rd, vtep_ip ):
+    state.speaker.evpn_prefix_del(
+      route_type=EVPN_MULTICAST_ETAG_ROUTE, # RT3
+      route_dist=rd, # original RD
+      # vni=mac_vrf['vni'], # not used/allowed in withdraw
+      ethernet_tag_id=0
+    )
+
 def AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip, mobility_seq ):
    state.speaker.evpn_prefix_add(
        route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
@@ -193,7 +218,7 @@ def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip ):
     )
 
 def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
-   logging.info( f"UpdateMACVRF mac_vrf={mac_vrf}" )
+   logging.info( f"UpdateMACVRF mac_vrf={mac_vrf} previous_vteps={previous_vteps}" )
 
    # Clean up old VTEPs
    if previous_vteps:
@@ -388,38 +413,25 @@ def Add_Static_VTEP( state, remote_ip, vni ):
     # EVPN enabled itself. That way, any proxy will announce the same
     # route
     #
-    state.speaker.evpn_prefix_add(
-        route_type=EVPN_MULTICAST_ETAG_ROUTE,
-        route_dist=rd,
-        # esi=0, # should be ignored
-        ethernet_tag_id=0,
-        # mac_addr='00:11:22:33:44:55', # not relevant for MC route
-        ip_addr=state.params['source_address'], # originator == proxy IP
-        tunnel_type='vxlan',
-        vni=vni, # Not sent in advertisement
-        gw_ip_addr=remote_ip,
-        next_hop=remote_ip, # on behalf of remote VTEP
-        pmsi_tunnel_type=PMSI_TYPE_INGRESS_REP,
-        # Added via patch
-        tunnel_endpoint_ip=remote_ip
-    )
+    AnnounceMulticastRoute( state, rd, remote_ip, vni )
     state.bgp_vrfs[ rd ] = remote_ip
     return True
 
 def Remove_Static_VTEP( state, remote_ip, vni ):
 
     if vni not in state.mac_vrfs:
-        logging.warning( f"mac-vrf not found for VNI {vni}" )
+        logging.warning( f"Remove_Static_VTEP: mac-vrf not found for VNI {vni}" )
         return False
     mac_vrf = state.mac_vrfs[ vni ]
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
     if rd not in state.bgp_vrfs:
-        logging.warning( f"BGP MAC VRF does not exists: {rd}" )
+        logging.warning( f"Remove_Static_VTEP: BGP MAC VRF does not exists: {rd}" )
         return False
 
     logging.info(f"Remove_Static_VTEP: Removing VRF...RD={rd}")
 
-    # This should withdraw all routes too
+    # Deleting the VRF should withdraw all routes too? Doesn't look like it
+    WithdrawMulticastRoute(state,rd,remote_ip)
     state.speaker.vrf_del(route_dist=rd)
 
     del state.bgp_vrfs[ rd ]
@@ -600,6 +612,10 @@ def Handle_Notification(obj, state):
                     state.params[ "source_address" ] = data['source_address']['value']
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
+
+                state.params[ "vxlan_interfaces" ] = []
+                state.params[ "include_ip" ] = False
+                state.params[ "auto_discover_static_vteps" ] = False
                 if 'proof_of_concept' in data:
                     poc = data['proof_of_concept']
                     if 'vxlan_arp_learning_interfaces' in poc:
@@ -608,11 +624,6 @@ def Handle_Notification(obj, state):
                        state.params[ "include_ip" ] = bool( poc['include_ip']['value'] )
                     if 'auto_discover_static_vteps' in poc:
                        state.params[ "auto_discover_static_vteps" ] = bool( poc['auto_discover_static_vteps']['value'] )
-
-                else:
-                    state.params[ "vxlan_interfaces" ] = []
-                    state.params[ "include_ip" ] = False
-                    state.params[ "auto_discover_static_vteps" ] = False
 
             # cleanup ARP thread always, use link()?
             if hasattr( state, 'arp_threads' ):
