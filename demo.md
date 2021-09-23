@@ -10,7 +10,8 @@ cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
 
 This results in a setup containing 2 Cumulus nodes with static VXLAN configuration, and 2 SR Linux nodes with dynamic EVPN VXLAN.
 
-H1 (on Cumulus1) can ping H2 (on Cumulus2) and H3(on SRL1) can ping H4(on SRL2), but no other flows work.
+## Baseline validation
+H1 (on CVX1) can ping H2 (on CVX2) and H3(on SRL1) can ping H4(on SRL2), but no other flows work.
 ```
 jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.102 -c2
 PING 10.0.0.102 (10.0.0.102) 56(84) bytes of data.
@@ -29,7 +30,7 @@ PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 2 packets transmitted, 2 received, 0% packet loss, time 2ms
 rtt min/avg/max/mdev = 0.958/0.966/0.975/0.032 ms
 
-# Cannot ping from static to EVPN VTEP
+# Cannot ping from static to EVPN VTEP H1->H3
 jeroen@bembox:~/srlinux/srl-evpn-proxy$ docker exec -it clab-static-vxlan-spine-lab-h1 ping 10.0.0.103 -c2
 PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 From 10.0.0.101 icmp_seq=1 Destination Host Unreachable
@@ -39,4 +40,45 @@ From 10.0.0.101 icmp_seq=2 Destination Host Unreachable
 2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 15ms
 ```
 
+## Enable VXLAN proxy agent
+On SRL1, a BGP peering group is configured to enable an iBGP EVPN connection with the local VXLAN proxy agent:
+```
+A:srl1# /network-instance default                                                                                                                                                                                  
+--{ running }--[ network-instance default ]--                                                                                                                                                                      
+A:srl1# info protocols bgp group vxlan-agent                                                                                                                                                                       
+    protocols {
+        bgp {
+            group vxlan-agent {
+                admin-state enable
+                peer-as 65000
+                ipv4-unicast {
+                    admin-state disable
+                }
+                ipv6-unicast {
+                    admin-state disable
+                }
+                evpn {
+                    admin-state enable
+                }
+                route-reflector {
+                    client true
+                    cluster-id 1.1.1.5
+                }
+            }
+        }
+    }
+```
 
+To enable the local agent to run on lo0:
+```
+/network-instance default protocols vxlan-agent
+  admin-state enable
+  source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
+  local-as 65000
+  peer-as 65000
+```
+
+This should result in a new peer:
+```
+/show network-instance default protocols bgp neighbors
+```
