@@ -5,7 +5,7 @@
 bash -c "$(curl -sL https://get-clab.srlinux.dev)" # install Containerlab, version 0.18 or higher
 git clone --recurse-submodules https://github.com/jbemmel/srl-evpn-proxy
 cd srl-evpn-proxy
-make # to build the custom 'srl/evpn-proxy-agent' Docker container
+make all # to build the custom 'srl/evpn-proxy-agent' Docker container and the base image
 cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
 ```
 
