@@ -1,6 +1,6 @@
 module srl-evpn-proxy-agent {
 
-    yang-version "1";
+    yang-version "1.1";
 
     namespace "urn:srl_nokia_demo/evpn-proxy";
     // Put it in the same namespace, so we can read EVI config? Does not work
@@ -29,6 +29,7 @@ module srl-evpn-proxy-agent {
     import srl_nokia-tunnel-interfaces {
         prefix srl_nokia-tun;
     }
+    import srl_nokia-features { prefix srl-feat; }
 
     revision "2021-08-21" {
         description "Initial revision";
@@ -43,6 +44,8 @@ module srl-evpn-proxy-agent {
         description "Configure EVPN Proxy";
 
         container vxlan-agent {
+            if-feature "srl-feat:vxlan and srl-feat:evpn";
+
             presence "Configure BGP EVPN proxy agent for static VXLAN integration";
             must "../../srl_nokia-netinst:type = 'srl_nokia-netinst:default'" {
               error-message "VXLAN agent must be configured in the default network instance";
@@ -127,25 +130,51 @@ module srl-evpn-proxy-agent {
       description "Operational state for EVPN proxy";
 
       container vxlan-proxy {
+        // Only supported on SRL platforms that have both VXLAN and EVPN
+        if-feature "srl-feat:vxlan";
+        if-feature "srl-feat:evpn";
+
         presence "BGP EVPN proxy state";
         config false;
 
-        list vteps {
+        list static-vtep {
           key "vtep_ip";
 
           leaf vtep_ip {
             type srl_nokia-comm:ip-address;
             srl_nokia-ext:show-importance "high";
+            description "VXLAN source/destination IP for this VTEP";
           }
 
-          list vnids {
-            key "vni";
+          leaf last-update {
+            type srl_nokia-comm:date-and-time-delta;
+            srl_nokia-ext:show-importance "high";
+            description "The date and time of the last update of this VTEP";
+          }
+
+          leaf dynamic {
+            type boolean;
+            description "Indicates this VTEP IP was learned from dataplane ARP messages";
+          }
+
+          list mac-vrf {
+            key "name";
+            leaf name {
+              type string;
+            }
             leaf vni {
               type uint32 {
                 range "1..16777215";
               }
               srl_nokia-ext:show-importance "high";
-              description "VXLAN Network Identifier enabled for this VTEP.";
+              description "VXLAN Network Identifier enabled for this VTEP";
+            }
+            leaf evi {
+               type uint32 {
+                 range "1..65535";
+               }
+               srl_nokia-ext:show-importance "high";
+               description "EVPN instance enabled for this VTEP";
             }
             list mac {
               key "address";
@@ -171,6 +200,8 @@ module srl-evpn-proxy-agent {
     // Need to get the evi value for generating correct auto RD/RT
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-netinst:bgp-evpn/srl_nokia-bgp-evpn:bgp-instance" {
         container vxlan-agent {
+          if-feature "srl-feat:vxlan";
+          if-feature "srl-feat:evpn";
           presence "VXLAN agent configuration";
 
           description "Enable learning and advertisement of proxy EVPN routes for this instance";
@@ -194,7 +225,7 @@ module srl-evpn-proxy-agent {
 
           // Best way I could find to reference existing evi value from config
           leaf evi {
-             description "Copy of the EVI for this mac-vrf, used for auto-RD/RT";
+             description "Copy of the EVPN instance(evi) for this mac-vrf, used for auto-RD/RT";
 
              type uint32 {
                range "1..65535";

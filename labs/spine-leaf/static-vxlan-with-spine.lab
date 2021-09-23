@@ -11,6 +11,7 @@ topology:
     srl:
       # Need IXR D2 or D3 for EVPN/VXLAN support
       type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # type: ixr6
       # image: srl/custombase:latest
       image: srl/evpn-proxy-agent:latest
       extras:
@@ -46,13 +47,13 @@ topology:
     srl1:
       kind: srl
       group: evpn-fabric
-      startup-config: srl1.conf.json
-      # startup-config: srl1-with-evpn-proxy.conf.json
+      # startup-config: srl1.conf.json
+      startup-config: srl1-with-evpn-proxy.conf.json
     srl2:
       kind: srl
       group: evpn-fabric
-      startup-config: srl2.conf.json
-      # startup-config: srl2-with-evpn-proxy.conf.json
+      # startup-config: srl2.conf.json
+      startup-config: srl2-with-evpn-proxy.conf.json
 
     h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
     h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }

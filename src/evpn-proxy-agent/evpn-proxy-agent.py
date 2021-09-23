@@ -15,7 +15,7 @@ grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
 
 # May need to start a separate Python process for BGP
 
-import datetime
+from datetime import datetime
 import time
 import sys
 import logging
@@ -118,6 +118,24 @@ def Subscribe_Notifications(stream_id):
 
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
+
+def Add_Telemetry(js_path, js_obj):
+    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
+    telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
+    telemetry_info = telemetry_update_request.state.add()
+    telemetry_info.key.js_path = js_path
+    telemetry_info.data.json_content = json.dumps(js_obj)
+    logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
+    telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
+    return telemetry_response
+
+def Remove_Telemetry(js_path):
+    telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
+    telemetry_del_request = telemetry_service_pb2.TelemetryDeleteRequest()
+    telemetry_del_request.key.js_path = js_path
+    logging.info(f"Telemetry_Delete_Request :: {telemetry_del_request}")
+    telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_del_request, metadata=metadata)
+    return telemetry_response
 
 def Configure_BFD(state,remote_evpn_vtep):
    logging.info(f"Configure_BFD :: remote_evpn_vtep={remote_evpn_vtep}")
@@ -393,7 +411,7 @@ def AutoRouteDistinguisher( vtep_ip, mac_vrf ):
 def AutoRouteTarget( state, mac_vrf ):
     return f"{state.params['local_as']}:{mac_vrf['evi']}"
 
-def Add_Static_VTEP( state, remote_ip, vni ):
+def Add_Static_VTEP( state, remote_ip, vni, dynamic=False ):
 
     if vni not in state.mac_vrfs:
         logging.warning( f"Add_Static_VTEP({remote_ip}): mac-vrf not found for VNI {vni}" )
@@ -407,6 +425,20 @@ def Add_Static_VTEP( state, remote_ip, vni ):
     rt = AutoRouteTarget(state,mac_vrf)
     logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
     state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
+    now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    data = {
+      'last_update' : { "value" : now_ts },
+    }
+    if dynamic:
+       data['dynamic'] = { "value" : True }
+    Add_Telemetry( js_path, data )
+
+    # Would prefer to combine these 2 calls, but cannot figure out the syntax
+    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
+    data = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': vni } }
+    Add_Telemetry( js_path, data )
+
     logging.info("Adding EVPN multicast route...")
     #
     # For RD use the static VTEP's IP, just like it would do if it was
@@ -433,6 +465,8 @@ def Remove_Static_VTEP( state, remote_ip, vni ):
     # Deleting the VRF should withdraw all routes too? Doesn't look like it
     WithdrawMulticastRoute(state,rd,remote_ip)
     state.speaker.vrf_del(route_dist=rd)
+    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
+    Remove_Telemetry( js_path )
 
     del state.bgp_vrfs[ rd ]
     return True
@@ -506,7 +540,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
              continue
            else:
              logging.info( f"Dynamically adding auto-discovered VTEP {static_vtep}" )
-             Add_Static_VTEP( state, static_vtep, vni )
+             Add_Static_VTEP( state, static_vtep, vni, dynamic=True )
              mac_vrf['vxlan_vteps'][ static_vtep ] = "dynamic-from-arp"
 
         # Announce EVPN route(s)
@@ -762,10 +796,9 @@ def Exit_Gracefully(signum, frame):
     logging.info( f"Caught signal :: {signum}\n will unregister EVPN proxy agent" )
     try:
         response=stub.AgentUnRegister(request=sdk_service_pb2.AgentRegistrationRequest(), metadata=metadata)
-        logging.error( f'try: Unregister response:: {response}' )
-        sys.exit()
-    except grpc._channel._Rendezvous as err:
-        logging.info( f'GOING TO EXIT NOW: {err}' )
+        logging.info( f'Exit_Gracefully: Unregister response:: {response}' )
+    finally:
+        logging.info( f'GOING TO EXIT NOW' )
         sys.exit()
 
 ##################################################################################################
@@ -787,7 +820,7 @@ if __name__ == '__main__':
       handlers=[RotatingFileHandler(log_filename, maxBytes=3000000,backupCount=5)],
       format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
       datefmt='%H:%M:%S', level=logging.DEBUG)
-    logging.info("START TIME :: {}".format(datetime.datetime.now()))
+    logging.info("START TIME :: {}".format(datetime.now()))
     if Run():
         logging.info('Agent unregistered and BGP shutdown')
     else:
