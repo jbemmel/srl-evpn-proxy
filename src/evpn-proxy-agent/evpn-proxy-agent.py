@@ -235,6 +235,10 @@ def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip ):
       ip_addr=ip if state.params['include_ip'] else None
     )
 
+    # Also remove telemetry
+    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{vtep_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
+    Remove_Telemetry( js_path )
+
 def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
    logging.info( f"UpdateMACVRF mac_vrf={mac_vrf} previous_vteps={previous_vteps}" )
 
@@ -544,7 +548,6 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
              mac_vrf['vxlan_vteps'][ static_vtep ] = "dynamic-from-arp"
 
         # Announce EVPN route(s)
-
         mobility_seq = None  # First time: no attribute
 
         if mac in mac_vrf['macs']:
@@ -595,11 +598,14 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
             logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
             mac_vrf['macs'].update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
 
-            # Also update telemetry, for demo purposes only
-            js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{static_vtep}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
-            now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-            data = { 'last_update' : { "value" : now_ts } }
-            Add_Telemetry( js_path, data )
+        js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{static_vtep}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
+        now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        data = {
+          'last_update'  : { "value" : now_ts },
+          'ip'           : { "value" : ip },
+          'evpn_mac_mobility' : { "value": mobility_seq } # None -> not shown
+        }
+        Add_Telemetry( js_path, data )
 
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
         AnnounceRoute(state, mac_vrf, static_vtep, mac, ip, mobility_seq)

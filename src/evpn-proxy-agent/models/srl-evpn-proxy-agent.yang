@@ -186,6 +186,13 @@ module srl-evpn-proxy-agent {
                 srl_nokia-ext:show-importance "high";
                 description "The date and time of the last update of this mac";
               }
+              leaf ip {
+                type srl_nokia-comm:ip-address;
+              }
+              leaf evpn-mac-mobility {
+                description "EVPN MAC mobility sequence number used/seen";
+                type uint32;
+              }
             }
           }
         }
