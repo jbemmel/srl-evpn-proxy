@@ -71,11 +71,13 @@ A:srl1# info protocols bgp group vxlan-agent
 
 To enable the local agent to run on lo0:
 ```
+enter candidate
 /network-instance default protocols vxlan-agent
   admin-state enable
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
   peer-as 65000
+commit stay
 ```
 
 This should result in a new peer:
