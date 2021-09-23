@@ -231,3 +231,27 @@ PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 1 packets transmitted, 0 received, 100% packet loss, time 0ms
 ```
 
+## Model driven provisioning benefits
+The configuration for the agent is fully integrated with the SR Linux system. The agent [YANG model](https://github.com/jbemmel/srl-evpn-proxy/blob/main/src/evpn-proxy-agent/models/srl-evpn-proxy-agent.yang) defines the parameters and constraints that apply. This ensures that - for example - operators can only provision the correct EVI and VNI values for a given mac-vrf service:
+
+```
+A:srl1# /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 vxlan-agent                                                                                                                              
+--{ + candidate shared default }--[ network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 vxlan-agent ]--                                                                                               
+A:srl1# info                                                                                                                                                                                                       
+    admin-state disable
+    evi 57069
+    vni 11189196
+    static-vxlan-remoteips [
+        1.1.1.1
+    ]
+--{ + candidate shared default }--[ network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 vxlan-agent ]--                                                                                               
+A:srl1# evi 1234                                                                                                                                                                                                   
+--{ +* candidate shared default }--[ network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 vxlan-agent ]--                                                                                              
+A:srl1# vni 5678                                                                                                                                                                                                   
+--{ +* candidate shared default }--[ network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 vxlan-agent ]--                                                                                              
+A:srl1# commit stay                                                                                                                                                                                                
+Error: Error in path: .network-instance{.name=="mac-vrf-evi10"}.protocols.bgp-evpn.bgp-instance{.id==1}.vxlan-agent.evi
+    [FailedPrecondition] EVI must match bgp-evpn config
+Error in path: .network-instance{.name=="mac-vrf-evi10"}.protocols.bgp-evpn.bgp-instance{.id==1}.vxlan-agent.vni
+    [FailedPrecondition] VNI must match ingress vni on the vxlan-interface
+```
