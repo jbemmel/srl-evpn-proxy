@@ -44,7 +44,7 @@ class EVPNProxy(object):
    # connect_done = asyncio.Event()
 
    def best_path_change_event(event):
-     logging.warning( f'Best path changed: {event.path}' )
+     logging.debug( f'Best path changed: {event.path}' )
 
      # Could remove VTEP IP upon withdraw too
      if not event.is_withdraw:
@@ -56,7 +56,8 @@ class EVPNProxy(object):
            if is_from_proxy:
               logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
            else:
-              logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}, adding" )
+              logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}, adding {event.path.nlri}" )
+              # Note: not recording VNI here
               self.evpn_vteps[ event.nexthop ] = event.remote_as
         elif hasattr( event.path.nlri, 'vni'):
           vni = event.path.nlri.vni
@@ -251,7 +252,7 @@ class EVPNProxy(object):
          cur.update( { 'vtep' : vtep, 'seq' : mobility_seq } )
      elif is_static_vtep:
          logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with static VTEP {vtep}" )
-         mac_vrf.update( { mac : { 'vtep': vtep, 'seq': 0 } } )
+         mac_vrf.update( { mac : { 'vtep': vtep, 'seq': 0, 'src': 'arp' } } )
      else:
          logging.info( f"VNI {vni}: MAC {mac} from EVPN VTEP {vtep} - ignoring" )
          return False
@@ -287,14 +288,14 @@ class EVPNProxy(object):
            self.vni_2_macvrf[ vni ] = mac_vrf
         # TODO process static flag too
         logging.info( f"Unknown MAC {mac}, tracking mobility sequence {mac_mobility}" )
-        mac_vrf.update( { mac : { 'vtep': 'tbd', 'seq': mac_mobility } } )
+        mac_vrf.update( { mac : { 'vtep': 'tbd', 'seq': mac_mobility, 'src': 'evpn' } } )
 
  def checkAdvertisedRoute( self, vni, mac ):
     logging.info( f"checkAdvertisedRoute vni={vni} mac={mac} table={self.vni_2_macvrf}" )
     # lookup MAC in vni table
     if vni in self.vni_2_macvrf:
         macvrf = self.vni_2_macvrf[ vni ]
-        return macvrf[mac]['vtep'] if mac in macvrf else None
+        return macvrf[mac] if mac in macvrf else None
     logging.info( f"No route advertised for MAC {mac} in VNI {vni}" )
     return None
 

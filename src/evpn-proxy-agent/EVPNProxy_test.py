@@ -124,44 +124,62 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.shutdown()
    eventlet.sleep(1)
 
+ def assertRoute(self,vni,mac,vtep_ip,src=None):
+   route = self.evpn_proxy.checkAdvertisedRoute(vni,mac)
+   self.assertTrue( 'vtep' in route, "No 'vtep' in route" )
+   self.assertEquals( route['vtep'], vtep_ip,
+     f"proxy failed to advertise correct VTEP IP {vtep_ip}" )
+   if src:
+      self.assertTrue( 'src' in route, "No 'src' in route" )
+      self.assertEquals( route['src'], src, "Unexpected source" )
+
+ def assertNoRoute(self,vni,mac):
+   route = self.evpn_proxy.checkAdvertisedRoute(vni,mac)
+   self.assertIsNone( route, f"proxy failed to withdraw route for {vni} {mac}" )
+
  def test_1_normal_scenario_arp_request_broadcast(self,src=VTEP1,dst=VTEP3):
    # ARP request broadcast to all proxies
    self.evpn_proxy.rxVXLAN_ARP( VNI, src, dst, MAC1 )
    eventlet.sleep(1)
 
-   self.assertEqual( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1), src,
-    "proxy failed to advertise correct VTEP" )
+   self.assertRoute( VNI, MAC1, src, src='arp' )
 
  # Case: ARP response sent from static VTEP (or lost ARP broadcast request)
+ def test_2_normal_scenario_arp_response_unicast(self,src=VTEP1,dst=VTEP3):
+   # ARP response received by proxy AGENT1 on VTEP3
+   if self.clientsock:
+      self.evpn_proxy.rxVXLAN_ARP( VNI, src, dst, MAC1 )
+   eventlet.sleep(1)
+
+   # The other proxy AGENT2 should receive the route from AGENT1 via EVPN
+   self.assertRoute( VNI, MAC1, src, src='arp' if self.clientsock else 'evpn' )
 
  # Case: MAC move static VTEP1 to static VTEP2
- def test_2_normal_scenario_mac_move(self):
-  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
+ def test_3_normal_scenario_mac_move(self):
+   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
 
-  # Emulate MAC1 moving to static VTEP2
-  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP2,dst=VTEP3)
+   # Emulate MAC1 moving to static VTEP2
+   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP2,dst=VTEP3)
 
  # Case: MAC move static VTEP1 to EVPN VTEP4
- def test_3_normal_scenario_mac_move_to_evpn(self):
-  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
+ def test_4_normal_scenario_mac_move_to_evpn(self):
+   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
 
-  # Emulate MAC1 moving to EVPN VTEP4, detected via ARP
-  self.evpn_proxy.rxVXLAN_ARP( VNI, VTEP4, VTEP3, MAC1 )
-  eventlet.sleep(1)
+   # Emulate MAC1 moving to EVPN VTEP4, detected via ARP
+   self.evpn_proxy.rxVXLAN_ARP( VNI, VTEP4, VTEP3, MAC1 )
+   eventlet.sleep(1)
 
-  self.assertIsNone( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1),
-    "proxy failed to withdraw route for MAC moved to EVPN VTEP" )
+   self.assertNoRoute( VNI, MAC1 )
 
  # Case: MAC move static VTEP1 to EVPN VTEP4, detected through RT2 update
- def test_4_normal_scenario_mac_move_to_evpn_detected_via_evpn(self):
-  self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
+ def test_5_normal_scenario_mac_move_to_evpn_detected_via_evpn(self):
+   self.test_1_normal_scenario_arp_request_broadcast(src=VTEP1,dst=VTEP3)
 
-  # Emulate MAC1 moving to EVPN VTEP4, seen via RT2
-  self.evpn_proxy.rxEVPN_RT2( VNI, MAC1, VTEP4, is_from_proxy=False )
-  eventlet.sleep(1)
+   # Emulate MAC1 moving to EVPN VTEP4, seen via RT2
+   self.evpn_proxy.rxEVPN_RT2( VNI, MAC1, VTEP4, is_from_proxy=False )
+   eventlet.sleep(1)
 
-  self.assertIsNone( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1),
-    "proxy failed to withdraw route for MAC moved to EVPN VTEP through RT2" )
+   self.assertNoRoute( VNI, MAC1 )
 
 if __name__ == '__main__':
-    unittest.main( argv=sys.argv[:1] )  # Only pass program name
+   unittest.main( argv=sys.argv[:1] )  # Only pass program name
