@@ -117,6 +117,20 @@ Once we enable the agent for a particular L2 EVPN service, it starts to advertis
 commit stay
 ```
 
+To check that the service is provisioned:
+```
+A:srl1# /info from state vxlan-proxy                                                                                                                                                                               
+    vxlan-proxy {
+        static-vtep 1.1.1.1 {
+            last-update "7 seconds ago"
+            mac-vrf mac-vrf-evi10 {
+                vni 11189196
+                evi 57069
+            }
+        }
+    }
+```
+
 ### Verify static VTEP proxy routes
 ```
 A:srl1# show /network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn                                                                                                                         
