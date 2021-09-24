@@ -252,7 +252,7 @@ protocols {
  bgp-evpn {
   bgp-instance 1 {
   admin-state enable
-  vxlan-interface vxlan0.0
+  vxlan-interface vxlan0.1
   evi 57070 !!! Second customer
   ecmp 8
   vxlan-agent {
