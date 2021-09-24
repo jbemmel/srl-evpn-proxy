@@ -1114,35 +1114,6 @@
       ]
     },
     {
-      "name": "irb0",
-      "admin-state": "enable",
-      "subinterface": [
-        {
-          "index": 0,
-          "admin-state": "enable",
-          "ipv4": {
-            "address": [
-              {
-                "ip-prefix": "10.0.0.1/24",
-                "primary": [null]
-              }
-            ],
-            "srl_nokia-interfaces-nbr:arp": {
-              "duplicate-address-detection": false
-            }
-          },
-          "ipv6": {
-            "address": [
-              {
-                "ip-prefix": "2001::10.0.0.1/64",
-                "primary": [null]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
       "name": "lo0",
       "description": "Loopback",
       "admin-state": "enable",
@@ -1526,9 +1497,6 @@
       "interface": [
         {
           "name": "ethernet-1/2.0"
-        },
-        {
-          "name": "irb0.0"
         }
       ],
       "vxlan-interface": [

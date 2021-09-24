@@ -1137,10 +1137,14 @@
     {
       "name": "ethernet-1/2",
       "admin-state": "enable",
+      "vlan-tagging": true,
       "subinterface": [
         {
           "index": 0,
           "type": "srl_nokia-interfaces:bridged",
+          "srl_nokia-interfaces-vlans:vlan": {
+           "encap": { "untagged": { } }
+          },
           "admin-state": "enable"
         }
       ]
