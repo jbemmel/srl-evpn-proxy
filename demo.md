@@ -9,7 +9,7 @@ make all # to build the custom 'srl/evpn-proxy-agent' Docker container and the b
 cd labs/spine-leaf && sudo containerlab deploy -t static-vxlan-with-spine.lab
 ```
 
-This results in a setup containing 2 Cumulus nodes with static VXLAN configuration, and 2 SR Linux nodes with dynamic EVPN VXLAN.
+After a minute or two, this results in a setup containing 2 Cumulus nodes with static VXLAN configuration, and 2 SR Linux nodes with dynamic EVPN VXLAN.
 Both CVX1 and CVX2 have the EVPN VTEPs SRL1 and SRL2 listed in their config, but the reverse path is disabled.
 
 ## Baseline validation
