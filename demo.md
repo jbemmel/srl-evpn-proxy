@@ -249,7 +249,15 @@ The VXLAN agent supports multiple customer services in parallel. To verify, prov
 ```
 /interface ethernet-1/2 subinterface 1
 type bridged
+vlan {
+   encap {
+      single-tagged {
+        vlan-id 1
+      }
+   }
+}
 admin-state enable
+
 /tunnel-interface vxlan0 vxlan-interface 1
 type bridged
 ingress vni 11189197
