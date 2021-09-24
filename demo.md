@@ -119,7 +119,7 @@ commit stay
 
 To check that the service is provisioned:
 ```
-A:srl1# /info from state vxlan-proxy                                                                                                                                                                               
+A:srl1# /info from state vxlan-proxy
     vxlan-proxy {
         static-vtep 1.1.1.1 {
             last-update "7 seconds ago"
