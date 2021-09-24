@@ -282,7 +282,7 @@ protocols {
     evi 57070
     vni 11189197
     static-vxlan-remoteips [
-      1.1.1.1
+      1.1.1.1 1.1.1.2
     ]
    }
   }
