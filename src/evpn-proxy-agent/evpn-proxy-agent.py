@@ -119,12 +119,13 @@ def Subscribe_Notifications(stream_id):
     # Subscribe to config changes, first
     Subscribe(stream_id, 'cfg')
 
-def Add_Telemetry(js_path, js_obj):
+def Add_Telemetry( path_obj_list ):
     telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
     telemetry_update_request = telemetry_service_pb2.TelemetryUpdateRequest()
-    telemetry_info = telemetry_update_request.state.add()
-    telemetry_info.key.js_path = js_path
-    telemetry_info.data.json_content = json.dumps(js_obj)
+    for js_path,obj in path_obj_list:
+      telemetry_info = telemetry_update_request.state.add()
+      telemetry_info.key.js_path = js_path
+      telemetry_info.data.json_content = json.dumps(obj)
     logging.info(f"Telemetry_Update_Request :: {telemetry_update_request}")
     telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
     return telemetry_response
@@ -438,12 +439,10 @@ def Add_Static_VTEP( state, remote_ip, vni, dynamic=False ):
     }
     if dynamic:
        data['dynamic'] = { "value" : True }
-    Add_Telemetry( js_path, data )
 
-    # Would prefer to combine these 2 calls, but cannot figure out the syntax
-    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
-    data = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': vni } }
-    Add_Telemetry( js_path, data )
+    js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
+    data2 = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': vni } }
+    Add_Telemetry( [(js_path, data),(js_path2,data2)] )
 
     logging.info("Adding EVPN multicast route...")
     #
@@ -610,7 +609,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
           'ip'           : { "value" : ip },
           'evpn_mac_mobility' : { "value": mobility_seq } # None -> not shown
         }
-        Add_Telemetry( js_path, data )
+        Add_Telemetry( [(js_path, data)] )
 
         logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
         AnnounceRoute(state, mac_vrf, static_vtep, mac, ip, mobility_seq)
