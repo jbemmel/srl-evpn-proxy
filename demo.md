@@ -230,6 +230,48 @@ PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 --- 10.0.0.103 ping statistics ---
 1 packets transmitted, 0 received, 100% packet loss, time 0ms
 ```
+## Multiple customer services
+The VXLAN agent supports multiple customer services in parallel. To verify, provision a new mac-vrf on SRL1:
+```
+/interface ethernet-1/2 subinterface 1
+type bridged
+admin-state enable
+/tunnel-interface vxlan0 vxlan-interface 1
+type bridged
+ingress vni 11189197
+egress source-ip use-system-ipv4-address
+
+/network-instance mac-vrf-customer-2
+type mac-vrf
+admin-state enable
+interface ethernet-1/2.1 {
+}
+vxlan-interface vxlan0.1 {
+}
+protocols {
+ bgp-evpn {
+  bgp-instance 1 {
+  admin-state enable
+  vxlan-interface vxlan0.0
+  evi 57070 !!! Second customer
+  ecmp 8
+  vxlan-agent {
+    admin-state enable
+    evi 57070
+    vni 11189197
+    static-vxlan-remoteips [
+      1.1.1.1
+    ]
+   }
+  }
+ }
+ bgp-vpn {
+  bgp-instance 1 {
+ }
+}
+}
+commit stay
+```
 
 ## Model driven provisioning benefits
 The configuration for the agent is fully integrated with the SR Linux system. The agent [YANG model](https://github.com/jbemmel/srl-evpn-proxy/blob/main/src/evpn-proxy-agent/models/srl-evpn-proxy-agent.yang) defines the parameters and constraints that apply. This ensures that - for example - operators can only provision the correct EVI and VNI values for a given mac-vrf service:
