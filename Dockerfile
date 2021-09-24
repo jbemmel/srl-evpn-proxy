@@ -49,15 +49,15 @@ COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
-RUN sudo mkdir -p /etc/opt/srlinux/appmgr/ /opt/srlinux/agents/evpn-proxy-agent
+RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
-COPY ./src /opt/srlinux/agents/
+COPY ./src /opt/demo-agents/
 
 # Add in auto-config agent sources too
-# COPY --from=srl/auto-config:latest /opt/srlinux/agents/ /opt/srlinux/agents/
+# COPY --from=srl/auto-config:latest /opt/demo-agents/ /opt/demo-agents/
 
 # run pylint to catch any obvious errors
-RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/srlinux/agents/evpn-proxy-agent
+RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/evpn-proxy-agent
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_EVPN_PROXY_RELEASE="[custom build]"

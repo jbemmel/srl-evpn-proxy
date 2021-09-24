@@ -1,18 +1,18 @@
 # See example_config.yml for an explanation of all the accepted fields
 srl_evpn_proxy_agent:
-   path: /opt/srlinux/agents/evpn-proxy-agent
-   launch-command: sudo /opt/srlinux/agents/evpn-proxy-agent/scripts/evpn-proxy-agent.sh
-   search-command: python3 /opt/srlinux/agents/evpn-proxy-agent/evpn-proxy-agent.py
+   path: /opt/demo-agents/evpn-proxy-agent
+   launch-command: sudo /opt/demo-agents/evpn-proxy-agent/scripts/evpn-proxy-agent.sh
+   search-command: python3 /opt/demo-agents/evpn-proxy-agent/evpn-proxy-agent.py
    wait-for-config: Yes
    failure-threshold: 100
    failure-action: wait=forever
    author: 'Nokia'
-   version-command: ' cat /opt/srlinux/agents/evpn-proxy-agent/agent_version'
+   version-command: ' cat /opt/demo-agents/evpn-proxy-agent/agent_version'
    yang-modules:
        names:
            - "srl-evpn-proxy-agent"
        source-directories:
-           - "/opt/srlinux/agents/evpn-proxy-agent/models/"
+           - "/opt/demo-agents/evpn-proxy-agent/models/"
            - "/opt/srlinux/models/srl_nokia/models/common/"
            - "/opt/srlinux/models/srl_nokia/models/network-instance/"
            - "/opt/srlinux/models/srl_nokia/models/tunnel/"
