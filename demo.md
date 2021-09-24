@@ -245,53 +245,19 @@ PING 10.0.0.103 (10.0.0.103) 56(84) bytes of data.
 1 packets transmitted, 0 received, 100% packet loss, time 0ms
 ```
 ## Multiple customer services
-The VXLAN agent supports multiple customer services in parallel. To verify, provision a new mac-vrf on SRL1:
+The VXLAN agent supports multiple customer services in parallel. To verify, enable the agent for a second mac-vrf on SRL1:
 ```
-/interface ethernet-1/2 subinterface 1
-type bridged
-vlan {
-   encap {
-      single-tagged {
-        vlan-id 1
-      }
-   }
-}
-admin-state enable
-
-/tunnel-interface vxlan0 vxlan-interface 1
-type bridged
-ingress vni 11189197
-egress source-ip use-system-ipv4-address
-
-/network-instance mac-vrf-customer-2
-type mac-vrf
-admin-state enable
-interface ethernet-1/2.1 {
-}
-vxlan-interface vxlan0.1 {
-}
+/network-instance mac-vrf-evi20
 protocols {
  bgp-evpn {
   bgp-instance 1 {
-  admin-state enable
-  vxlan-interface vxlan0.1
-  evi 57070 !!! Second customer
-  ecmp 8
-  vxlan-agent {
+   vxlan-agent {
     admin-state enable
-    evi 57070
-    vni 11189197
+    evi 20
+    vni 20
     static-vxlan-remoteips [
       1.1.1.1 1.1.1.2
     ]
-   }
-  }
- }
- bgp-vpn {
-  bgp-instance 1 {
- }
-}
-}
 commit stay
 ```
 
