@@ -9,11 +9,24 @@ import asyncio
 
 # from ryu.lib import hub
 
+# Test to fix logging during testing
+class CapturableHandler(logging.StreamHandler):
+
+    @property
+    def stream(self):
+        return sys.stdout
+
+    @stream.setter
+    def stream(self, value):
+        logging.info( f"Attempt to replace log stream with {value}, averted" )
+        pass
+
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
 logger.level = logging.INFO # DEBUG
 stream_handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(stream_handler)
+# logger.addHandler(CapturableHandler())
 
 from EVPNProxy import EVPNProxy
 
@@ -29,12 +42,8 @@ VTEP2 = "1.1.1.2"
 VTEP3 = "1.1.1.5" # SRL1
 VTEP4 = "1.1.1.7" # SRL2
 
-# Global variables
-serverAddr = None
-sock = None
-
 #
-# Run: cd /opt/srlinux/agents/evpn-proxy-agent && ip netns exec srbase-default python3 -m unittest EVPNProxy_test.EVPNProxyTestCase -v
+# Run: ip netns exec srbase-default python3 /opt/demo-agents/evpn-proxy-agent/EVPNProxy_test.py
 #
 # Note that Ryu only supports a single BGPSpeaker per Python process, hence we
 # need to create multiple test processes (one per EVPN proxy)
@@ -45,10 +54,49 @@ sock = None
 #
 class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
 
+ @classmethod
+ def setUpClass(cls):
+   logging.info("setUpClass")
+
+   # 8378 == "TEST" on a phone dialpad
+   serverAddr = (sys.argv[1],8378) if len(sys.argv)>1 else None
+
+   # Create a TCP/IP socket
+   sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+   sock.setblocking( True )
+   logger.info( f"Opening socket server={serverAddr}" )
+   if serverAddr is None:
+       sock.bind( ("1.1.1.4",8378) )
+       sock.listen(1)
+       cls.clientsock, cls.clientAddr = sock.accept()
+       cls.clientsock.setblocking( True )
+   else:
+       sock.connect( serverAddr )
+       cls.clientsock = cls.clientAddr = None
+   cls.sock = sock
+
+ @classmethod
+ def tearDownClass(cls):
+     if cls.clientsock:
+         cls.clientsock.close()
+     cls.sock.close()
+
  def setUp(self):
+   logging.info( "setUp" )
 
    # Restore our log
    stream_handler.stream = sys.stdout
+
+   # Synchronize client/server
+   if self.clientsock:
+      sync_msg = self.clientsock.recv( bufsize=256 )
+      logging.info( f"Server: sync_msg={sync_msg}, echoing")
+      self.clientsock.sendall(sync_msg)
+   else:
+      logging.info( "Client: sending sync_msg" )
+      self.sock.sendall("setUp".encode())
+      sync_msg = self.sock.recv( bufsize=256 )
+      logging.info( f"Client: received sync_msg {sync_msg}" )
 
    self.evpn_proxy = EVPNProxy(router_id="1.1.1.4")
 
@@ -68,17 +116,8 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP1 )
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
-   # Synchronize client/server
-   global serverAddr, sock
-   if serverAddr is None:
-      sync_msg = sock.recv( bufsize=256 )
-      logger.info( f"Server: sync_msg={sync_msg}")
-   else:
-      logger.info( "Client: sending sync_msg" )
-      sock.sendall("setUp")
-
  def tearDown(self):
-   logger.info( "TEARDOWN - shutdown EVPN proxy" )
+   logging.info( "TEARDOWN - shutdown EVPN proxy" )
    self.evpn_proxy.shutdown()
    eventlet.sleep(1)
 
@@ -121,26 +160,5 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
   self.assertIsNone( self.evpn_proxy.checkAdvertisedRoute(VNI,MAC1),
     "proxy failed to withdraw route for MAC moved to EVPN VTEP through RT2" )
 
-
 if __name__ == '__main__':
-  # 8378 == "TEST" on a phone dialpad
-  serverAddr = (sys.argv[1]+":8378") if len(sys.argv)>1 else None
-
-  # Create a TCP/IP socket
-  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  logger.info( f"Opening socket server={serverAddr}" )
-  if serverAddr is None:
-      sock.bind( ("1.1.1.4",8378) )
-      sock.listen(1)
-      clientsock, clientAddr = sock.accept()
-  else:
-      sock.connect( serverAddr )
-
-  # asyncio.run( unittest.main() ) # Python 3.7+
-  # loop = asyncio.get_event_loop()
-  # loop.run_until_complete( unittest.main() )
-  try:
-     logger.info( "Starting UnitTest..." )
-     unittest.main()
-  finally:
-     sock.close()
+    unittest.main( argv=sys.argv[:1] )  # Only pass program name
