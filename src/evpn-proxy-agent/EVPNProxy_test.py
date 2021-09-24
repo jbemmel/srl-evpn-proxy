@@ -9,24 +9,11 @@ import asyncio
 
 # from ryu.lib import hub
 
-# Test to fix logging during testing
-class CapturableHandler(logging.StreamHandler):
-
-    @property
-    def stream(self):
-        return sys.stdout
-
-    @stream.setter
-    def stream(self, value):
-        logging.info( f"Attempt to replace log stream with {value}, averted" )
-        pass
-
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
 logger.level = logging.INFO # DEBUG
 stream_handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(stream_handler)
-# logger.addHandler(CapturableHandler())
 
 from EVPNProxy import EVPNProxy
 
@@ -101,7 +88,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
       sync_msg = self.sock.recv( bufsize=256 )
       logging.info( f"Client: received sync_msg {sync_msg}" )
 
-   self.evpn_proxy = EVPNProxy(router_id=AGENT2 if self.clientAddr else AGENT1)
+   self.evpn_proxy = EVPNProxy(router_id=AGENT1 if self.clientAddr else AGENT2)
 
    # Assumes a BGP neighbor config in SRL
    # Cannot 'await'

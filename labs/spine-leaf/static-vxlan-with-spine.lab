@@ -19,6 +19,7 @@ topology:
         - /lib/modules:/lib/modules:ro
         - /usr/src:/usr/src
         - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+        - ../../src:/opt/demo-agents
 
     cvx:
       image: networkop/cx:4.4.0
