@@ -36,6 +36,9 @@ EVI = 57069
 MAC1 = "00:11:22:33:44:01"
 MAC2 = "00:11:22:33:44:02"
 
+AGENT1 = "1.1.1.4"
+AGENT2 = "1.1.1.6"
+
 # Static VTEPs (TODO emulate dynamic EVPN VTEPs too, by calling rxEVPN_RT2)
 VTEP1 = "1.1.1.1"
 VTEP2 = "1.1.1.2"
@@ -66,7 +69,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    sock.setblocking( True )
    logger.info( f"Opening socket server={serverAddr}" )
    if serverAddr is None:
-       sock.bind( ("1.1.1.4",8378) )
+       sock.bind( (AGENT1,8378) )
        sock.listen(1)
        cls.clientsock, cls.clientAddr = sock.accept()
        cls.clientsock.setblocking( True )
@@ -98,7 +101,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
       sync_msg = self.sock.recv( bufsize=256 )
       logging.info( f"Client: received sync_msg {sync_msg}" )
 
-   self.evpn_proxy = EVPNProxy(router_id="1.1.1.4")
+   self.evpn_proxy = EVPNProxy(router_id=AGENT2 if self.clientAddr else AGENT1)
 
    # Assumes a BGP neighbor config in SRL
    # Cannot 'await'
