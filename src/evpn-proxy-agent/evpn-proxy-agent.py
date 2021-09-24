@@ -129,11 +129,12 @@ def Add_Telemetry(js_path, js_obj):
     telemetry_response = telemetry_stub.TelemetryAddOrUpdate(request=telemetry_update_request, metadata=metadata)
     return telemetry_response
 
-def Remove_Telemetry(js_path):
+def Remove_Telemetry(js_paths):
     telemetry_stub = telemetry_service_pb2_grpc.SdkMgrTelemetryServiceStub(channel)
     telemetry_del_request = telemetry_service_pb2.TelemetryDeleteRequest()
-    telemetry_key = telemetry_del_request.key.add()
-    telemetry_key.js_path = js_path
+    for path in js_paths:
+      telemetry_key = telemetry_del_request.key.add()
+      telemetry_key.js_path = path
     logging.info(f"Telemetry_Delete_Request :: {telemetry_del_request}")
     telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_del_request, metadata=metadata)
     return telemetry_response
@@ -238,7 +239,7 @@ def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip ):
 
     # Also remove telemetry
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{vtep_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
-    Remove_Telemetry( js_path )
+    Remove_Telemetry( [js_path] )
 
 def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
    logging.info( f"UpdateMACVRF mac_vrf={mac_vrf} previous_vteps={previous_vteps}" )
@@ -470,8 +471,11 @@ def Remove_Static_VTEP( state, remote_ip, vni ):
     # Deleting the VRF should withdraw all routes too? Doesn't look like it
     WithdrawMulticastRoute(state,rd,remote_ip)
     state.speaker.vrf_del(route_dist=rd)
+
+    # This isn't sufficient
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
-    Remove_Telemetry( js_path )
+    js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
+    Remove_Telemetry( [js_path,js_path2] )
 
     del state.bgp_vrfs[ rd ]
     return True
@@ -696,7 +700,7 @@ def Handle_Notification(obj, state):
                state.speaker.shutdown()
                hub.kill( state.bgpThread )
                del state.bgpThread
-               Remove_Telemetry( ".vxlan_proxy" )
+               Remove_Telemetry( [".vxlan_proxy"] ) # Works?
 
             return True
 
