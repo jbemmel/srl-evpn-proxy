@@ -161,19 +161,19 @@ module srl-evpn-proxy-agent {
             leaf name {
               type string;
             }
-            leaf vni {
-              type uint32 {
-                range "1..16777215";
-              }
-              srl_nokia-ext:show-importance "high";
-              description "VXLAN Network Identifier enabled for this VTEP";
-            }
             leaf evi {
                type uint32 {
                  range "1..65535";
                }
                srl_nokia-ext:show-importance "high";
                description "EVPN instance enabled for this VTEP";
+            }
+            leaf vni {
+              type uint32 {
+                range "1..16777215";
+              }
+              srl_nokia-ext:show-importance "high";
+              description "VXLAN Network Identifier enabled for this VTEP";
             }
             list mac {
               key "address";
