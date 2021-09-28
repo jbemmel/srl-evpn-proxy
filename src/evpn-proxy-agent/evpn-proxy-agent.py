@@ -247,8 +247,8 @@ def UpdateMACVRF( state, mac_vrf, new_vni=None, new_evi=None ):
 
    if new_evi:
       # Clean up old VTEPs, RDs need to be changed
-      for static_vtep in mac_vrf['vxlan_vteps']:
-         Remove_Static_VTEP( state, mac_vrf, static_vtep )
+      for static_vtep in list( mac_vrf['vxlan_vteps'].keys() ):
+         Remove_Static_VTEP( state, mac_vrf, static_vtep, clear_macs=False )
       mac_vrf['evi'] = new_evi
 
    if new_vni:
@@ -489,7 +489,7 @@ def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     AnnounceMulticastRoute( state, rd, remote_ip, mac_vrf['vni'] )
     return True
 
-def Remove_Static_VTEP( state, mac_vrf, remote_ip ):
+def Remove_Static_VTEP( state, mac_vrf, remote_ip, clear_macs=True ):
 
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
     if rd not in state.bgp_vrfs:
@@ -507,7 +507,8 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip ):
     js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
     Remove_Telemetry( [js_path,js_path2] )
 
-    del mac_vrf['vxlan_vteps'][ remote_ip ]
+    if clear_macs:
+       del mac_vrf['vxlan_vteps'][ remote_ip ]
     del state.bgp_vrfs[ rd ]
     return True
 
@@ -793,7 +794,7 @@ def Handle_Notification(obj, state):
             mac_vrf = state.mac_vrfs[ mac_vrf_name ]
             if obj.config.op == 2: # delete static VTEP
               # All MAC routes get withdrawn too
-              Remove_Static_VTEP( state, mac_vrf, vtep_ip )
+              Remove_Static_VTEP( state, mac_vrf, vtep_ip, clear_macs=True )
             else:
               static_macs = {}
               if 'static_vtep' in data and 'static_macs' in data['static_vtep']:
