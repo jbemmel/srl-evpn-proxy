@@ -16,3 +16,8 @@ vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
 commit stay
 ```
 
+### Validation
+```
+info from state /network-instance default bgp-rib attr-sets attr-set rib-in index ${//network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-pre/imet-routes[originating-router=1.1.1.4]/attr_id}
+```
+
