@@ -290,9 +290,8 @@ def UpdateMACVRF_StaticVTEP( state, mac_vrf, vtep_ip, macs ):
                WithdrawRoute( state, mac_vrf, vtep_ip, mac )
 
       # Announce new MACs
-      existing_routes = list( vtep.keys() )
-      for mac, status in macs.items():
-          if mac not in existing_routes and status != 'static_announced':
+      for mac in macs.keys():
+          if not vtep or mac not in vtep or vtep[mac] != 'static_announced':
               AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
               macs[ mac ] = 'static_announced'
 
@@ -461,13 +460,12 @@ def AutoRouteTarget( state, mac_vrf ):
 
 def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
-    if rd in state.bgp_vrfs:
-        logging.warning( f"MAC VRF already exists: {rd}" )
-        return False
+    if rd not in state.bgp_vrfs:
+       rt = AutoRouteTarget(state,mac_vrf)
+       logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
+       state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
+       state.bgp_vrfs[ rd ] = remote_ip
 
-    rt = AutoRouteTarget(state,mac_vrf)
-    logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
-    state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
     now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
     data = {
@@ -487,7 +485,6 @@ def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     # route
     #
     AnnounceMulticastRoute( state, rd, remote_ip, mac_vrf['vni'] )
-    state.bgp_vrfs[ rd ] = remote_ip
     return True
 
 def Remove_Static_VTEP( state, mac_vrf, remote_ip ):
@@ -508,6 +505,7 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip ):
     js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
     Remove_Telemetry( [js_path,js_path2] )
 
+    del mac_vrf['vxlan_vteps'][ remote_ip ]
     del state.bgp_vrfs[ rd ]
     return True
 
