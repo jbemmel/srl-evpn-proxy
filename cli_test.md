@@ -37,3 +37,16 @@ The Route Distinguishers for all VTEPs should include the updated EVI value
 ```
 show /network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 ```
+
+## Remove and add back static VTEP
+```
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
+vxlan-agent
+delete static-vtep 1.1.1.1
+commit stay
+```
+and add it back, without MACs:
+```
+static-vtep 1.1.1.1
+commit stay
+```
