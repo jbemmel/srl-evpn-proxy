@@ -741,7 +741,8 @@ def Handle_Notification(obj, state):
           if vni:
             if admin_state == "enable":
                if vni not in state.mac_vrfs and mac_vrf_name not in state.mac_vrfs:
-                 vrf = { 'admin_state': admin_state, 'vni': vni, 'evi': evi,
+                 vrf = { 'name': mac_vrf_name,
+                         'admin_state': admin_state, 'vni': vni, 'evi': evi,
                          'macs': {}, 'ips': {}, 'vxlan_vteps': {} }
                  state.mac_vrfs[ vni ] = state.mac_vrfs[ mac_vrf_name ] = vrf
                else:
