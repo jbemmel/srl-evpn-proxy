@@ -282,12 +282,14 @@ def UpdateMACVRF_StaticVTEP( state, mac_vrf, vtep_ip, macs ):
    vtep = vteps[ vtep_ip ] if vtep_ip in vteps else None
 
    if hasattr( state, 'speaker' ):  # BGP running?
-      # Clean up old MAC routes
       if vtep:
+         # Clean up old MAC routes
          macs_to_keep = list( macs.keys() )
          for mac in vtep.keys():
             if mac not in macs_to_keep:
                WithdrawRoute( state, mac_vrf, vtep_ip, mac )
+      else:
+         Add_Static_VTEP( state, mac_vrf, vtep_ip )
 
       # Announce new MACs
       for mac in macs.keys():
