@@ -252,13 +252,21 @@ def UpdateMACVRF( state, mac_vrf, new_vni=None, new_evi=None ):
       mac_vrf['evi'] = new_evi
 
    if new_vni:
+      # Clean up old EVPN routes, VNI needs to be changed
+      for vtep_ip,macs in mac_vrf['vxlan_vteps'].items():
+         rd = AutoRouteDistinguisher( vtep_ip, mac_vrf )
+         WithdrawMulticastRoute( state, rd, vtep_ip )
+         for mac,status in macs.items():
+            if status=='static_announced':
+               WithdrawRoute( state, mac_vrf, vtep_ip, mac )
+               mac_vrf['vxlan_vteps'][ vtep_ip ][ mac ] = 'static'
       mac_vrf['vni'] = new_vni
 
    # Make sure all VTEPs exist
    if mac_vrf['admin_state'] == "enable":
-     for vtep_ip, macs in mac_vrf['vxlan_vteps'].items():
+     for vtep_ip,macs in mac_vrf['vxlan_vteps'].items():
        Add_Static_VTEP( state, mac_vrf, vtep_ip )
-       for mac, status in macs.items():
+       for mac,status in macs.items():
            if status != 'static_announced':
                AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
                mac_vrf['vxlan_vteps'][ vtep_ip ][ mac ] = 'static_announced'
