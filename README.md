@@ -128,9 +128,9 @@ vxlan-agent
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
   vxlan-agent
     admin-state enable
-    static-vxlan-remoteips [ 1.1.1.1 ]
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
+    static-vtep 1.1.1.1 { }
 
 commit stay
 ```
@@ -252,6 +252,51 @@ PING 10.0.0.104 (10.0.0.104) 56(84) bytes of data.
 rtt min/avg/max/mdev = 2.633/2.935/3.238/0.307 ms
 ```
 This could be avoided by running the EVPN proxy on every SRL node.
+
+## Static MAC address entries
+Instead of dynamic learning via ARP, it is also possible to configure static MAC entries for each VTEP:
+```
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
+  vxlan-agent
+  static-vtep 1.1.1.1 {
+    static-macs [ 00:11:22:33:44:55 ]
+  }
+```
+This causes the agent to send out a Type 2 EVPN route for the given MAC address(es):
+```
+A:srl1# /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn                                                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Peer        : 1.1.1.4, remote AS: 65000, local AS: 65000
+Type        : static
+Description : Local EVPN proxy agent
+Group       : vxlan-agent
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Status codes: u=used, *=valid, >=best, x=stale
+Origin codes: i=IGP, e=EGP, ?=incomplete
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 2 MAC-IP Advertisement Routes
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+--------+
+| Status |     Route-distinguisher      |   Tag-ID   |    MAC-address    |          IP-address          |           Next-Hop           |             MED              | LocPref |              Path             |
++========+==============================+============+===================+==============================+==============================+==============================+========+
+| u*>    | 1.1.1.1:57069                | 0          | 00:11:22:33:44:55 | 0.0.0.0                      | 1.1.1.1                      | -                            | 100     |                              |
+| u*>    | 1.1.1.2:57069                | 0          | 00:11:22:33:44:66 | 0.0.0.0                      | 1.1.1.2                      | -                            | 100     |                              |
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+----+----
+Type 3 Inclusive Multicast Ethernet Tag Routes
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+---+
+| Status |         Route-distinguisher          |   Tag-ID   |    Originator-IP    |               Next-Hop               |                 MED                  | LocPref |                 Path                 |
++========+======================================+============+=====================+======================================+======================================+=========+===+
+| u*>    | 1.1.1.1:57069                        | 0          | 1.1.1.4             | 1.1.1.1                              | -                                    | 100     |                                      |
+| u*>    | 1.1.1.2:57069                        | 0          | 1.1.1.4             | 1.1.1.2                              | -                                    | 100     |                                      |
++--------+--------------------------------------+------------+---------------------+--------------------------------------+--------------------------------------+---------+---+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+0 Ethernet Auto-Discovery routes 0 used, 0 valid
+2 MAC-IP Advertisement routes 2 used, 2 valid
+2 Inclusive Multicast Ethernet Tag routes 2 used, 2 valid
+0 Ethernet Segment routes 0 used, 0 valid
+0 IP Prefix routes 0 used, 0 valid
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--{ running }--[ network-instance mac-vrf-evi10 protocols bgp-evpn ]--
+```
 
 # Packet tracing using Linux kernel trace events
 The Linux kernel supports trace events, which can be used to track packets as they move through the fabric.
