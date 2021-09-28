@@ -267,7 +267,7 @@ def UpdateMACVRF( state, mac_vrf, new_vni=None, new_evi=None ):
      for vtep_ip,macs in mac_vrf['vxlan_vteps'].items():
        Add_Static_VTEP( state, mac_vrf, vtep_ip )
        for mac,status in macs.items():
-           if status != 'static_announced':
+           if status != 'static_announced' or new_evi:
                AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
                mac_vrf['vxlan_vteps'][ vtep_ip ][ mac ] = 'static_announced'
 
