@@ -335,6 +335,8 @@ def runBGPThread( state ):
             else:
                logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
                evpn_vteps[ event.nexthop ] = event.remote_as
+               # Could withdraw routes and remove static MACs if this IP matches
+               # a static vtep in our configuration
 
          # check for RT2 MAC moves between static VTEPs and EVPN VTEPs
          # event.label is reduced to the 20-bit MPLS label

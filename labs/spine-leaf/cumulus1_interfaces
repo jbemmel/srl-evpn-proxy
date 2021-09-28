@@ -6,6 +6,8 @@ iface lo inet loopback
 # To Spine1
 auto e1-1
 iface e1-1
+    # Stop STP from going across VXLAN
+    mstpctl-portbpdufilter yes
     address 192.168.0.1/31
     # Static route for all other loopbacks
     post-up ip route add 1.1.1.0/29 via 192.168.0.0
