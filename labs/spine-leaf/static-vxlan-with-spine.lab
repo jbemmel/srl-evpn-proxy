@@ -23,6 +23,7 @@ topology:
 
     cvx:
       image: networkop/cx:4.4.0
+      runtime: docker # instead of ignite
       binds:
         - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
     linux:

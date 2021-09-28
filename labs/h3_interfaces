@@ -5,3 +5,4 @@ auto eth1
 iface eth1
     address 10.0.0.103/24
     address 2001::10.0.0.103/64
+    hwaddress ether 00:11:22:33:44:03
