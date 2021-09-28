@@ -242,18 +242,22 @@ def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip=None ):
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{vtep_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
     Remove_Telemetry( [js_path] )
 
-def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
-   logging.info( f"UpdateMACVRF mac_vrf={mac_vrf} previous_vteps={previous_vteps}" )
+def UpdateMACVRF( state, mac_vrf, new_vni=None, new_evi=None ):
+   logging.info( f"UpdateMACVRF mac_vrf={mac_vrf} new_vni={new_vni} new_evi={new_evi}" )
 
-   # Clean up old VTEPs
-   if previous_vteps:
-      for static_vtep in previous_vteps:
-         Remove_Static_VTEP( state, static_vtep, mac_vrf['vni'] )
+   if new_evi:
+      # Clean up old VTEPs, RDs need to be changed
+      for static_vtep in mac_vrf['vxlan_vteps']:
+         Remove_Static_VTEP( state, mac_vrf, static_vtep )
+      mac_vrf['evi'] = new_evi
+
+   if new_vni:
+      mac_vrf['vni'] = new_vni
 
    # Make sure all VTEPs exist
    if mac_vrf['admin_state'] == "enable":
      for vtep_ip, macs in mac_vrf['vxlan_vteps'].items():
-       Add_Static_VTEP( state, vtep_ip, mac_vrf['vni'] )
+       Add_Static_VTEP( state, mac_vrf, vtep_ip )
        for mac, status in macs.items():
            if status != 'static_announced':
                AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
@@ -447,12 +451,7 @@ def AutoRouteDistinguisher( vtep_ip, mac_vrf ):
 def AutoRouteTarget( state, mac_vrf ):
     return f"{state.params['local_as']}:{mac_vrf['evi']}"
 
-def Add_Static_VTEP( state, remote_ip, vni, dynamic=False ):
-
-    if vni not in state.mac_vrfs:
-        logging.warning( f"Add_Static_VTEP({remote_ip}): mac-vrf not found for VNI {vni}" )
-        return False
-    mac_vrf = state.mac_vrfs[ vni ]
+def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
     if rd in state.bgp_vrfs:
         logging.warning( f"MAC VRF already exists: {rd}" )
@@ -470,7 +469,7 @@ def Add_Static_VTEP( state, remote_ip, vni, dynamic=False ):
        data['dynamic'] = { "value" : True }
 
     js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
-    data2 = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': vni } }
+    data2 = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': mac_vrf['vni'] } }
     Add_Telemetry( [(js_path, data),(js_path2,data2)] )
 
     logging.info("Adding EVPN multicast route...")
@@ -479,16 +478,12 @@ def Add_Static_VTEP( state, remote_ip, vni, dynamic=False ):
     # EVPN enabled itself. That way, any proxy will announce the same
     # route
     #
-    AnnounceMulticastRoute( state, rd, remote_ip, vni )
+    AnnounceMulticastRoute( state, rd, remote_ip, mac_vrf['vni'] )
     state.bgp_vrfs[ rd ] = remote_ip
     return True
 
-def Remove_Static_VTEP( state, remote_ip, vni ):
+def Remove_Static_VTEP( state, mac_vrf, remote_ip ):
 
-    if vni not in state.mac_vrfs:
-        logging.warning( f"Remove_Static_VTEP: mac-vrf not found for VNI {vni}" )
-        return False
-    mac_vrf = state.mac_vrfs[ vni ]
     rd = AutoRouteDistinguisher( remote_ip, mac_vrf )
     if rd not in state.bgp_vrfs:
         logging.warning( f"Remove_Static_VTEP: BGP MAC VRF does not exists: {rd}" )
@@ -577,7 +572,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
              continue
            else:
              logging.info( f"Dynamically adding auto-discovered VTEP {static_vtep}" )
-             Add_Static_VTEP( state, static_vtep, vni, dynamic=True )
+             Add_Static_VTEP( state, mac_vrf, static_vtep, dynamic=True )
              mac_vrf['vxlan_vteps'][ static_vtep ] = "dynamic-from-arp"
 
         # Announce EVPN route(s)
@@ -738,36 +733,50 @@ def Handle_Notification(obj, state):
         elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent":
           mac_vrf_name = obj.config.key.keys[0]
 
-          mac_vrf = { 'name' : mac_vrf_name }
-          if 'admin_state' in data:
-             mac_vrf[ "admin_state" ] = data['admin_state'][12:]
-          # mac_vrf['vxlan_vteps'] = { i['value'] : "static" for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) }
-          vni = mac_vrf['vni'] = int( data['vni']['value'] ) if 'vni' in data else None
-          mac_vrf['evi'] = int( data['evi']['value'] ) if 'evi' in data else None
+          admin_state = data['admin_state'][12:] if 'admin_state' in data else None
+          vni = int( data['vni']['value'] ) if 'vni' in data else None
+          evi = int( data['evi']['value'] ) if 'evi' in data else None
 
           # Index by VNI
           if vni:
-            if mac_vrf[ "admin_state" ] == "enable":
-               previous_vteps = {}
-               if vni not in state.mac_vrfs:
-                 vrf = { **mac_vrf, 'macs': {}, 'ips': {}, 'vxlan_vteps': {} }
+            if admin_state == "enable":
+               if vni not in state.mac_vrfs and mac_vrf_name not in state.mac_vrfs:
+                 vrf = { 'admin_state': admin_state, 'vni': vni, 'evi': evi,
+                         'macs': {}, 'ips': {}, 'vxlan_vteps': {} }
                  state.mac_vrfs[ vni ] = state.mac_vrfs[ mac_vrf_name ] = vrf
                else:
-                 previous_vteps = state.mac_vrfs[ mac_vrf['vni'] ][ 'vxlan_vteps' ]
-                 state.mac_vrfs[ vni ].update( **mac_vrf )
+                 # Support VNI modifications
+                 new_vni = None
+                 if vni not in state.mac_vrfs:
+                    orig_vrf = state.mac_vrfs[ mac_vrf_name ]
+                    new_vni = vni
+                    logging.info( f"VNI modified on {mac_vrf_name}: {orig_vrf['vni']}->{vni}" )
+                    state.mac_vrfs[ vni ] = orig_vrf
+                    state.mac_vrfs.pop( orig_vrf['vni'], None )
 
+                 # Support EVI modifications
+                 new_evi = None
+                 if evi != state.mac_vrfs[ vni ][ 'evi' ]:
+                    new_evi = evi
+                    logging.info( f"EVI modified on {mac_vrf_name}: {state.mac_vrfs[ vni ][ 'evi' ]}->{new_evi}" )
+               state.mac_vrfs[ vni ][ 'admin_state' ] = "enable"
                if hasattr( state, 'speaker' ): # BGP running?
-                 UpdateMACVRF( state, mac_vrf, previous_vteps )
+                 UpdateMACVRF( state, state.mac_vrfs[ vni ], new_vni=new_vni, new_evi=new_evi )
                else:
                  logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
             else:
-               logging.info( f"mac-vrf {mac_vrf} disabled, removing state" )
+               logging.info( f"mac-vrf {mac_vrf_name} disabled, removing state" )
                if vni in state.mac_vrfs:
                    old_vrf = state.mac_vrfs[ vni ]
-                   old_vrf[ "admin_state" ] = "disable"
-                   UpdateMACVRF(state, old_vrf, old_vrf['vxlan_vteps'])
-                   state.mac_vrfs.pop( vni, None )
-                   state.mac_vrfs.pop( old_vrf['name'], None )
+               elif mac_vrf_name in state.mac_vrfs:
+                   old_vrf = state.mac_vrfs[ mac_vrf_name ]
+                   vni = old_vrf['vni']
+               else:
+                   return
+               old_vrf[ "admin_state" ] = "disable"
+               UpdateMACVRF( state, old_vrf )
+               state.mac_vrfs.pop( vni, None )
+               state.mac_vrfs.pop( old_vrf['name'], None )
         elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent.static_vtep":
           mac_vrf_name = obj.config.key.keys[0]
           vtep_ip = obj.config.key.keys[2]
@@ -775,7 +784,7 @@ def Handle_Notification(obj, state):
             mac_vrf = state.mac_vrfs[ mac_vrf_name ]
             if obj.config.op == 2: # delete static VTEP
               # All MAC routes get withdrawn too
-              Remove_Static_VTEP( state, vtep_ip, mac_vrf['vni'] )
+              Remove_Static_VTEP( state, mac_vrf, vtep_ip )
             else:
               static_macs = {}
               if 'static_vtep' in data and 'static_macs' in data['static_vtep']:
