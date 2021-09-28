@@ -21,3 +21,18 @@ commit stay
 info from state /network-instance default bgp-rib attr-sets attr-set rib-in index ${//network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-pre/imet-routes[originating-router=1.1.1.4]/attr_id}
 ```
 
+## Change EVI
+The EVI must match the bgp-evpn config of the encompassing mac-vrf
+```
+enter candidate
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
+evi 1234
+vxlan-agent
+evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
+commit stay
+```
+
+### Validation
+```
+info from state /network-instance default bgp-rib attr-sets attr-set rib-in index ${//network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-pre/imet-routes[originating-router=1.1.1.4]/attr_id}
+```
