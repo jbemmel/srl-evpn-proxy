@@ -228,7 +228,7 @@ def AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip, mobility_seq ):
        mac_mobility=mobility_seq # Sequence number for MAC mobility
    )
 
-def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip ):
+def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip=None ):
     state.speaker.evpn_prefix_del(
       route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
       route_dist=AutoRouteDistinguisher(vtep_ip,mac_vrf), # original RD
@@ -252,10 +252,39 @@ def UpdateMACVRF( state, mac_vrf, previous_vteps=None ):
 
    # Make sure all VTEPs exist
    if mac_vrf['admin_state'] == "enable":
-     for static_vtep in mac_vrf['vxlan_vteps']:
-       Add_Static_VTEP( state, static_vtep, mac_vrf['vni'] )
+     for vtep_ip, macs in mac_vrf['vxlan_vteps'].items():
+       Add_Static_VTEP( state, vtep_ip, mac_vrf['vni'] )
+       for mac, status in macs.items():
+           if status != 'static_announced':
+               AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
+               mac_vrf['vxlan_vteps'][ vtep_ip ][ mac ] = 'static_announced'
+
    else:
      logging.info( "UpdateMACVRF: admin-state not 'enable'" )
+
+# Updates a single static VTEP
+def UpdateMACVRF_StaticVTEP( state, mac_vrf, vtep_ip, macs ):
+   logging.info( f"UpdateMACVRF_StaticVTEP mac_vrf={mac_vrf} vtep_ip={vtep_ip} macs={macs}" )
+
+   vteps = mac_vrf['vxlan_vteps']
+   vtep = vteps[ vtep_ip ] if vtep_ip in vteps else None
+
+   if hasattr( state, 'speaker' ):  # BGP running?
+      # Clean up old MAC routes
+      if vtep:
+         macs_to_keep = list( macs.keys() )
+         for mac in vtep.keys():
+            if mac not in macs_to_keep:
+               WithdrawRoute( state, mac_vrf, vtep_ip, mac )
+
+      # Announce new MACs
+      existing_routes = list( vtep.keys() )
+      for mac, status in macs.items():
+          if mac not in existing_routes and status != 'static_announced':
+              AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip=None, mobility_seq=-1 )
+              macs[ mac ] = 'static_announced'
+
+   vteps[ vtep_ip ] = macs
 
 #
 # Runs BGP EVPN as a separate thread>, using Ryu hub
@@ -712,19 +741,20 @@ def Handle_Notification(obj, state):
           mac_vrf = { 'name' : mac_vrf_name }
           if 'admin_state' in data:
              mac_vrf[ "admin_state" ] = data['admin_state'][12:]
-          mac_vrf['vxlan_vteps'] = { i['value'] : "static" for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) }
-          mac_vrf['vni'] = int( data['vni']['value'] ) if 'vni' in data else None
+          # mac_vrf['vxlan_vteps'] = { i['value'] : "static" for i in (data['static_vxlan_remoteips'] if 'static_vxlan_remoteips' in data else []) }
+          vni = mac_vrf['vni'] = int( data['vni']['value'] ) if 'vni' in data else None
           mac_vrf['evi'] = int( data['evi']['value'] ) if 'evi' in data else None
 
           # Index by VNI
-          if mac_vrf['vni']:
+          if vni:
             if mac_vrf[ "admin_state" ] == "enable":
                previous_vteps = {}
-               if mac_vrf['vni'] not in state.mac_vrfs:
-                 state.mac_vrfs[ mac_vrf['vni'] ] = { **mac_vrf, 'macs': {}, 'ips': {} }
+               if vni not in state.mac_vrfs:
+                 vrf = { **mac_vrf, 'macs': {}, 'ips': {}, 'vxlan_vteps': {} }
+                 state.mac_vrfs[ vni ] = state.mac_vrfs[ mac_vrf_name ] = vrf
                else:
                  previous_vteps = state.mac_vrfs[ mac_vrf['vni'] ][ 'vxlan_vteps' ]
-                 state.mac_vrfs[ mac_vrf['vni'] ].update( **mac_vrf )
+                 state.mac_vrfs[ vni ].update( **mac_vrf )
 
                if hasattr( state, 'speaker' ): # BGP running?
                  UpdateMACVRF( state, mac_vrf, previous_vteps )
@@ -732,11 +762,25 @@ def Handle_Notification(obj, state):
                  logging.info( "BGP thread not running yet, postponing UpdateMACVRF" )
             else:
                logging.info( f"mac-vrf {mac_vrf} disabled, removing state" )
-               if mac_vrf['vni'] in state.mac_vrfs:
-                   old_vrf = state.mac_vrfs[ mac_vrf['vni'] ]
+               if vni in state.mac_vrfs:
+                   old_vrf = state.mac_vrfs[ vni ]
                    old_vrf[ "admin_state" ] = "disable"
                    UpdateMACVRF(state, old_vrf, old_vrf['vxlan_vteps'])
-                   state.mac_vrfs.pop( mac_vrf['vni'], None )
+                   state.mac_vrfs.pop( vni, None )
+                   state.mac_vrfs.pop( old_vrf['name'], None )
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent.static_vtep":
+          mac_vrf_name = obj.config.key.keys[0]
+          vtep_ip = obj.config.key.keys[2]
+          if mac_vrf_name in state.mac_vrfs:
+              mac_vrf = state.mac_vrfs[ mac_vrf_name ]
+              static_macs = {}
+              if 'static_vtep' in data and 'static_macs' in data['static_vtep']:
+                 static_macs = { m['value'] : "static"
+                                 for m in data['static_vtep']['static_macs'] }
+
+              UpdateMACVRF_StaticVTEP( state, mac_vrf, vtep_ip, static_macs )
+          else:
+              logging.error( f"mac-vrf not found in state: {mac_vrf_name}" )
 
     else:
         logging.info(f"Unexpected notification : {obj}")

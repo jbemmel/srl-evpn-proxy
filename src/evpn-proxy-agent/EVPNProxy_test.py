@@ -11,7 +11,7 @@ import asyncio
 
 # unittest replaces sys.stdout/sys.stderr
 logger = logging.getLogger()
-logger.level = logging.INFO # DEBUG
+logger.level = logging.DEBUG # INFO # DEBUG
 stream_handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(stream_handler)
 
@@ -71,6 +71,19 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
          cls.clientsock.close()
      cls.sock.close()
 
+ def syncClientServer(self,msg):
+   if self.clientsock:
+      sync_msg = self.clientsock.recv( bufsize=256 )
+      logging.info( f"Server: sync_msg={sync_msg}, echoing")
+      self.clientsock.sendall(sync_msg)
+   else:
+      logging.info( f"Client: sending sync_msg '{msg}'" )
+      msg_bytes = msg.encode()
+      self.sock.sendall(msg_bytes)
+      sync_msg = self.sock.recv( bufsize=256 )
+      logging.info( f"Client: received sync_msg {sync_msg}" )
+      self.assertEqual( sync_msg, msg_bytes, "Sync failed" )
+
  def setUp(self):
    logging.info( "setUp" )
 
@@ -78,15 +91,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    stream_handler.stream = sys.stdout
 
    # Synchronize client/server
-   if self.clientsock:
-      sync_msg = self.clientsock.recv( bufsize=256 )
-      logging.info( f"Server: sync_msg={sync_msg}, echoing")
-      self.clientsock.sendall(sync_msg)
-   else:
-      logging.info( "Client: sending sync_msg" )
-      self.sock.sendall("setUp".encode())
-      sync_msg = self.sock.recv( bufsize=256 )
-      logging.info( f"Client: received sync_msg {sync_msg}" )
+   self.syncClientServer("setUp")
 
    self.evpn_proxy = EVPNProxy(router_id=AGENT1 if self.clientAddr else AGENT2)
 
@@ -107,18 +112,20 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.evpn_proxy.addStaticVTEP( VNI, EVI, VTEP2 )
 
  def tearDown(self):
-   logging.info( "TEARDOWN - shutdown EVPN proxy" )
+   logging.info( "TEARDOWN - sync, then shutdown EVPN proxy" )
+   self.syncClientServer("tearDown")
    self.evpn_proxy.shutdown()
    eventlet.sleep(1)
 
  def assertRoute(self,vni,mac,vtep_ip,src=None):
    route = self.evpn_proxy.checkAdvertisedRoute(vni,mac)
+   self.assertIsNotNone( route, f"No EVPN route advertised for {vni} {mac}" )
    self.assertTrue( 'vtep' in route, "No 'vtep' in route" )
-   self.assertEquals( route['vtep'], vtep_ip,
+   self.assertEqual( route['vtep'], vtep_ip,
      f"proxy failed to advertise correct VTEP IP {vtep_ip}" )
    if src:
       self.assertTrue( 'src' in route, "No 'src' in route" )
-      self.assertEquals( route['src'], src, "Unexpected source" )
+      self.assertEqual( route['src'], src, "Unexpected source" )
 
  def assertNoRoute(self,vni,mac):
    route = self.evpn_proxy.checkAdvertisedRoute(vni,mac)
@@ -136,7 +143,7 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    # ARP response received by proxy AGENT1 on VTEP3
    if self.clientsock:
       self.evpn_proxy.rxVXLAN_ARP( VNI, src, dst, MAC1 )
-   eventlet.sleep(1)
+   eventlet.sleep(2)
 
    # The other proxy AGENT2 should receive the route from AGENT1 via EVPN
    self.assertRoute( VNI, MAC1, src, src='arp' if self.clientsock else 'evpn' )
@@ -169,4 +176,6 @@ class EVPNProxyTestCase( unittest.TestCase ): # tried aiounittest.AsyncTestCase
    self.assertNoRoute( VNI, MAC1 )
 
 if __name__ == '__main__':
-   unittest.main( argv=sys.argv[:1] )  # Only pass program name
+   # unittest.main( argv=sys.argv[:1] )  # Only pass program name
+   unittest.main( argv=[ sys.argv[0], '-v',
+     'EVPNProxyTestCase.test_2_normal_scenario_arp_response_unicast' ] )

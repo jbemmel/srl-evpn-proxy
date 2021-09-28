@@ -1517,8 +1517,9 @@
                 "admin-state": "enable",
                 "evi": 57069,
                 "vni": 11189196,
-                "static-vxlan-remoteips": [
-                  "1.1.1.1"
+                "static-vtep": [
+                  { "vtep-ip": "1.1.1.1", "static-macs": [ "00:11:22:33:44:55" ] },
+                  { "vtep-ip": "1.1.1.2", "static-macs": [ "00:11:22:33:44:66" ] }
                 ]
               }
             }
@@ -1550,16 +1551,6 @@
           "export-neighbors": true
         }
       }
-    },
-    {
-      "name": "overlay",
-      "type": "srl_nokia-network-instance:ip-vrf",
-      "admin-state": "enable",
-      "interface": [
-        {
-          "name": "irb0.0"
-        }
-      ]
     }
   ],
   "srl_nokia-routing-policy:routing-policy": {

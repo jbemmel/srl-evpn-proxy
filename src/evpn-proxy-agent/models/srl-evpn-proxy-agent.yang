@@ -222,12 +222,6 @@ module srl-evpn-proxy-agent {
               description "Administratively enable or disable VXLAN agent functionality for this mac-vrf";
           }
 
-          leaf-list static-vxlan-remoteips {
-            type srl_nokia-comm:ipv4-address;
-
-            description "Optional list of remote VTEP IPs for static non-EVPN peers (IPv4)";
-          }
-
           // Best way I could find to reference existing evi value from config
           leaf evi {
              description "Copy of the EVPN instance(evi) for this mac-vrf, used for auto-RD/RT";
@@ -251,6 +245,20 @@ module srl-evpn-proxy-agent {
               error-message "VNI must match ingress vni on the vxlan-interface";
             }
           }
+
+          list static-vtep {
+            description "List of remote VTEPs for static non-EVPN peers (IPv4)";
+            key vtep-ip;
+            leaf vtep-ip {
+              type srl_nokia-comm:ipv4-address;
+            }
+            leaf-list static-macs {
+              description "Optional list of endpoint MAC addresses hosted by this VTEP";
+              type srl_nokia-comm:mac-address;
+            }
+          }
+
+
         }
     }
 

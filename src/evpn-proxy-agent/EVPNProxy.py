@@ -70,6 +70,7 @@ class EVPNProxy(object):
                     return c.sequence_number # TODO need static flag too?
              return 0 # not present
 
+          logging.info( f"Received BGP EVPN RT2 from {originator_id}: {vni} {mac}" )
           return self.rxEVPN_RT2( vni, mac, event.nexthop, is_from_proxy, GetMACMobility() )
         else:
           logging.info( "Not multicast and no VNI -> ignoring" )
@@ -157,6 +158,7 @@ class EVPNProxy(object):
 
  def announceEVPNRoute( self, rd: str, vni: int, mac: str, static_vtep: str,
                         mobility_seq: int, ip=None ):
+    logging.info( f"announceEVPNRoute: vni={vni} mac={mac} vtep={static_vtep}")
     self.bgpSpeaker.evpn_prefix_add(
       route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
       route_dist=rd,
