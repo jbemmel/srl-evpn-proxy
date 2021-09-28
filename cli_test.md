@@ -50,3 +50,10 @@ and add it back, without MACs:
 static-vtep 1.1.1.1
 commit stay
 ```
+
+# Model-driven testing
+gNMIc can auto-generate test cases:
+```
+gnmic generate --file /opt/demo-agents/srl-evpn-proxy-agent/models/srl-evpn-proxy-agent.yang set-request --dir /opt/srlinux/models/ \
+ --update /network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/vxlan-agent
+```
