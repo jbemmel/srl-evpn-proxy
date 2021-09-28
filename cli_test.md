@@ -33,6 +33,7 @@ commit stay
 ```
 
 ### Validation
+The Route Distinguishers for all VTEPs should include the updated EVI value
 ```
-info from state /network-instance default bgp-rib attr-sets attr-set rib-in index ${//network-instance[name=default]/bgp-rib/evpn/rib-in-out/rib-in-pre/imet-routes[originating-router=1.1.1.4]/attr_id}
+show /network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 ```
