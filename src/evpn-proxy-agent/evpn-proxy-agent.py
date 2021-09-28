@@ -665,7 +665,7 @@ def Handle_Notification(obj, state):
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
         json_str = obj.config.data.json.replace("'", "\"")
-        data = json.loads(json_str if json_str != "" else "{}")
+        data = json.loads(json_str) if json_str != "" else {}
 
         # net_inst = obj.config.key.keys[0] # always "default"
         if obj.config.key.js_path == ".network_instance.protocols.vxlan_agent":
@@ -774,7 +774,7 @@ def Handle_Notification(obj, state):
           if mac_vrf_name in state.mac_vrfs:
             mac_vrf = state.mac_vrfs[ mac_vrf_name ]
             if obj.config.op == 2: # delete static VTEP
-              # XXX TODO need to withdraw all routes too?
+              # All MAC routes get withdrawn too
               Remove_Static_VTEP( state, vtep_ip, mac_vrf['vni'] )
             else:
               static_macs = {}
