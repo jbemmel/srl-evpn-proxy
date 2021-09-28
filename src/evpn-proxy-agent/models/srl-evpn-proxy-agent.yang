@@ -254,7 +254,11 @@ module srl-evpn-proxy-agent {
             }
             leaf-list static-macs {
               description "Optional list of endpoint MAC addresses hosted by this VTEP";
-              type srl_nokia-comm:mac-address;
+              // type srl_nokia-comm:mac-address;
+              // Use custom pattern to exclude broadcast/multicast MACs
+              type string {
+                pattern '[0-9a-fA-F][02468aceACE](:[0-9a-fA-F]{2}){5}';
+              }
             }
           }
 
