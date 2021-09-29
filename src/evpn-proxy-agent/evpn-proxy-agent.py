@@ -679,12 +679,13 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    """
    logging.info( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
 
-   def get_timestamp_ms():
+   def get_timestamp_ms(): # 40-bit
       now = datetime.now(timezone.utc)
-      epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
-      posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
-      posix_timestamp_millis = posix_timestamp_micros // 1000
-      return posix_timestamp_millis
+      # epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
+      # posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
+      # posix_timestamp_millis = posix_timestamp_micros // 1000
+      # return posix_timestamp_millis
+      return int( int(now.timestamp() * 1000) & 0xffffffffff )
 
    _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
 
@@ -694,16 +695,20 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    phase = 0
    if opcode==RFC5494_EXP1:
      _arp = rx_pkt.get_protocol( arp.arp )
-     phase = int(_arp.src_mac[3:5],16) + 1
+     phase = int(_arp.src_mac[0:2],16) + 1
+
+     m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
+     ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
+     delta = get_timestamp_ms() - ts
+     if (delta<0):
+         delta += (1<<40)
+     logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} phase={phase}), ARP={_arp} intf={_eths[1]}" )
 
      if phase > 2: # end of 3 phase handshake
-         logging.info( f"Received reflected ARP response, TS={_arp} intf={_eths[1]}" )
-         # TODO calculate delta, update telemetry
          return
      else:
          _udp = rx_pkt.get_protocol( udp.udp )
          udp_src_port = _udp.src_port # Reflect port
-         logging.info( f"Received ARP probe response, reflecting...phase={phase} udp_src={udp_src_port}" )
 
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
@@ -717,7 +722,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
 
    # Reflect timestamp for ARP replies, include IP TTL
    _ip = rx_pkt.get_protocol( ipv4.ipv4 )
-   dst_mac = (f'ec:{_ip.ttl:02x}:{_eths[1].src[6:]}') if opcode==RFC5494_EXP1 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
+   dst_mac = (f'{_ip.ttl:02x}:{_eths[1].src[3:]}') if opcode==RFC5494_EXP1 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
    src_mac = '00:00:00:00:00:00' # 'ec:<phase>'+ts_mac filled in below
    a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
                src_mac=src_mac, src_ip=local_vtep_ip,
@@ -730,11 +735,11 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
        ts = t = get_timestamp_ms()
 
        ts_mac = ""
-       for b in range(0,4):
+       for b in range(0,5): # 40 bit
           ts_mac = f":{(t%256):02x}" + ts_mac
           t = t // 256
 
-       a.src_mac = f'ec:{phase:02x}'+ts_mac
+       a.src_mac = f'{phase:02x}'+ts_mac
        if udp_src_port==0:
           u.src_port = (ts+seed) % 65535 + 1
           u.csum = 0 # Recalculate
