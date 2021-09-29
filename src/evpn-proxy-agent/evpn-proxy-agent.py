@@ -706,7 +706,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
              'latency' : avg,
              'loss'    : int(loss),
              'probes'  : sorted(good),
-             'uplinks' : [ f"{mac}:{probes}" for mac,probes in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
+             'uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
+                           for mac,i in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
@@ -727,6 +728,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
      _arp = rx_pkt.get_protocol( arp.arp )
      path = int(_arp.src_mac[0],16)
      phase = int(_arp.src_mac[1],16) + 1
+     ttl = int( _arp.dst_mac[0:2], 16 ) # Starts as 255
 
      m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
      ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
@@ -737,9 +739,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
      if dest_vtep_ip in mac_vrf['path_probes']:
          mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = delta
          uplinks = mac_vrf['path_probes'][ dest_vtep_ip ][ 'interfaces' ]
-         # Could put TTL too
          m = _eths[1].src
-         uplinks[ m ] = 1 + (uplinks[m] if m in uplinks else 0)
+         uplinks[ m ] = { 'count': 1 + (uplinks[m]['count'] if m in uplinks else 0), 'hops': 255 - ttl }
      if phase > 2: # end of 3 phase handshake
          return
      else:
@@ -759,7 +760,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
-   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP)
+   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,tos=0xc0)
    u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=mac_vrf['vni'])
 
