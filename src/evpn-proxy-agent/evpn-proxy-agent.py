@@ -693,6 +693,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
    udp_src_port = 0
    phase = 0
+   path = 1
    if opcode==RFC5494_EXP1:
      _arp = rx_pkt.get_protocol( arp.arp )
      path = int(_arp.src_mac[0],16)
@@ -732,7 +733,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    for h in [e,i,u,v,e2,a]:
       p.add_protocol(h)
 
-   def timestamped_packet(seq=1):
+   def timestamped_packet(path):
        ts = t = get_timestamp_ms()
 
        ts_mac = ""
@@ -740,16 +741,16 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
           ts_mac = f":{(t%256):02x}" + ts_mac
           t = t // 256
 
-       a.src_mac = f'{seq:1x}{phase:1x}'+ts_mac
+       a.src_mac = f'{path:1x}{phase:1x}'+ts_mac
        if udp_src_port==0:
-          u.src_port = 1000 * seq # Consistently hash to the same path
-          u.csum = 0              # Recalculate
+          u.src_port = 1000 * path # Consistently hash to the same path, could add configurable hash seed
+          u.csum = 0               # Recalculate
        p.serialize()
        return p
 
    # raw_socket.setsockopt(socket.SOL_IP, socket.IP_HDRINCL, 1)
    # with netns.NetNS(nsname="srbase"): # not needed
-   pkt = timestamped_packet()
+   pkt = timestamped_packet(path)
    logging.info( f"Sending/reflecting ARP probe response: {pkt}" )
    socket.sendall( pkt.data )
 
