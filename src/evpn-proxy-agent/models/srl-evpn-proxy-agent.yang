@@ -229,7 +229,7 @@ module srl-evpn-proxy-agent {
             leaf sent { type uint8; description "Number of probes sent"; }
             leaf lost { type uint8; description "Number of probes lost"; }
             leaf-list probes { type uint32; }
-            leaf-list uplinks {
+            leaf-list peer-uplinks {
               description "Distribution of probes over uplink interfaces";
               type string;
             }

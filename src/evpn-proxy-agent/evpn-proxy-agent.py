@@ -708,8 +708,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
              'sent'    : len(values),
              'lost'    : lost,
              'probes'  : sorted(good),
-             'uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
-                           for mac,i in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
+             'peer_uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
+                                for mac,i in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
