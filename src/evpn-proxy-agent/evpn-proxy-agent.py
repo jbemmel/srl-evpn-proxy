@@ -680,13 +680,13 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    """
    logging.info( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
 
-   def get_timestamp_ms(): # 40-bit
+   def get_timestamp_us(): # 40-bit
       now = datetime.now(timezone.utc)
       # epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
       # posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
       # posix_timestamp_millis = posix_timestamp_micros // 1000
       # return posix_timestamp_millis
-      return int( int(now.timestamp() * 1000) & 0xffffffffff )
+      return int( int(now.timestamp() * 1000000) & 0xffffffffff )
 
    def start_timer():
 
@@ -701,9 +701,9 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
            else:
                loss = 100.0 * (lost / len(values))
 
-           avg = sum(good)/len(good)
+           avg = int( sum(good)/len(good) )
            data = {
-             'result'  : { "value" : f"Avg rtt latency: {avg:.1f}ms loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
+             'result'  : { "value" : f"Avg rtt latency: {avg}us loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
              'latency' : avg,
              'sent'    : len(values),
              'lost'    : lost,
@@ -734,7 +734,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
 
      m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
      ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
-     delta = get_timestamp_ms() - ts
+     delta = get_timestamp_us() - ts
      if (delta<0):
          delta += (1<<40)
      logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
@@ -782,7 +782,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
       p.add_protocol(h)
 
    def timestamped_packet(path):
-       ts = t = get_timestamp_ms()
+       ts = t = get_timestamp_us()
 
        ts_mac = ""
        for b in range(0,5): # 40 bit

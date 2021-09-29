@@ -225,7 +225,7 @@ module srl-evpn-proxy-agent {
             leaf result {
               type string;
             }
-            leaf latency { type uint32; description "Average RTT in ms for all paths"; }
+            leaf latency { type uint32; description "Average RTT in us across all paths"; }
             leaf sent { type uint8; description "Number of probes sent"; }
             leaf lost { type uint8; description "Number of probes lost"; }
             leaf-list probes { type uint32; }
