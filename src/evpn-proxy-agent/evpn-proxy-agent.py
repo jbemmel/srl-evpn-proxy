@@ -702,11 +702,11 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
 
            avg = sum(good)/len(good)
            data = {
-             'result'  : { "value" : f"Avg rtt latency: {avg:.2f}ms loss: {loss:.2f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
+             'result'  : { "value" : f"Avg rtt latency: {avg:.1f}ms loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
              'latency' : avg,
              'loss'    : int(loss),
              'probes'  : sorted(good),
-             'uplinks' : { "value" : str(mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces']) }
+             'uplinks' : [ f"{mac}:{probes}" for mac,probes in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
