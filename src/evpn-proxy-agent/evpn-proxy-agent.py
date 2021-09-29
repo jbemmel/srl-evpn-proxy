@@ -705,6 +705,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
            data = {
              'result'  : { "value" : f"Avg rtt latency: {avg:.1f}ms loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
              'latency' : avg,
+             'sent'    : len(values),
              'lost'    : lost,
              'probes'  : sorted(good),
              'uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
