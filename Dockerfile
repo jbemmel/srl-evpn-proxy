@@ -44,7 +44,7 @@ FROM target-image AS final
 COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/grpc /usr/local/lib64/python3.6/site-packages/grpc
 
 # Add custom built etherate tool
-COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
+# COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
