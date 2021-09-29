@@ -760,7 +760,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
-   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,tos=0xc0)
+   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,
+                 tos=0xc0,identification=udp_src_port)
    u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=mac_vrf['vni'])
 
