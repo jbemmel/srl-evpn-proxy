@@ -706,7 +706,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
              'latency' : avg,
              'loss'    : int(loss),
              'probes'  : sorted(good),
-             'uplinks' : { "value" : mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'] }
+             'uplinks' : { "value" : str(mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces']) }
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
