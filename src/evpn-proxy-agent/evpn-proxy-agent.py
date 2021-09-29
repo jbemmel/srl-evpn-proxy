@@ -570,7 +570,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
 
         if _ip.src in evpn_vteps:
            logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
-           if _ip.dst in evpn_vteps:
+           if _ip.dst in evpn_vteps and _arp.opcode!=2: # Ignore regular responses
                SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, vni )
            continue
         elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
@@ -688,33 +688,40 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
 
    _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
 
-   # 1. ARP response: Check for probe request or reflected probe
-   if opcode==2:
-     if _eths[1].src[0:5] == 'd0:d0':
-       if _eths[1].dst != '00:00:00:00:00:00':
-         logging.info( f"Received reflected ARP response, TS={_eths[1].dst} intf={_eths[1].src}" )
+   # Check for probe request or reflected probe
+   RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
+   udp_src_port = 0
+   phase = 0
+   if opcode==RFC5494_EXP1:
+     _arp = rx_pkt.get_protocol( arp.arp )
+     phase = int(_arp.src_mac[3:5],16) + 1
+
+     if phase > 2: # end of 3 phase handshake
+         logging.info( f"Received reflected ARP response, TS={_arp} intf={_eths[1]}" )
          # TODO calculate delta, update telemetry
          return
-       else:
-         logging.info( f"Received ARP probe response, reflecting..." )
      else:
-       logging.info( "Regular ARP response, ignoring" )
-       return
+         _udp = rx_pkt.get_protocol( udp.udp )
+         udp_src_port = _udp.src_port # Reflect port
+         logging.info( f"Received ARP probe response, reflecting...phase={phase} udp_src={udp_src_port}" )
 
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
    i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP)
-   u = udp.udp(src_port=0,dst_port=4789) # vary source == timestamp
+   u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=vni)
 
-   # Reflect timestamp for ARP replies
-   dst_mac = _eths[1].src if opcode==2 else '00:00:00:00:00:00' # invalid dest -> discarded by other systems
-   src_mac = '00:00:00:00:00:00' # 'd0:d0'+ts_mac filled in below
-   e2 = ethernet.ethernet(dst=dst_mac,src=src_mac,ethertype=ether.ETH_TYPE_ARP)
-   a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=2,
-            src_mac=_eths[0].dst, src_ip=local_vtep_ip, # src == interface MAC, to measure ECMP spread
-            dst_mac=dst_mac, dst_ip=dest_vtep_ip)
+   # src == interface MAC, to measure ECMP spread
+   e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
+
+   # Reflect timestamp for ARP replies, include IP TTL
+   _ip = rx_pkt.get_protocol( ipv4.ipv4 )
+   dst_mac = (f'ec:{_ip.ttl:02x}:{_eths[1].src[6:]}') if opcode==2 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
+   src_mac = '00:00:00:00:00:00' # 'ec:<phase>'+ts_mac filled in below
+   a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
+               src_mac=src_mac, src_ip=local_vtep_ip,
+               dst_mac=dst_mac, dst_ip=dest_vtep_ip )
    p = packet.Packet()
    for h in [e,i,u,v,e2,a]:
       p.add_protocol(h)
@@ -727,9 +734,10 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
           ts_mac = f":{(t%256):02x}" + ts_mac
           t = t // 256
 
-       e2.src = 'd0:d0'+ts_mac
-       u.src_port = (ts % 65535 + 1)
-       u.csum = 0 # Recalculate
+       a.src_mac = f'ec:{phase:02x}'+ts_mac
+       if udp_src_port==0:
+          u.src_port = (ts % 65535 + 1)
+          u.csum = 0 # Recalculate
        p.serialize()
        return p
 
