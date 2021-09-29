@@ -226,7 +226,7 @@ module srl-evpn-proxy-agent {
               type string;
             }
             leaf latency { type uint32; description "Average RTT in ms for all paths"; }
-            leaf loss { type srl_nokia-comm:percentage; }
+            leaf lost { type uint8; description "Number of probes lost"; }
             leaf-list probes { type uint32; }
             leaf-list uplinks {
               description "Distribution of probes over uplink interfaces";

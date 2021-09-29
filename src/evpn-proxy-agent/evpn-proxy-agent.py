@@ -695,16 +695,17 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
            js_path = f'.vxlan_proxy.path_probe_to{{.vtep_ip=="{dest_vtep_ip}"}}.at{{.timestamp=="{now_ts}"}}'
            values = list( mac_vrf['path_probes'][ dest_vtep_ip ]['paths'].values() )
            good = list( [ i for i in values if i!="missing" ] )
+           lost = len(values)-len(good)
            if len(values)==0:
                loss = 100.0
            else:
-               loss = 100.0 * ((len(values)-len(good)) / len(values))
+               loss = 100.0 * (lost / len(values))
 
            avg = sum(good)/len(good)
            data = {
              'result'  : { "value" : f"Avg rtt latency: {avg:.1f}ms loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
              'latency' : avg,
-             'loss'    : int(loss),
+             'lost'    : lost,
              'probes'  : sorted(good),
              'uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
                            for mac,i in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
