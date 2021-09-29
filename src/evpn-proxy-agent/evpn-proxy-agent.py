@@ -731,7 +731,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    for h in [e,i,u,v,e2,a]:
       p.add_protocol(h)
 
-   def timestamped_packet(seed=0):
+   def timestamped_packet(seq=1):
        ts = t = get_timestamp_ms()
 
        ts_mac = ""
@@ -739,10 +739,10 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
           ts_mac = f":{(t%256):02x}" + ts_mac
           t = t // 256
 
-       a.src_mac = f'{phase:02x}'+ts_mac
+       a.src_mac = f'{seq:1x}{phase:1x}'+ts_mac
        if udp_src_port==0:
-          u.src_port = (ts+seed) % 65535 + 1
-          u.csum = 0 # Recalculate
+          u.src_port = 1000 * seq # Consistently hash to the same path
+          u.csum = 0              # Recalculate
        p.serialize()
        return p
 
@@ -754,7 +754,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
 
    # In response to ARP requests, send multiple packets with varying UDP src ports
    if opcode==1:
-       for i in range(1,3):
+       for i in range(2,4):
            pkt = timestamped_packet(i)
            logging.info( f"Sending additional ARP probe {i}: {pkt}" )
            socket.sendall( pkt.data )
