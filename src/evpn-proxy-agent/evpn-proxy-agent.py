@@ -693,8 +693,19 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
        def on_timer():
            now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
            js_path = f'.vxlan_proxy.path_probe_to{{.vtep_ip=="{dest_vtep_ip}"}}.at{{.timestamp=="{now_ts}"}}'
+           values = list( mac_vrf['path_probes'][ dest_vtep_ip ].values() )
+           good = list( [ i for i in values if i!="missing" ] )
+           if len(values)==0:
+               loss = 100.0
+           else:
+               loss = 100.0 * ((len(values)-len(good)) / len(values))
+
+           avg = sum(good)/len(good)
            data = {
-             'result'  : { "value" : str(mac_vrf['path_probes'][ dest_vtep_ip ]) }
+             'result'  : { "value" : f"Avg rtt latency: {avg}ms loss: {loss}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]}" },
+             'latency' : avg,
+             'loss'    : int(loss),
+             'probes'  : good
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
