@@ -706,7 +706,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
              'latency' : avg,
              'loss'    : int(loss),
              'probes'  : sorted(good),
-             'uplinks' : sorted( mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].keys() )
+             'uplinks' : { "value" : mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'] }
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
@@ -736,7 +736,10 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
      logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
      if dest_vtep_ip in mac_vrf['path_probes']:
          mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = delta
-         mac_vrf['path_probes'][ dest_vtep_ip ][ 'interfaces' ][ _eths[1].src ] = path # Could put TTL too
+         uplinks = mac_vrf['path_probes'][ dest_vtep_ip ][ 'interfaces' ]
+         # Could put TTL too
+         m = _eths[1].src
+         uplinks[ m ] = 1 + (uplinks[m] if m in uplinks else 0)
      if phase > 2: # end of 3 phase handshake
          return
      else:
