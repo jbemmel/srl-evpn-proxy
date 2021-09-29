@@ -15,7 +15,7 @@ grpc_eventlet.init_eventlet() # Fix gRPC eventlet interworking, early
 
 # May need to start a separate Python process for BGP
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import time
 import sys
 import logging
@@ -67,7 +67,8 @@ from ryu.lib import hub
 # eBPF ARP filter imports
 #
 from bcc import BPF
-from ryu.lib.packet import packet, ipv4, vxlan, ethernet, arp
+from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
+from ryu.ofproto import ether, inet
 
 ############################################################
 ## Agent will start with this name
@@ -532,6 +533,10 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
+
+    # To make sendto work?
+    # sock.bind((vxlan_intf, 0x0800))
+
     _self['socket'] = sock # Used for close()
     try:
      while 1:
@@ -549,7 +554,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         # 5: ARP                 -> MAC, IP
         #
         for p in pkt:
-            logging.debug( f"ARP packet:{p.protocol_name}={p}" )
+            logging.info( f"ARP packet:{p.protocol_name}={p}" )
             if p.protocol_name == 'vlan':
                 logging.debug( f'vlan id = {p.vid}' )
             elif p.protocol_name == 'vxlan':
@@ -564,7 +569,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         mac_vrf = state.mac_vrfs[ vni ]
 
         if _ip.src in evpn_vteps:
-           logging.info( f"ARP from EVPN VTEP {_ip.src} -> ignoring" )
+           logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
+           if _ip.dst in evpn_vteps:
+               SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, vni )
            continue
         elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
            static_vtep = _ip.src
@@ -661,6 +668,83 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
 
     # Doesn't happen
     bpf.cleanup()
+
+def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
+   """
+   Sends an ARP response packet over VXLAN to another agent, to measure RTT and packet loss
+   Uses MAC addresses / IPs gleaned from ARP packet on the wire
+
+   ARP request  -> send response with timestamp encoded as MAC (TODO x3 with varying UDP source port)
+   ARP response -> check for magic MAC, if match process/reflect timestamp
+   """
+   logging.info( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
+
+   def get_timestamp_ms():
+      now = datetime.now(timezone.utc)
+      epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
+      posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
+      posix_timestamp_millis = posix_timestamp_micros // 1000
+      return posix_timestamp_millis
+
+   _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
+
+   # 1. ARP response: Check for probe request or reflected probe
+   if opcode==2:
+     if _eths[1].src[0:5] == 'd0:d0':
+       if _eths[1].dst != '00:00:00:00:00:00':
+         logging.info( f"Received reflected ARP response, TS={_eths[1].dst} intf={_eths[1].src}" )
+         # TODO calculate delta, update telemetry
+         return
+       else:
+         logging.info( f"Received ARP probe response, reflecting..." )
+     else:
+       logging.info( "Regular ARP response, ignoring" )
+       return
+
+   e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
+                         src=_eths[0].dst, # source interface MAC, per uplink
+                         ethertype=ether.ETH_TYPE_IP)
+   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP)
+   u = udp.udp(src_port=0,dst_port=4789) # vary source == timestamp
+   v = vxlan.vxlan(vni=vni)
+
+   # Reflect timestamp for ARP replies
+   dst_mac = _eths[1].src if opcode==2 else '00:00:00:00:00:00' # invalid dest -> discarded by other systems
+   src_mac = '00:00:00:00:00:00' # 'd0:d0'+ts_mac filled in below
+   e2 = ethernet.ethernet(dst=dst_mac,src=src_mac,ethertype=ether.ETH_TYPE_ARP)
+   a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=2,
+            src_mac=_eths[0].dst, src_ip=local_vtep_ip, # src == interface MAC, to measure ECMP spread
+            dst_mac=dst_mac, dst_ip=dest_vtep_ip)
+   p = packet.Packet()
+   for h in [e,i,u,v,e2,a]:
+      p.add_protocol(h)
+
+   def timestamped_packet():
+       ts = t = get_timestamp_ms()
+
+       ts_mac = ""
+       for b in range(0,4):
+          ts_mac = f":{(t%256):02x}" + ts_mac
+          t = t // 256
+
+       e2.src = 'd0:d0'+ts_mac
+       u.src_port = (ts % 65535 + 1)
+       u.csum = 0 # Recalculate
+       p.serialize()
+       return p
+
+   # raw_socket.setsockopt(socket.SOL_IP, socket.IP_HDRINCL, 1)
+   # with netns.NetNS(nsname="srbase"): # not needed
+   pkt = timestamped_packet()
+   logging.info( f"Sending/reflecting ARP probe response: {pkt}" )
+   socket.sendall( pkt.data )
+
+   # In response to ARP requests, send multiple packets with varying UDP src ports
+   if opcode==1:
+       for i in range(1,3):
+           pkt = timestamped_packet()
+           logging.info( f"Sending additional ARP probe {i}: {pkt}" )
+           socket.sendall( pkt.data )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
