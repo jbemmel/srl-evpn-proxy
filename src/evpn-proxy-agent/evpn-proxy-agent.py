@@ -693,7 +693,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
        def on_timer():
            now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
            js_path = f'.vxlan_proxy.path_probe_to{{.vtep_ip=="{dest_vtep_ip}"}}.at{{.timestamp=="{now_ts}"}}'
-           values = list( mac_vrf['path_probes'][ dest_vtep_ip ].values() )
+           values = list( mac_vrf['path_probes'][ dest_vtep_ip ]['paths'].values() )
            good = list( [ i for i in values if i!="missing" ] )
            if len(values)==0:
                loss = 100.0
@@ -702,17 +702,18 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
 
            avg = sum(good)/len(good)
            data = {
-             'result'  : { "value" : f"Avg rtt latency: {avg:.2f}ms loss: {loss:.2f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]}" },
+             'result'  : { "value" : f"Avg rtt latency: {avg:.2f}ms loss: {loss:.2f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
              'latency' : avg,
              'loss'    : int(loss),
-             'probes'  : sorted(good)
+             'probes'  : sorted(good),
+             'uplinks' : sorted( mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].keys() )
            }
            Add_Telemetry( [(js_path, data)] )
            mac_vrf['path_probes'].pop( dest_vtep_ip, None )
 
-       mac_vrf['path_probes'][ dest_vtep_ip ] = {}
+       mac_vrf['path_probes'][ dest_vtep_ip ] = { 'paths': {}, 'interfaces': {} }
        for path in range(1,4):
-          mac_vrf['path_probes'][ dest_vtep_ip ][ path ] = "missing"
+          mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = "missing"
        Timer( 1, on_timer ).start()
 
    _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
@@ -734,7 +735,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
          delta += (1<<40)
      logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
      if dest_vtep_ip in mac_vrf['path_probes']:
-         mac_vrf['path_probes'][ dest_vtep_ip ][ path ] = delta
+         mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = delta
+         mac_vrf['path_probes'][ dest_vtep_ip ][ 'interfaces' ][ _eths[1].src ] = path # Could put TTL too
      if phase > 2: # end of 3 phase handshake
          return
      else:
