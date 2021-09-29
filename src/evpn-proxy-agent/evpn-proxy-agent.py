@@ -717,7 +717,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
 
    # Reflect timestamp for ARP replies, include IP TTL
    _ip = rx_pkt.get_protocol( ipv4.ipv4 )
-   dst_mac = (f'ec:{_ip.ttl:02x}:{_eths[1].src[6:]}') if opcode==2 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
+   dst_mac = (f'ec:{_ip.ttl:02x}:{_eths[1].src[6:]}') if opcode==RFC5494_EXP1 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
    src_mac = '00:00:00:00:00:00' # 'ec:<phase>'+ts_mac filled in below
    a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
                src_mac=src_mac, src_ip=local_vtep_ip,
