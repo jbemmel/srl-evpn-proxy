@@ -554,7 +554,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         # 5: ARP                 -> MAC, IP
         #
         for p in pkt:
-            logging.info( f"ARP packet:{p.protocol_name}={p}" )
+            logging.debug( f"ARP packet:{p.protocol_name}={p}" )
             if p.protocol_name == 'vlan':
                 logging.debug( f'vlan id = {p.vid}' )
             elif p.protocol_name == 'vxlan':
@@ -695,14 +695,15 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
    phase = 0
    if opcode==RFC5494_EXP1:
      _arp = rx_pkt.get_protocol( arp.arp )
-     phase = int(_arp.src_mac[0:2],16) + 1
+     path = int(_arp.src_mac[0],16)
+     phase = int(_arp.src_mac[1],16) + 1
 
      m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
      ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
      delta = get_timestamp_ms() - ts
      if (delta<0):
          delta += (1<<40)
-     logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} phase={phase}), ARP={_arp} intf={_eths[1]}" )
+     logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
 
      if phase > 2: # end of 3 phase handshake
          return
