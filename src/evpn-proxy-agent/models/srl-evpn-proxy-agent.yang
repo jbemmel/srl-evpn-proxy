@@ -115,6 +115,12 @@ module srl-evpn-proxy-agent {
                 default true;
                 description "Whether to announce EVPN routes for static VTEPs that are not explicitly configured";
               }
+
+              leaf ecmp-path-probes {
+                type boolean;
+                default true;
+                description "Enable experimental ARP-in-VXLAN probe packets to measure path diversity and latency";
+              }
             }
 
             leaf oper-state {
@@ -193,6 +199,31 @@ module srl-evpn-proxy-agent {
                 description "EVPN MAC mobility sequence number used/seen";
                 type uint32;
               }
+            }
+          }
+        }
+
+        list path-probe-to {
+          key "vtep_ip";
+
+          leaf vtep_ip {
+            type srl_nokia-comm:ip-address;
+            srl_nokia-ext:show-importance "high";
+            description "VXLAN source/destination IP for this VTEP";
+          }
+
+          list at {
+            key timestamp;
+            // ordered-by user;
+
+            leaf timestamp {
+              type srl_nokia-comm:date-and-time-delta;
+              srl_nokia-ext:show-importance "high";
+              description "The date and time of the last update of this mac";
+            }
+
+            leaf result {
+              type string;
             }
           }
         }

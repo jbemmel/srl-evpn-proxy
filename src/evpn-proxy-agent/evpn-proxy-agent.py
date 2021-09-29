@@ -26,7 +26,7 @@ import ipaddress
 import json
 import traceback
 import subprocess
-# from concurrent.futures import ThreadPoolExecutor
+from threading import Timer
 import pwd
 
 # sys.path.append('/usr/lib/python3.6/site-packages/sdk_protos')
@@ -570,8 +570,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
 
         if _ip.src in evpn_vteps:
            logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
-           if _ip.dst in evpn_vteps and _arp.opcode!=2: # Ignore regular responses
-               SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, vni )
+           if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
+                                                and _arp.opcode!=2): # Ignore regular responses
+               SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, mac_vrf )
            continue
         elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
            static_vtep = _ip.src
@@ -669,7 +670,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     # Doesn't happen
     bpf.cleanup()
 
-def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
+def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    """
    Sends an ARP response packet over VXLAN to another agent, to measure RTT and packet loss
    Uses MAC addresses / IPs gleaned from ARP packet on the wire
@@ -686,6 +687,22 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
       # posix_timestamp_millis = posix_timestamp_micros // 1000
       # return posix_timestamp_millis
       return int( int(now.timestamp() * 1000) & 0xffffffffff )
+
+   def start_timer():
+
+       def on_timer():
+           now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+           js_path = f'.vxlan_proxy.path_probe_to{{.vtep_ip=="{dest_vtep_ip}"}}.at{{.timestamp=="{now_ts}"}}'
+           data = {
+             'result'  : { "value" : str(mac_vrf['path_probes'][ dest_vtep_ip ]) }
+           }
+           Add_Telemetry( [(js_path, data)] )
+           mac_vrf['path_probes'].pop( dest_vtep_ip, None )
+
+       mac_vrf['path_probes'][ dest_vtep_ip ] = {}
+       for path in range(1,4):
+          mac_vrf['path_probes'][ dest_vtep_ip ][ path ] = "missing"
+       Timer( 1, on_timer ).start()
 
    _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
 
@@ -705,19 +722,30 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,vni):
      if (delta<0):
          delta += (1<<40)
      logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
-
+     if dest_vtep_ip in mac_vrf['path_probes']:
+         mac_vrf['path_probes'][ dest_vtep_ip ][ path ] = delta
      if phase > 2: # end of 3 phase handshake
          return
      else:
          _udp = rx_pkt.get_protocol( udp.udp )
          udp_src_port = _udp.src_port # Reflect port
 
+   # Originator (ARP req) or receiver(phase 2): Start reporting timer (1s)
+   if opcode==1 or phase==2:
+     if dest_vtep_ip not in mac_vrf['path_probes']:
+       start_timer()
+     else:
+       logging.info( f"Path probe ongoing, not starting timer for {dest_vtep_ip}" )
+       if opcode==1:
+          logging.info( f"Ignoring ARP broadcast trigger" )
+          return
+
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
    i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP)
    u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
-   v = vxlan.vxlan(vni=vni)
+   v = vxlan.vxlan(vni=mac_vrf['vni'])
 
    # src == interface MAC, to measure ECMP spread
    e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
@@ -800,6 +828,7 @@ def Handle_Notification(obj, state):
 
                 state.params[ "vxlan_interfaces" ] = []
                 state.params[ "include_ip" ] = False
+                state.params[ "ecmp_path_probes" ] = False
                 state.params[ "auto_discover_static_vteps" ] = False
                 if 'proof_of_concept' in data:
                     poc = data['proof_of_concept']
@@ -807,6 +836,8 @@ def Handle_Notification(obj, state):
                        state.params[ "vxlan_interfaces" ] = [ i['value'] for i in poc['vxlan_arp_learning_interfaces'] ]
                     if 'include_ip' in poc:
                        state.params[ "include_ip" ] = bool( poc['include_ip']['value'] )
+                    if 'ecmp_path_probes' in poc:
+                       state.params[ "ecmp_path_probes" ] = bool( poc['ecmp_path_probes']['value'] )
                     if 'auto_discover_static_vteps' in poc:
                        state.params[ "auto_discover_static_vteps" ] = bool( poc['auto_discover_static_vteps']['value'] )
 
@@ -853,7 +884,7 @@ def Handle_Notification(obj, state):
                if vni not in state.mac_vrfs and mac_vrf_name not in state.mac_vrfs:
                  vrf = { 'name': mac_vrf_name,
                          'admin_state': admin_state, 'vni': vni, 'evi': evi,
-                         'macs': {}, 'ips': {}, 'vxlan_vteps': {} }
+                         'macs': {}, 'ips': {}, 'vxlan_vteps': {}, 'path_probes': {} }
                  state.mac_vrfs[ vni ] = state.mac_vrfs[ mac_vrf_name ] = vrf
                else:
                  # Support VNI modifications
