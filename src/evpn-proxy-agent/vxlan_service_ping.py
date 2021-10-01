@@ -14,7 +14,7 @@ import logging
 #
 # L2 service ping using custom ARP packets
 #
-class VxlanServicePing(ToolsPlugin):
+class Plugin(ToolsPlugin):
 
     # Provide list of plugins that must be loaded before this one
     def get_required_plugins(self):
