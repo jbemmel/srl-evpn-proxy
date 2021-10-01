@@ -29,7 +29,8 @@ class VxlanServicePing(ToolsPlugin):
     # Helper function to get arguments and help strings for this plugin command
     def _get_syntax(self):
         syntax = Syntax("vxlan-service-ping", help="Pings other VXLAN VTEPs in a given L2 overlay service")
-        syntax.add_named_argument(name='mac-vrf', suggestions=KeyCompleter(path='/network-instance[type=mac-vrf]')) # Cannot select type=mac-vrf only?
+        syntax.add_named_argument('mac-vrf', suggestions=KeyCompleter(path='/network-instance[type=mac-vrf]')) # Cannot select type=mac-vrf only?
+        syntax.add_unnamed_argument(name='vtep', default='*', suggestions=KeyCompleter(path='/network-instance[type=mac-vrf]')) # Lookup state published by evpn agent
 
         # TODO add 'count' argument, default 3
 
@@ -38,3 +39,7 @@ class VxlanServicePing(ToolsPlugin):
     # Callback that runs when the plugin is run in sr_cli
 def do_service_ping(state, input, output, arguments, **_kwargs):
     logging.debug( f"JvB: do_service_ping arguments={arguments}" )
+
+    # For each uplink interface in default vrf:
+    # 1. Get MAC and peer MAC
+    # 2. Pass MACs to agent config
