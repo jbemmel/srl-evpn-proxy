@@ -692,7 +692,8 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
 
        def on_timer():
            now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-           js_path = f'.vxlan_proxy.path_probe_to{{.vtep_ip=="{dest_vtep_ip}"}}.at{{.timestamp=="{now_ts}"}}'
+           key = f'{{.mac_vrf=="{mac_vrf["name"]}"}}{{.vtep_ip=="{dest_vtep_ip}"}}{{.vni=={mac_vrf["vni"]}}}'
+           js_path = f'.vxlan_proxy.path_probe_to{key}.at{{.timestamp=="{now_ts}"}}'
            values = list( mac_vrf['path_probes'][ dest_vtep_ip ]['paths'].values() )
            good = list( [ i for i in values if i!="missing" ] )
            lost = len(values)-len(good)

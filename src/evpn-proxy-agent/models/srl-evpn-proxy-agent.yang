@@ -165,7 +165,9 @@ module srl-evpn-proxy-agent {
           list mac-vrf {
             key "name";
             leaf name {
-              type string;
+              type leafref {
+                path "/srl_nokia-netinst:network-instance/srl_nokia-netinst:name";
+              }
             }
             leaf evi {
                type uint32 {
@@ -204,12 +206,29 @@ module srl-evpn-proxy-agent {
         }
 
         list path-probe-to {
-          key "vtep_ip";
+          key "mac-vrf vtep-ip vni";
 
-          leaf vtep_ip {
+          leaf mac-vrf {
+            type leafref {
+              // This allows auto-completion to work in the CLI
+              path "/srl_nokia-netinst:network-instance/srl_nokia-netinst:name";
+            }
+            srl_nokia-ext:show-importance "high";
+            description "Name of mac-vrf used for this probe";
+          }
+
+          leaf vtep-ip {
             type srl_nokia-comm:ip-address;
             srl_nokia-ext:show-importance "high";
-            description "VXLAN source/destination IP for this VTEP";
+            description "IP of remote VTEP";
+          }
+
+          leaf vni {
+            type uint32 {
+              range "1..16777215";
+            }
+            srl_nokia-ext:show-importance "high";
+            description "VNI used for this probe";
           }
 
           list at {

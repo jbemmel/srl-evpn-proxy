@@ -49,6 +49,10 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
+# Integrate vxlan service ping CLI command
+COPY src/evpn-proxy-agent/vxlan_service_ping_tools_cli.py /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
+RUN sudo sh -c ' echo "vxlan_ping = srlinux.mgmt.cli.plugins.VxlanServicePing:Plugin" >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
+
 RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/evpn-proxy-agent
 COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/demo-agents/
