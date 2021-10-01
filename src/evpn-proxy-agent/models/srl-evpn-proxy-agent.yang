@@ -133,9 +133,9 @@ module srl-evpn-proxy-agent {
     }
 
     grouping evpn-proxy-state {
-      description "Operational state for EVPN proxy";
-
       container vxlan-proxy {
+        description "Operational state for VXLAN EVPN proxy agent";
+
         // Only supported on SRL platforms that have both VXLAN and EVPN
         if-feature "srl-feat:vxlan and srl-feat:evpn";
 
