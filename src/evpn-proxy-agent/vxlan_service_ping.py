@@ -30,15 +30,31 @@ class Plugin(ToolsPlugin):
     def on_tools_load(self, state):
         # Could also add it under /tools network-instance
         root = state.command_tree.tools_mode.root
-        root.add_command(self._get_syntax(), update_location=False, callback=do_service_ping)
+        root.add_command(self._get_syntax(state), update_location=False, callback=do_service_ping)
         # system = state.command_tree.tools_mode.root.get_command('system')
         # system.add_command(self._get_syntax(), update_location=False, callback=do_service_ping)
 
     # Helper function to get arguments and help strings for this plugin command
-    def _get_syntax(self):
+    def _get_syntax(self,state):
         syntax = Syntax("vxlan-service-ping", help="Pings other VXLAN VTEPs in a given L2 overlay service")
         syntax.add_named_argument('mac-vrf', suggestions=KeyCompleter(path='/network-instance[name=*]')) # Cannot select type=mac-vrf only?
-        syntax.add_unnamed_argument(name='vtep', default='*') # TODO Lookup in state published by evpn agent
+
+        # Lookup vxlan interface for given mac-vrf - seems to deadlock
+        def _get_path(arguments):
+          mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
+          logging.info( f"_get_path args={arguments} mac_vrf={mac_vrf}" )
+          vxlan_intf = get_vxlan_interface(state,mac_vrf)
+          logging.info( f"_get_path args vxlan_intf={vxl}" )
+          tun = vxlan_intf.split('.')
+          return build_path(f'/tunnel-interface[name={tun[0]}]/vxlan-interface[index={tun[1]}]/bridge-table/multicast-destinations/destination[vtep=*]')
+
+        # Hardcoded
+        syntax.add_named_argument('vtep', default='*',
+           # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
+           suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/bridge-table/multicast-destinations/destination[vtep=*]') )
+
+        # syntax.add_named_argument('vtep', default='*',
+        #   suggestions=KeyCompleter(path=_get_path) )
 
         # TODO add 'count' argument, default 3
         return syntax
@@ -54,6 +70,11 @@ class Plugin(ToolsPlugin):
 
 # end class VxlanServicePing
 
+def get_vxlan_interface(state,mac_vrf):
+   path = build_path(f'/network-instance[name={mac_vrf}]/protocols/bgp-evpn/bgp-instance[id=1]/vxlan-interface')
+   data = state.server_data_store.get_data(path, recursive=True)
+   return data.network_instance.get().protocols.get().bgp_evpn.get().bgp_instance.get().vxlan_interface
+
     # Callback that runs when the plugin is run in sr_cli
 def do_service_ping(state, input, output, arguments, **_kwargs):
     logging.info( f"JvB: do_service_ping arguments={arguments}" )
@@ -63,11 +84,7 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # 2. Pass MACs to agent config (or open raw socket and send ARP packet here)
 
     mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
-
-    def get_vxlan_interface():
-       path = build_path(f'/network-instance[name={mac_vrf}]/protocols/bgp-evpn/bgp-instance[id=1]/vxlan-interface')
-       data = state.server_data_store.get_data(path, recursive=True)
-       return data.network_instance.get().protocols.get().bgp_evpn.get().bgp_instance.get().vxlan_interface
+    vtep = arguments.get('vxlan-service-ping', 'vtep')
 
     def get_vni(vxlan_intf):
        tun = vxlan_intf.split('.')
@@ -95,11 +112,11 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
        data = state.server.get_data_store( DataStore.State ).get_data(path, recursive=True)
        return [ p.vtep for p in data.tunnel_interface.get().vxlan_interface.get().bridge_table.get().multicast_destinations.get().destination.items() ]
 
-    vxlan_intf = get_vxlan_interface()
+    vxlan_intf = get_vxlan_interface(state,mac_vrf)
     vni = get_vni(vxlan_intf)
     local_vtep = get_system0_vtep_ip()
     uplinks = ",".join( get_uplinks() )
-    dest_vteps = ",".join( get_evpn_vteps(vxlan_intf) )
+    dest_vteps = vtep if vtep!='*' else ",".join( get_evpn_vteps(vxlan_intf) )
 
     # open UDP socket and have OS figure out MAC addresses
     # Run a separate, simple Python binary in the default namespace
