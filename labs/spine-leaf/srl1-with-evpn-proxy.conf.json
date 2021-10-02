@@ -1211,6 +1211,9 @@
         }
       ]
     },
+    "srl_nokia-ntp:clock": {
+      "timezone": "America/Chicago"
+    },
     "srl_nokia-ssh:ssh-server": {
       "network-instance": [
         {

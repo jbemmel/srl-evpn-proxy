@@ -22,7 +22,10 @@ UPLINKS = sys.argv[3].split(",")
 VTEP_IPs = sys.argv[4].split(",")
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
-logging.basicConfig(filename='/var/log/srlinux/stdout/vxping.log',
+logging.basicConfig(
+  filename='/var/log/srlinux/stdout/vxping.log',
+  format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
+  datefmt='%H:%M:%S',
   level=logging.DEBUG if DEBUG else logging.INFO)
 
 def get_timestamp_us(): # 40-bit
@@ -108,7 +111,7 @@ def receive_packet(sock, mask):
            _arp = pkt.get_protocol( arp.arp )
            if _arp.opcode != RFC5494_EXP1:
                return
-
+           _ip = pkt.get_protocol( ipv4.ipv4 )
            logging.debug( pkt )
 
            path = int(_arp.src_mac[0],16)
@@ -123,7 +126,8 @@ def receive_packet(sock, mask):
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
            print( f"Ping response on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
-           ping_replies.append( { 'hops': 255-ttl, 'rtt': delta, 'interface': intf } )
+           ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
+                                  'rtt': delta, 'interface': intf } )
 
 for i in UPLINKS:
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -166,7 +170,7 @@ while True:
         callback(key.fileobj, mask)
 
 sel.close()
-
+logging.debug( ping_replies )
 total = sum( [ r['rtt'] for r in ping_replies ] )
 print( f"Average RTT: {total/3:.1f} us" )
 
