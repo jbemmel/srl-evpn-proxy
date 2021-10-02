@@ -125,7 +125,7 @@ def receive_packet(sock, mask):
                delta += (1<<40)
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
-           print( f"Ping response on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
+           print( f"Ping response from {_ip.src} on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
                                   'rtt': delta, 'interface': intf } )
 

@@ -338,6 +338,8 @@ def runBGPThread( state ):
                evpn_vteps[ event.nexthop ] = event.remote_as
                # Could withdraw routes and remove static MACs if this IP matches
                # a static vtep in our configuration
+               data = { 'evpn_vteps': sorted(evpn_vteps.keys()) }
+               Add_Telemetry( [('.vxlan_proxy', data)] )
 
          # check for RT2 MAC moves between static VTEPs and EVPN VTEPs
          # event.label is reduced to the 20-bit MPLS label

@@ -205,6 +205,10 @@ module srl-evpn-proxy-agent {
           }
         }
 
+        leaf-list evpn-vteps {
+          type srl_nokia-comm:ip-address;
+        }
+
         list path-probe-to {
           key "mac-vrf vtep-ip vni";
 
