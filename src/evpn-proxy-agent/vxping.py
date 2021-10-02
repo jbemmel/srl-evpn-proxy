@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import socket, sys, re, os, netns
+import socket, sys, re, os, netns, selectors
 from datetime import datetime, timezone
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
 from ryu.ofproto import ether, inet
@@ -47,6 +47,7 @@ def timestamped_packet(path):
     for b in range(0,5): # 40 bit
        ts_mac = f":{(t%256):02x}" + ts_mac
        t = t // 256
+    ip.identification = path
     u.src_port = path * 1000
     u.csum = 0 # Recalculate
     a.src_mac = f'{path:1x}1'+ts_mac
@@ -84,6 +85,18 @@ def get_peer_mac(sock,uplink):
     mac = re.search( '.*\[([0-9a-fA-F:]+)\].*', arping )
     return mac.groups()[0] if mac else None
 
+
+sel = selectors.DefaultSelector()
+
+def receive_packet(sock, mask):
+    data = sock.recv(1000)  # Should be ready
+    if data:
+        print('Received', len(data), 'bytes on', sock.getsockname() )
+        # Our ARP packets are 110 bytes
+        if len(data)==110:
+           pkt = packet.Packet( bytearray(data) )
+           print( pkt )
+
 for i in UPLINKS:
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     e.src = e2.src = get_interface_mac(uplink_sock, i)
@@ -98,6 +111,8 @@ for i in UPLINKS:
 
     vxlan_sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     # vxlan_sock.setblocking(True)
+    vxlan_sock.setblocking(False)
+    sel.register(vxlan_sock, selectors.EVENT_READ, receive_packet)
 
     for v in VTEP_IPs:
        ip.dst = v
@@ -109,6 +124,18 @@ for i in UPLINKS:
           # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
           # print( f"Result: {bytes_sent} bytes sent" )
 
-    vxlan_sock.close()
+    # vxlan_sock.close()
+
+# Listen for packets, with timeout
+while True:
+    events = sel.select(timeout=1) # 1 second
+    if events==[]:
+        break
+    print( "Events:", events )
+    for key, mask in events:
+        callback = key.data
+        callback(key.fileobj, mask)
+
+sel.close()
 
 sys.exit(0)

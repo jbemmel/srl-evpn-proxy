@@ -760,11 +760,14 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
           logging.info( f"Ignoring ARP broadcast trigger" )
           return
 
+   # Decode received IP header, for identification and TTL
+   _ip = rx_pkt.get_protocol( ipv4.ipv4 )
+
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
    i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,
-                 tos=0xc0,identification=udp_src_port,flags=(1<<1)) # Set DF
+                 tos=0xc0,identification=_ip.identification,flags=(1<<1)) # Set DF
    u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=mac_vrf['vni'])
 
@@ -772,7 +775,6 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
 
    # Reflect timestamp for ARP replies, include IP TTL
-   _ip = rx_pkt.get_protocol( ipv4.ipv4 )
    dst_mac = (f'{_ip.ttl:02x}:{_eths[1].src[3:]}') if opcode==RFC5494_EXP1 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
    src_mac = '00:00:00:00:00:00' # 'ec:<phase>'+ts_mac filled in below
    a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
