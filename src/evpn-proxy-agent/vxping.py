@@ -4,7 +4,7 @@
 # Assumes this is being run in srbase-default namespace (however its name)
 #
 
-import socket, sys, re, os, netns, selectors
+import socket, sys, re, os, netns, selectors, logging
 from datetime import datetime, timezone
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
 from ryu.ofproto import ether, inet
@@ -20,6 +20,10 @@ VNI = int(sys.argv[1])
 LOCAL_VTEP = sys.argv[2]
 UPLINKS = sys.argv[3].split(",")
 VTEP_IPs = sys.argv[4].split(",")
+
+DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
+logging.basicConfig(filename='/var/log/srlinux/stdout/vxping.log',
+  level=logging.DEBUG if DEBUG else logging.INFO)
 
 def get_timestamp_us(): # 40-bit
    now = datetime.now(timezone.utc)
@@ -77,7 +81,7 @@ def get_interface_mac(sock,dev):
         sock.fileno(),
         0x8927,  # SIOCGIFHWADDR = 0x8927
         struct.pack('256s', dev[:15].encode()))
-    return ':'.join(['%02X' % b for b in info[18:24]])
+    return ':'.join(['%02x' % b for b in info[18:24]])
 
 def get_peer_mac(sock,uplink):
     local_ip = get_interface_ip(sock,uplink)
@@ -88,19 +92,38 @@ def get_peer_mac(sock,uplink):
     arping = os.popen(f'/usr/sbin/arping -I {uplink} {peer_ip} -f').read()
     print( f"arping: {arping}" )
     mac = re.search( '.*\[([0-9a-fA-F:]+)\].*', arping )
-    return mac.groups()[0] if mac else None
+    return mac.groups()[0].lower() if mac else None
 
 
 sel = selectors.DefaultSelector()
-
+ping_replies = []
 def receive_packet(sock, mask):
     data = sock.recv(1000)  # Should be ready
     if data:
-        print('Received', len(data), 'bytes on', sock.getsockname() )
+        intf = sock.getsockname()[0]
+        logging.debug( f'Received {len(data)} bytes on {intf}' )
         # Our ARP packets are 110 bytes
         if len(data)==110:
            pkt = packet.Packet( bytearray(data) )
-           print( pkt )
+           _arp = pkt.get_protocol( arp.arp )
+           if _arp.opcode != RFC5494_EXP1:
+               return
+
+           logging.debug( pkt )
+
+           path = int(_arp.src_mac[0],16)
+           phase = int(_arp.src_mac[1],16) + 1
+           ttl = int( _arp.dst_mac[0:2], 16 ) # Starts as 255
+
+           m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
+           ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
+           delta = get_timestamp_us() - ts
+           if (delta<0):
+               delta += (1<<40)
+           logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
+
+           print( f"Ping response on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
+           ping_replies.append( { 'hops': 255-ttl, 'rtt': delta, 'interface': intf } )
 
 for i in UPLINKS:
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -124,7 +147,8 @@ for i in UPLINKS:
        a.dst_ip = v
        for path in range(1,4):
           pkt = timestamped_packet(path)
-          print( f"Sending {pkt}" )
+          logging.debug( f"Sending {pkt}" )
+          print( f"Sending ARP ping packet #{path} to {v} on {i}" )
           vxlan_sock.sendall( pkt.data )
           # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
           # print( f"Result: {bytes_sent} bytes sent" )
@@ -136,11 +160,14 @@ while True:
     events = sel.select(timeout=1) # 1 second
     if events==[]:
         break
-    print( "Events:", events )
+    logging.debug( events )
     for key, mask in events:
         callback = key.data
         callback(key.fileobj, mask)
 
 sel.close()
+
+total = sum( [ r['rtt'] for r in ping_replies ] )
+print( f"Average RTT: {total/3:.1f} us" )
 
 sys.exit(0)
