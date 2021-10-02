@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 
-import socket, sys
+import socket, sys, re, os, netns
 from datetime import datetime, timezone
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
 from ryu.ofproto import ether, inet
+
+# from bcc import BPF
+from bcc.libbcc import lib
 
 if len(sys.argv) < 5:
     print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','>" )
@@ -21,14 +24,21 @@ def get_timestamp_us(): # 40-bit
 # Build VXLAN ARP packet
 RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
 ZERO = "00:00:00:00:00:00"
+
+e = ethernet.ethernet(dst=ZERO, # nexthop MAC, per vxlan_intf
+                      src=ZERO, # source interface MAC, per uplink
+                      ethertype=ether.ETH_TYPE_IP)
+ip = ipv4.ipv4(dst=VTEP_IPs[0],src=LOCAL_VTEP,proto=inet.IPPROTO_UDP,
+              tos=0xc0,identification=0,flags=(1<<1)) # Set DF
+u = udp.udp(src_port=0,dst_port=4789) # vary source == timestamp
 vxl = vxlan.vxlan(vni=VNI)
-eth = ethernet.ethernet(dst=ZERO,src=ZERO,ethertype=ether.ETH_TYPE_ARP)
+e2 = ethernet.ethernet(dst=ZERO,src=ZERO,ethertype=ether.ETH_TYPE_ARP)
 a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
             src_mac=ZERO, src_ip=LOCAL_VTEP,
             dst_mac=ZERO, dst_ip="0.0.0.0" )
 
 p = packet.Packet()
-for h in [vxl,eth,a]:
+for h in [e,ip,u,vxl,e2,a]:
    p.add_protocol(h)
 
 def timestamped_packet(path):
@@ -37,20 +47,68 @@ def timestamped_packet(path):
     for b in range(0,5): # 40 bit
        ts_mac = f":{(t%256):02x}" + ts_mac
        t = t // 256
-
+    u.src_port = path * 1000
+    u.csum = 0 # Recalculate
     a.src_mac = f'{path:1x}1'+ts_mac
     p.serialize()
     return p
 
-for path in range(1,4):
-  vxlan_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-  vxlan_sock.bind( (LOCAL_VTEP, 1000*path) ) #  vary source port
-  for i in UPLINKS:
-    vxlan_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, i.encode() )
+def get_interface_ip(sock,dev):
+    # ip a show dev e1-1.0 | awk '/inet /{ print $2}'
+    # or use ipdb
+    import fcntl, struct
+    return socket.inet_ntoa(fcntl.ioctl(
+        sock.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', dev[:15].encode())
+    )[20:24])
+
+def get_interface_mac(sock,dev):
+    # ip a show dev e1-1.0 | awk '/inet /{ print $2}'
+    # or use ipdb
+    # or open('/sys/class/net/'+interface+'/address').readline()
+    import fcntl, struct
+    info = fcntl.ioctl(
+        sock.fileno(),
+        0x8927,  # SIOCGIFHWADDR = 0x8927
+        struct.pack('256s', dev[:15].encode()))
+    return ':'.join(['%02X' % b for b in info[18:24]])
+
+def get_peer_mac(sock,uplink):
+    local_ip = get_interface_ip(sock,uplink)
+    d = int(local_ip[-1])
+    peer_ip = local_ip[:-1] + str( (d-1) if (d%2) else (d+1) )
+    # XXX hardcoded name of 'default' network-instance
+    arping = os.popen(f'/usr/sbin/ip netns exec srbase-default /usr/sbin/arping -I {uplink} {peer_ip} -f').read()
+    print( f"arping: {arping}" )
+    mac = re.search( '.*\[([0-9a-fA-F:]+)\].*', arping )
+    return mac.groups()[0] if mac else None
+
+for i in UPLINKS:
+    uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+    e.src = e2.src = get_interface_mac(uplink_sock, i)
+    e.dst = e2.dst = get_peer_mac(uplink_sock, i)
+    uplink_sock.close()
+
+    base_intf = i.split('.')[0] # e1-1.0 -> e1-1 in srbase
+
+    # Use BCC bpf_open_raw_sock to create a raw socket attached in srbase netns
+    with netns.NetNS(nsname="srbase"):
+       socket_fd = lib.bpf_open_raw_sock(base_intf.encode())
+
+    vxlan_sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+    # vxlan_sock.setblocking(True)
+
     for v in VTEP_IPs:
-      a.dst_ip = v
-      pkt = timestamped_packet(path)
-      print( f"Sending {pkt}" )
-      vxlan_sock.sendto( pkt.data, (v,4789) )
+       ip.dst = v
+       a.dst_ip = v
+       for path in range(1,4):
+          pkt = timestamped_packet(path)
+          print( f"Sending {pkt}" )
+          vxlan_sock.sendall( pkt.data )
+          # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
+          # print( f"Result: {bytes_sent} bytes sent" )
+
+    vxlan_sock.close()
 
 sys.exit(0)

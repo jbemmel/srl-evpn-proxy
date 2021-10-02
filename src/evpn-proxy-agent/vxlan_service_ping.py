@@ -10,6 +10,7 @@ from srlinux.mgmt.cli import KeyCompleter
 from srlinux.syntax import Syntax
 from srlinux.location import build_path
 from srlinux.mgmt.cli.plugins.bash_network_command_helper import execute_network_command
+from srlinux import child_process
 
 import sys
 sys.path.append('/usr/local/lib/python3.6/site-packages') # for netns
@@ -54,15 +55,20 @@ class Plugin(ToolsPlugin):
 
     # Callback that runs when the plugin is run in sr_cli
 def do_service_ping(state, input, output, arguments, **_kwargs):
-    logging.info( f"JvB2: do_service_ping arguments={arguments}" )
+    logging.info( f"JvB: do_service_ping arguments={arguments}" )
 
     # For each uplink interface in default vrf:
     # 1. Get MAC and peer MAC
     # 2. Pass MACs to agent config (or open raw socket and send ARP packet here)
 
+    mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
+    vni = 1234 # TODO retrieve from state
+    local_vtep = "1.1.1.5"
+    uplinks = "e1-1.0" # CSV list
+    dest_vteps = "1.1.1.7"
+
     # open UDP socket and have OS figure out MAC addresses
-    # Run a separate, simple Python binary
-    with netns.NetNS(nsname="srbase-default"):
-      socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-      socket.bind( 'e1-1.0', 12345 ) # Set source port
-      socket.sendto( "Hello".encode(), ("1.1.1.7", 4789) )
+    # Run a separate, simple Python binary in the default namespace
+    # Need sudo
+    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {uplinks} {dest_vteps}"
+    exit_code = child_process.run( cmd.split(), output=output )
