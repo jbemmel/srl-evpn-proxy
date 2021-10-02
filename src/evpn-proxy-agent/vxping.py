@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+#
+# Assumes this is being run in srbase-default namespace (however its name)
+#
+
 import socket, sys, re, os, netns, selectors
 from datetime import datetime, timezone
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
@@ -80,7 +84,8 @@ def get_peer_mac(sock,uplink):
     d = int(local_ip[-1])
     peer_ip = local_ip[:-1] + str( (d-1) if (d%2) else (d+1) )
     # XXX hardcoded name of 'default' network-instance
-    arping = os.popen(f'/usr/sbin/ip netns exec srbase-default /usr/sbin/arping -I {uplink} {peer_ip} -f').read()
+    # arping = os.popen(f'/usr/sbin/ip netns exec srbase-default /usr/sbin/arping -I {uplink} {peer_ip} -f').read()
+    arping = os.popen(f'/usr/sbin/arping -I {uplink} {peer_ip} -f').read()
     print( f"arping: {arping}" )
     mac = re.search( '.*\[([0-9a-fA-F:]+)\].*', arping )
     return mac.groups()[0] if mac else None
