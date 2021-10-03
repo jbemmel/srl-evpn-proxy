@@ -1,0 +1,4 @@
+FROM srl/evpn-proxy-agent:latest
+
+# Add in auto-config agent sources
+COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/

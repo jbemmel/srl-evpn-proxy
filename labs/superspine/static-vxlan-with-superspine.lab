@@ -1,0 +1,96 @@
+#
+# In order to test path diversity for vxlan service ping, this topology uses
+# a super-spine with multiple uplinks to each spine
+#
+name: static-vxlan-superspine-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # image: srl/custombase:latest
+      image: srl/evpn-proxy-agent:latest
+      extras:
+        srl-agents: [ ../../srl-evpn-proxy-agent.yml, ../../../srl-self-organizing/auto-config-agent.yml ]
+      binds:
+        # - /lib/modules:/lib/modules:ro
+        # - /usr/src:/usr/src
+        # - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+        - ../../src:/opt/demo-agents
+        - ../../src/evpn-proxy-agent/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
+
+    cvx:
+      image: networkop/cx:4.4.0
+      runtime: docker # instead of ignite
+
+    linux:
+      image: networkop/host:ifreload
+      # cmd: 2 # wait for 2 interfaces to be connected: eth0 + eth1
+
+  nodes:
+    superspine1:
+      kind: srl
+      group: evpn-fabric
+      startup-config: auto.conf.json
+
+    spine1:
+      kind: srl
+      group: evpn-fabric
+      startup-config: auto.conf.json
+    spine2:
+      kind: srl
+      group: evpn-fabric
+      startup-config: auto.conf.json
+
+    cumulus1:
+      kind: cvx
+      group: static-fabric
+      binds:
+        - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+        - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
+        - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
+    cumulus2:
+      kind: cvx
+      group: static-fabric
+      binds:
+        - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+        - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
+        - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
+    srl1:
+      kind: srl
+      group: evpn-fabric
+      # startup-config: srl1.conf.json
+      startup-config: srl1-with-evpn-proxy.conf.json
+    srl2:
+      kind: srl
+      group: evpn-fabric
+      # startup-config: srl2.conf.json
+      startup-config: srl2-with-evpn-proxy.conf.json
+
+    h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ ../h3_interfaces:/etc/network/interfaces ] }
+    h4: { kind: linux, group: evpn-hosts,   binds: [ ../h4_interfaces:/etc/network/interfaces ] }
+
+  links:
+    # SuperSpine double connected to each spine
+    - endpoints: ["superspine1:e1-1", "spine1:e1-1"]
+    - endpoints: ["superspine1:e1-2", "spine1:e1-2"]
+    - endpoints: ["superspine1:e1-3", "spine2:e1-1"]
+    - endpoints: ["superspine1:e1-4", "spine2:e1-2"]
+
+    - endpoints: ["spine1:e1-3", "cumulus1:e1-1"]
+    - endpoints: ["spine2:e1-3", "cumulus1:e1-2"]
+    - endpoints: ["spine1:e1-4", "cumulus2:e1-1"]
+    - endpoints: ["spine2:e1-4", "cumulus2:e1-2"]
+    - endpoints: ["spine1:e1-5", "srl1:e1-1"]
+    - endpoints: ["spine2:e1-5", "srl1:e1-2"]
+    - endpoints: ["spine1:e1-6", "srl2:e1-1"]
+    - endpoints: ["spine2:e1-6", "srl2:e1-2"]
+
+    # A host connected to each switch on e1-3
+    - endpoints: ["cumulus1:e1-3", "h1:eth1"]
+    - endpoints: ["cumulus2:e1-3", "h2:eth1"]
+    - endpoints: ["srl1:e1-3", "h3:eth1"]
+    - endpoints: ["srl2:e1-3", "h4:eth1"]

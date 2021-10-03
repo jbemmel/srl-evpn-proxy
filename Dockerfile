@@ -58,7 +58,7 @@ COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/demo-agents/
 
 # Add in auto-config agent sources too
-# COPY --from=srl/auto-config:latest /opt/demo-agents/ /opt/demo-agents/
+# COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 
 # run pylint to catch any obvious errors
 RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/evpn-proxy-agent

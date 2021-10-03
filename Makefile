@@ -25,3 +25,6 @@ all: build-submodules build
 
 grpc_eventlet:
 	sudo docker build -f ./Dockerfile.grpc_with_eventlet -t srl/grpc-with-eventlet:latest .
+
+auto_agent:
+	sudo docker build -f ./Dockerfile.auto_agent -t srl/evpn_proxy_with_auto_agent_v2:latest .

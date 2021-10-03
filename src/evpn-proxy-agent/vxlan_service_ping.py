@@ -44,17 +44,14 @@ class Plugin(ToolsPlugin):
           mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
           logging.info( f"_get_path args={arguments} mac_vrf={mac_vrf}" )
           vxlan_intf = get_vxlan_interface(state,mac_vrf)
-          logging.info( f"_get_path args vxlan_intf={vxl}" )
           tun = vxlan_intf.split('.')
           return build_path(f'/tunnel-interface[name={tun[0]}]/vxlan-interface[index={tun[1]}]/bridge-table/multicast-destinations/destination[vtep=*]')
 
         # Hardcoded
         syntax.add_named_argument('vtep', default='*',
+           # suggestions=KeyCompleter(path=_get_path) )
            # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
            suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/bridge-table/multicast-destinations/destination[vtep=*]') )
-
-        # syntax.add_named_argument('vtep', default='*',
-        #   suggestions=KeyCompleter(path=_get_path) )
 
         # TODO add 'count' argument, default 3
         return syntax
