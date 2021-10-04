@@ -17,7 +17,7 @@ topology:
         # - /lib/modules:/lib/modules:ro
         # - /usr/src:/usr/src
         # - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
-        - ../../src:/opt/demo-agents
+        # - ../../src:/opt/demo-agents
         - ../../src/evpn-proxy-agent/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
 
     cvx:
@@ -37,11 +37,11 @@ topology:
     spine1:
       kind: srl
       group: evpn-fabric
-      startup-config: auto.conf.json
+      startup-config: auto.spine1.conf.json
     spine2:
       kind: srl
       group: evpn-fabric
-      startup-config: auto.conf.json
+      startup-config: auto.spine2.conf.json
 
     cumulus1:
       kind: cvx
@@ -57,12 +57,12 @@ topology:
         - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
-    srl1:
+    leaf3:
       kind: srl
       group: evpn-fabric
       # startup-config: srl1.conf.json
       startup-config: srl1-with-evpn-proxy.conf.json
-    srl2:
+    leaf4:
       kind: srl
       group: evpn-fabric
       # startup-config: srl2.conf.json
@@ -84,13 +84,13 @@ topology:
     - endpoints: ["spine2:e1-3", "cumulus1:e1-2"]
     - endpoints: ["spine1:e1-4", "cumulus2:e1-1"]
     - endpoints: ["spine2:e1-4", "cumulus2:e1-2"]
-    - endpoints: ["spine1:e1-5", "srl1:e1-1"]
-    - endpoints: ["spine2:e1-5", "srl1:e1-2"]
-    - endpoints: ["spine1:e1-6", "srl2:e1-1"]
-    - endpoints: ["spine2:e1-6", "srl2:e1-2"]
+    - endpoints: ["spine1:e1-5", "leaf3:e1-1"]
+    - endpoints: ["spine2:e1-5", "leaf3:e1-2"]
+    - endpoints: ["spine1:e1-6", "leaf4:e1-1"]
+    - endpoints: ["spine2:e1-6", "leaf4:e1-2"]
 
     # A host connected to each switch on e1-3
     - endpoints: ["cumulus1:e1-3", "h1:eth1"]
     - endpoints: ["cumulus2:e1-3", "h2:eth1"]
-    - endpoints: ["srl1:e1-3", "h3:eth1"]
-    - endpoints: ["srl2:e1-3", "h4:eth1"]
+    - endpoints: ["leaf3:e1-3", "h3:eth1"]
+    - endpoints: ["leaf4:e1-3", "h4:eth1"]

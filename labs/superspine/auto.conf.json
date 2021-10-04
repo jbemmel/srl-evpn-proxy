@@ -1456,75 +1456,7 @@
         {
           "name": "lo0.0"
         }
-      ],
-      "srl_nokia-static-routes:static-routes": {
-        "route": [
-          {
-            "prefix": "1.1.1.1/32",
-            "admin-state": "enable",
-            "next-hop-group": "cumulus1"
-          },
-          {
-            "prefix": "1.1.1.2/32",
-            "admin-state": "enable",
-            "next-hop-group": "cumulus2"
-          },
-          {
-            "prefix": "1.1.1.4/31",
-            "admin-state": "enable",
-            "next-hop-group": "srl1"
-          },
-          {
-            "prefix": "1.1.1.6/31",
-            "admin-state": "enable",
-            "next-hop-group": "srl2"
-          }
-        ]
-      },
-      "srl_nokia-next-hop-groups:next-hop-groups": {
-        "group": [
-          {
-            "name": "cumulus1",
-            "nexthop": [
-              {
-                "index": 0,
-                "ip-address": "192.168.0.1",
-                "admin-state": "enable"
-              }
-            ]
-          },
-          {
-            "name": "cumulus2",
-            "nexthop": [
-              {
-                "index": 0,
-                "ip-address": "192.168.0.3",
-                "admin-state": "enable"
-              }
-            ]
-          },
-          {
-            "name": "srl1",
-            "nexthop": [
-              {
-                "index": 0,
-                "ip-address": "192.168.0.5",
-                "admin-state": "enable"
-              }
-            ]
-          },
-          {
-            "name": "srl2",
-            "nexthop": [
-              {
-                "index": 0,
-                "ip-address": "192.168.0.7",
-                "admin-state": "enable"
-              }
-            ]
-          }
-        ]
-      }
+      ]
     },
     {
       "name": "mgmt",

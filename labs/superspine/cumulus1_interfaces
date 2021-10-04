@@ -6,12 +6,19 @@ iface lo inet loopback
 # To Spine1
 auto e1-1
 iface e1-1
-    address 192.168.0.1/31
+    address 192.168.127.5/31
     # Static route for all other loopbacks
-    post-up ip route add 1.1.1.0/29 via 192.168.0.0
+    post-up ip route add 1.1.1.0/29 via 192.168.127.4
 
-auto e1-2 # To H1
+# To Spine2
+auto e1-2
 iface e1-2
+    address 192.168.0.13/31
+    # Static route for all other loopbacks
+    post-up ip route add 1.1.1.0/29 via 192.168.0.12
+
+auto e1-3 # To H1
+iface e1-3
     # Native VLAN 1 untagged?
     bridge-access 10
     bridge-l2protocol-tunnel all
@@ -20,10 +27,10 @@ iface e1-2
 auto bridge
 iface bridge
   # Stop STP from going across VXLAN
-  mstpctl-portbpdufilter e1-2=yes vni-10=yes
+  mstpctl-portbpdufilter e1-3=yes vni-10=yes
   bridge-stp off
 
-  bridge-ports e1-2 vni-10
+  bridge-ports e1-3 vni-10
   bridge-vids 1 10
   # Primary VLAN Identifer (PVID), default setting, inherited
   bridge-pvid 1

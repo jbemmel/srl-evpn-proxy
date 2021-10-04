@@ -5,11 +5,16 @@ iface lo inet loopback
 
 auto e1-1 # To Spine1
 iface e1-1
-    address 192.168.0.3/31
-    post-up ip route add 1.1.1.0/29 via 192.168.0.2
+    address 192.168.127.7/31
+    post-up ip route add 1.1.1.0/29 via 192.168.127.6
 
-auto e1-2 # To H2
+auto e1-2 # To Spine2
 iface e1-2
+    address 192.168.0.15/31
+    post-up ip route add 1.1.1.0/29 via 192.168.0.14
+
+auto e1-3 # To H2
+iface e1-3
     # Native VLAN 1 untagged
     bridge-access 10
     bridge-l2protocol-tunnel all
@@ -19,10 +24,10 @@ auto bridge
 iface bridge
   # Stop STP from going across VXLAN
   # On Cumulus: /usr/share/ifupdown2/addons/mstpctl.py
-  mstpctl-portbpdufilter e1-2=yes vni-10=yes
+  mstpctl-portbpdufilter e1-3=yes vni-10=yes
   bridge-stp off
 
-  bridge-ports e1-2 vni-10
+  bridge-ports e1-3 vni-10
   bridge-vids 1 10
   # Primary VLAN Identifer (PVID), default setting, inherited by ports
   bridge-pvid 1
