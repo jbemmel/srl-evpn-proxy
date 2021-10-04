@@ -1350,9 +1350,6 @@
       "interface": [
         {
           "name": "lo0.0"
-        },
-        {
-          "name": "system0.0"
         }
       ],
       "protocols": {
