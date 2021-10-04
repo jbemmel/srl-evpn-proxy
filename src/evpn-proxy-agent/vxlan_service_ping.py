@@ -37,7 +37,12 @@ class Plugin(ToolsPlugin):
     # Helper function to get arguments and help strings for this plugin command
     def _get_syntax(self,state):
         syntax = Syntax("vxlan-service-ping", help="Pings other VXLAN VTEPs in a given L2 overlay service")
-        syntax.add_named_argument('mac-vrf', suggestions=KeyCompleter(path='/network-instance[name=*]')) # Cannot select type=mac-vrf only?
+        syntax.add_named_argument('mac-vrf', help="target mac-vrf used to lookup the VNI",
+          suggestions=KeyCompleter(path='/network-instance[name=*]')) # Cannot select type=mac-vrf only?
+
+        # Dont allow specific VNI directly, we need to know service context with VTEPs
+        # syntax.add_named_argument('vni', default="0", help="specific vni to use (instead of lookup by mac-vrf)",
+        #  suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/ingress/vni'))
 
         # Lookup vxlan interface for given mac-vrf - seems to deadlock
         def _get_path(arguments):
@@ -53,17 +58,10 @@ class Plugin(ToolsPlugin):
            # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
            suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/bridge-table/multicast-destinations/destination[vtep=*]') )
 
+        syntax.add_named_argument('subnet-src', default="", help="Perform a ping sweep using this source IP. Format: <ip>/prefix, e.g. '10.0.0.254/24'")
+
         # TODO add 'count' argument, default 3
         return syntax
-
-    # Example from reports/tunnel_interface_reports.py
-    def _fetch_state_vxlan_unicast(self, state, arguments, recurse=True):
-        tunnel_interface = arguments.get('tunnel-interface', 'interface')
-        vxlan_interface = arguments.get('vxlan-interface', 'index')
-        vtep = arguments.get('destination', 'vtep') if arguments.has_node('destination') else '*'
-        vni = arguments.get('destination', 'vni') if arguments.has_node('destination') else '*'
-        path = build_path(f'/tunnel-interface[name={tunnel_interface}]/vxlan-interface[index={vxlan_interface}]/bridge-table/unicast-destinations/destination[vtep={vtep}][vni={vni}]')
-        return state.server_data_store.stream_data(path, recursive=recurse)
 
 # end class VxlanServicePing
 
@@ -82,6 +80,8 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
 
     mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
     vtep = arguments.get('vxlan-service-ping', 'vtep')
+    # vni = int( arguments.get('vxlan-service-ping', 'vni') )
+    subnet_src = arguments.get('vxlan-service-ping', 'subnet-src')
 
     def get_vni(vxlan_intf):
        tun = vxlan_intf.split('.')
@@ -118,5 +118,5 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # open UDP socket and have OS figure out MAC addresses
     # Run a separate, simple Python binary in the default namespace
     # Need sudo
-    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {uplinks} {dest_vteps}"
+    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {uplinks} {dest_vteps} {subnet_src}"
     exit_code = child_process.run( cmd.split(), output=output )

@@ -1,21 +1,21 @@
 auto lo
 iface lo inet loopback
-  address 1.1.1.1/32
-  vxlan-local-tunnelip 1.1.1.1
+  address 1.1.0.1/32
+  vxlan-local-tunnelip 1.1.0.1
 
 # To Spine1
 auto e1-1
 iface e1-1
     address 192.168.127.5/31
     # Static route for all other loopbacks
-    post-up ip route add 1.1.1.0/29 via 192.168.127.4
+    post-up ip route add 1.1.0.0/29 via 192.168.127.4
 
 # To Spine2
 auto e1-2
 iface e1-2
     address 192.168.0.13/31
     # Static route for all other loopbacks
-    post-up ip route add 1.1.1.0/29 via 192.168.0.12
+    post-up ip route add 1.1.0.0/29 via 192.168.0.12
 
 auto e1-3 # To H1
 iface e1-3
@@ -47,11 +47,11 @@ iface vni-10
     bridge-l2protocol-tunnel all
     # 0xaabbcc = 11189196
     vxlan-id 11189196
-    # vxlan-local-tunnelip 1.1.1.1
+    # vxlan-local-tunnelip 1.1.0.1
     # Cumulus 2
-    vxlan-remoteip 1.1.1.2
+    vxlan-remoteip 1.1.0.2
     # SRL1
-    vxlan-remoteip 1.1.1.5
+    vxlan-remoteip 1.1.0.3
     # SRL2
-    vxlan-remoteip 1.1.1.7
+    vxlan-remoteip 1.1.0.4
     # bridge-learning on # Cumulus complains about conflict with EVPN?

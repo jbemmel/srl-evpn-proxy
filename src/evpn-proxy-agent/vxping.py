@@ -4,7 +4,7 @@
 # Assumes this is being run in srbase-default namespace (however its name)
 #
 
-import socket, sys, re, os, netns, selectors, logging
+import socket, sys, re, os, netns, selectors, logging, ipaddress
 from datetime import datetime, timezone
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
 from ryu.ofproto import ether, inet
@@ -13,13 +13,14 @@ from ryu.ofproto import ether, inet
 from bcc.libbcc import lib
 
 if len(sys.argv) < 5:
-    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','>" )
+    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source ip/prefix for ping sweep]" )
     sys.exit(1)
 
 VNI = int(sys.argv[1])
 LOCAL_VTEP = sys.argv[2]
 UPLINKS = sys.argv[3].split(",")
 VTEP_IPs = sys.argv[4].split(",")
+SUBNET_SRC = sys.argv[5] if len(sys.argv) > 5 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
 logging.basicConfig(
@@ -129,7 +130,19 @@ def receive_packet(sock, mask):
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
                                   'rtt': delta, 'interface': intf } )
 
-for i in UPLINKS:
+# If a subnet ip/src is provided, perform a ping sweep (receiving on all uplinks)
+if SUBNET_SRC:
+   print( f"Performing subnet ARP sweep from IP={SUBNET_SRC}...")
+   subnet = ipaddress.ip_network(SUBNET_SRC,strict=False)
+   src = SUBNET_SRC.split('/')[0]
+   hosts = list( map( str, subnet.hosts() ) )
+   hosts.remove( src )
+
+   e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
+   a.opcode = 1 # Request
+   a.src_ip = src
+
+for c,i in enumerate(UPLINKS):
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     e.src = e2.src = get_interface_mac(uplink_sock, i)
     e.dst = e2.dst = get_peer_mac(uplink_sock, i)
@@ -146,16 +159,25 @@ for i in UPLINKS:
     vxlan_sock.setblocking(False)
     sel.register(vxlan_sock, selectors.EVENT_READ, receive_packet)
 
-    for v in VTEP_IPs:
-       ip.dst = v
-       a.dst_ip = v
-       for path in range(1,4):
-          pkt = timestamped_packet(path)
-          logging.debug( f"Sending {pkt}" )
-          print( f"Sending ARP ping packet #{path} to {v} on {i}" )
-          vxlan_sock.sendall( pkt.data )
-          # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
-          # print( f"Result: {bytes_sent} bytes sent" )
+    if SUBNET_SRC:
+       for c2,host_ip in enumerate(hosts):
+           # Spread across all uplinks
+           if c2%len(UPLINKS) == c:
+               a.dst_ip = host_ip
+               p.serialize()
+               logging.debug( f"Sending ARP to {host_ip} on uplink {i}: {p}" )
+               vxlan_sock.sendall( p.data )
+    else:
+       for v in VTEP_IPs:
+          ip.dst = v
+          a.dst_ip = v
+          for path in range(1,4):
+             pkt = timestamped_packet(path)
+             logging.debug( f"Sending {pkt}" )
+             print( f"Sending ARP ping packet #{path} to {v} on {i}" )
+             vxlan_sock.sendall( pkt.data )
+             # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
+             # print( f"Result: {bytes_sent} bytes sent" )
 
     # vxlan_sock.close()
 
