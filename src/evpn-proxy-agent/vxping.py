@@ -191,11 +191,13 @@ for c,i in enumerate(UPLINKS):
 # Some VTEPs may never respond
 # while pings_sent > len(ping_replies):
 ts_start = datetime.now().timestamp()
-while (datetime.now().timestamp() - ts_start) < 2:
+logging.debug( f"Timestamp at start: {ts_start}" )
+while True:
     events = sel.select(timeout=1) # 1 second
 
     # Regular systems don't have uplinks quiet for a full second
-    if events==[]:
+    if events==[] or ((datetime.now().timestamp()-ts_start) >= 1.0):
+        logging.debug( "Stop listening after ~1-2s, ping replies={len(ping_replies)}" )
         break
     logging.debug( events )
     for key, mask in events:
