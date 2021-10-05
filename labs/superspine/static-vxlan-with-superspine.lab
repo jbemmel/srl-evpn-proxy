@@ -14,7 +14,8 @@ topology:
       extras:
         srl-agents: [ ../../srl-evpn-proxy-agent.yml, ../../../srl-self-organizing/auto-config-agent.yml ]
       binds:
-        # - /lib/modules:/lib/modules:ro
+        # Needed to compile eBPF
+        - /lib/modules:/lib/modules:ro
         # - /usr/src:/usr/src
         # - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
         # - ../../src:/opt/demo-agents
