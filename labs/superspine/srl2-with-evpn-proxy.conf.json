@@ -1356,9 +1356,6 @@
       "admin-state": "enable",
       "interface": [
         {
-          "name": "ethernet-1/1.0"
-        },
-        {
           "name": "lo0.0"
         }
       ],
