@@ -206,7 +206,11 @@ while True:
 
 sel.close()
 logging.debug( ping_replies )
-total = sum( [ r['rtt'] for r in ping_replies ] )
-print( f"Average RTT: {total/3:.1f} us" )
+for i in UPLINKS:
+  rtts = [ r['rtt'] for r in ping_replies if re.search( r['interface'], i) ]
+  if len(rtts)>0:
+     print( f"Average RTT received on interface {i} over {len(rtts)} packets: {sum(rtts)/len(rtts):.1f} us" )
+  else:
+     print( f"No replies received on interface {i}" )
 
 sys.exit(0)

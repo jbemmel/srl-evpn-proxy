@@ -72,7 +72,7 @@ def get_vxlan_interface(state,mac_vrf):
 
     # Callback that runs when the plugin is run in sr_cli
 def do_service_ping(state, input, output, arguments, **_kwargs):
-    logging.info( f"JvB: do_service_ping arguments={arguments}" )
+    logging.info( f"do_service_ping arguments={arguments}" )
 
     # For each uplink interface in default vrf:
     # 1. Get MAC and peer MAC
@@ -90,6 +90,8 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
        return data.tunnel_interface.get().vxlan_interface.get().ingress.get().vni
 
     def get_uplinks():
+       logging.info( f"vxlan-service-ping: Listing all uplinks in 'default' network-instance" )
+       # XXX hardcoded assumption it is called 'default'
        path = build_path(f'/network-instance[name=default]/interface[name=e*]')
        data = state.server_data_store.get_data(path, recursive=True)
        return [ i.name.replace('ethernet-','e').replace('/','-')
@@ -102,10 +104,11 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
 
     # Need to access State
     def get_evpn_vteps(vxlan_intf):
+       logging.info( f"vxlan-service-ping: Listing VTEPs associated with VXLAN interface {vxlan_intf}" )
        # path = build_path('/vxlan-agent/evpn-vteps')
        tun = vxlan_intf.split('.')
        path = build_path(f'/tunnel-interface[name={tun[0]}]/vxlan-interface[index={tun[1]}]/bridge-table/multicast-destinations/destination')
-       logging.info( f"Current store: {state.data_store}")
+       # logging.info( f"Current store: {state.data_store}")
        data = state.server.get_data_store( DataStore.State ).get_data(path, recursive=True)
        return [ p.vtep for p in data.tunnel_interface.get().vxlan_interface.get().bridge_table.get().multicast_destinations.get().destination.items() ]
 
@@ -119,4 +122,5 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # Run a separate, simple Python binary in the default namespace
     # Need sudo
     cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {uplinks} {dest_vteps} {subnet_src}"
+    logging.info( f"vxlan-service-ping: {cmd}" )
     exit_code = child_process.run( cmd.split(), output=output )
