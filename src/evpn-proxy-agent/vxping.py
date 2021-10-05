@@ -113,8 +113,8 @@ def receive_packet(sock, mask):
         if len(data)==110:
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
-           if _arp.opcode == 1:
-              logging.debug( "Ignoring ARP request" )
+           if not _arp or _arp.opcode == 1:
+              logging.debug( "Ignoring ARP request or non-ARP packet" )
               return # ignore requests
            _ip = pkt.get_protocol( ipv4.ipv4 )
            logging.debug( pkt )
