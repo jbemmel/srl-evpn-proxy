@@ -1090,30 +1090,11 @@
   "srl_nokia-interfaces:interface": [
     {
       "name": "ethernet-1/1",
-      "admin-state": "enable",
-      "srl_nokia-interfaces-vlans:vlan-tagging": false,
-      "subinterface": [
-        {
-          "index": 0,
-          "type": "srl_nokia-interfaces:routed",
-          "description": "Basic L3 underlay connection to Spine1",
-          "admin-state": "enable",
-          "ipv4": {
-            "address": [
-              {
-                "ip-prefix": "192.168.0.7/31"
-              }
-            ]
-          },
-          "ipv6": {
-            "address": [
-              {
-                "ip-prefix": "2001::192:168:0:7/127"
-              }
-            ]
-          }
-        }
-      ]
+      "admin-state": "enable"
+    },
+    {
+      "name": "ethernet-1/2",
+      "admin-state": "enable"
     },
     {
       "name": "ethernet-1/3",

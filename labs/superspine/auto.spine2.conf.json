@@ -1337,33 +1337,16 @@
     {
       "name": "default",
       "type": "srl_nokia-network-instance:default",
-      "admin-state": "enable",
-      "interface": [
-        {
-          "name": "ethernet-1/1.0"
-        },
-        {
-          "name": "ethernet-1/2.0"
-        },
-        {
-          "name": "ethernet-1/3.0"
-        },
-        {
-          "name": "ethernet-1/4.0"
-        },
-        {
-          "name": "lo0.0"
-        }
-      ],
+      "admin-state": "enable",      
       "srl_nokia-static-routes:static-routes": {
         "route": [
           {
-            "prefix": "1.1.1.1/32",
+            "prefix": "1.1.0.1/32",
             "admin-state": "enable",
             "next-hop-group": "cumulus1"
           },
           {
-            "prefix": "1.1.1.2/32",
+            "prefix": "1.1.0.2/32",
             "admin-state": "enable",
             "next-hop-group": "cumulus2"
           }
