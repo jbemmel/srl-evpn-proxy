@@ -33,7 +33,7 @@ iface e1-3.20
     bridge-access 20
     bridge-l2protocol-tunnel all
 
-# Bridge per VLAN
+# Bridge per VLAN, see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Layer-2/Ethernet-Bridging-VLANs/VLAN-Tagging/
 auto br-untagged
 iface br-untagged
   # Stop STP from going across VXLAN?
