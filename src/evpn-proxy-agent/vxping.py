@@ -60,7 +60,7 @@ def timestamped_packet(path,set_inner_src=False):
        ts_mac = f":{(t%256):02x}" + ts_mac
        t = t // 256
     ip.identification = path
-    u.src_port = path * (100 if path<=650 else 1)
+    u.src_port = path
     u.csum = 0 # Recalculate
     a.src_mac = f'{path:1x}0'+ts_mac
     if set_inner_src:
@@ -185,7 +185,7 @@ for c,i in enumerate(UPLINKS):
           ip.dst = v
           a.dst_ip = v
           for path in range(1,4):
-             pkt = timestamped_packet(path)
+             pkt = timestamped_packet(c*100 + path)
              logging.debug( f"Sending {pkt}" )
              print( f"Sending ARP special ping packet #{path} to {v} on {i}" )
              vxlan_sock.sendall( pkt.data )

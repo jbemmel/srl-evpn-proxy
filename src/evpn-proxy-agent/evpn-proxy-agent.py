@@ -571,10 +571,11 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         mac_vrf = state.mac_vrfs[ vni ]
 
         if _ip.src in evpn_vteps:
-           logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
            if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
-                                                and _arp.opcode!=2): # Ignore regular responses
+                                                and _arp.opcode==24): # Ignore regular responses
                SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, mac_vrf )
+           else:
+               logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
            continue
         elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
            static_vtep = _ip.src
@@ -680,7 +681,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    ARP request  -> send response with timestamp encoded as MAC (TODO x3 with varying UDP source port)
    ARP response -> check for magic MAC, if match process/reflect timestamp
    """
-   logging.info( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
+   logging.debug( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
 
    def get_timestamp_us(): # 40-bit
       now = datetime.now(timezone.utc)
@@ -804,14 +805,14 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    # raw_socket.setsockopt(socket.SOL_IP, socket.IP_HDRINCL, 1)
    # with netns.NetNS(nsname="srbase"): # not needed
    pkt = timestamped_packet(path)
-   logging.info( f"Sending/reflecting ARP probe response: {pkt}" )
+   # logging.debug( f"Sending/reflecting ARP probe response: {pkt}" )
    socket.sendall( pkt.data )
 
    # In response to ARP requests, send multiple packets with varying UDP src ports
    if opcode==1:
        for i in range(2,4):
            pkt = timestamped_packet(i)
-           logging.info( f"Sending additional ARP probe {i}: {pkt}" )
+           # logging.debug( f"Sending additional ARP probe {i}: {pkt}" )
            socket.sendall( pkt.data )
 
 ##################################################################
