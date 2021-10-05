@@ -142,7 +142,10 @@ if SUBNET_SRC:
    subnet = ipaddress.ip_network(SUBNET_SRC,strict=False)
    src = SUBNET_SRC.split('/')[0]
    hosts = list( map( str, subnet.hosts() ) )
-   hosts.pop( src, None )
+   if src in hosts:
+       hosts.remove( src )
+   else:
+       print( f"WARNING: Source IP {src} is not a valid host address, YMMV" )
 
    e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
    a.opcode = 1 # Request
