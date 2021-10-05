@@ -748,8 +748,13 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
    e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
 
    # Reflect timestamp for ARP replies, include IP TTL
-   dst_mac = (f'{_ip.ttl:02x}:{_eths[1].src[3:]}') if opcode==RFC5494_EXP1 else '00:00:00:00:00:00' # invalid dest -> ignored by other systems
-   src_mac = '00:00:00:00:00:00' # 'ec:<phase>'+ts_mac filled in below
+   dst_mac = f'{_ip.ttl:02x}:{_eths[1].src[3:]}'
+   ts = get_timestamp_us()
+   ts_mac = ""
+   for b in range(0,5): # 40 bit
+      ts_mac = f":{(ts%256):02x}" + ts_mac
+      ts = ts // 256
+   src_mac = f'{path:1x}1' + ts_mac  # Reply -> use '1'
    a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
                src_mac=src_mac, src_ip=local_vtep_ip,
                dst_mac=dst_mac, dst_ip=dest_vtep_ip )
@@ -757,23 +762,9 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
    for h in [e,i,u,v,e2,a]:
       p.add_protocol(h)
 
-   def timestamped_packet(_path):
-       ts = t = get_timestamp_us()
-
-       ts_mac = ""
-       for b in range(0,5): # 40 bit
-          ts_mac = f":{(t%256):02x}" + ts_mac
-          t = t // 256
-
-       a.src_mac = f'{_path:1x}1'+ts_mac  # Reply -> use '1'
-       p.serialize()
-       return p
-
-   # raw_socket.setsockopt(socket.SOL_IP, socket.IP_HDRINCL, 1)
-   # with netns.NetNS(nsname="srbase"): # not needed
-   pkt = timestamped_packet(path)
+   p.serialize()
    # logging.debug( f"Sending/reflecting ARP probe response: {pkt}" )
-   socket.sendall( pkt.data )
+   socket.sendall( p.data )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent

@@ -154,7 +154,8 @@ if SUBNET_SRC:
    a.opcode = 1 # Request
    a.src_ip = src
 
-for c,i in enumerate(UPLINKS):
+for n in range(1,3): # Repeat 2 times
+  for c,i in enumerate(UPLINKS):
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     e.src = get_interface_mac(uplink_sock, i)
     e.dst = e2.dst = get_peer_mac(uplink_sock, i)
@@ -176,7 +177,7 @@ for c,i in enumerate(UPLINKS):
            # Spread across all uplinks
            if c2%len(UPLINKS) == c:
                a.dst_ip = host_ip
-               pkt = timestamped_packet(path=c2+1,set_inner_src=True)
+               pkt = timestamped_packet(path=100*n+c2+1,set_inner_src=True)
                print( f"Sending ARP request to {host_ip} on uplink {i}: {pkt}" )
                vxlan_sock.sendall( pkt.data )
                pings_sent += 1
@@ -186,9 +187,9 @@ for c,i in enumerate(UPLINKS):
           ip.dst = v
           a.dst_ip = v
           for path in range(1,4):
-             pkt = timestamped_packet(c*100 + path)
+             pkt = timestamped_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )
-             print( f"Sending ARP special ping packet #{path} to {v} on {i}" )
+             print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}" )
              vxlan_sock.sendall( pkt.data )
              pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
