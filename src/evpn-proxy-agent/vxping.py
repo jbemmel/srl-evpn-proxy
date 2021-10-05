@@ -111,25 +111,27 @@ def receive_packet(sock, mask):
         if len(data)==110:
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
-           if _arp.opcode != RFC5494_EXP1:
-               return
+           # if _arp.opcode != RFC5494_EXP1:
+           #    return
            _ip = pkt.get_protocol( ipv4.ipv4 )
            logging.debug( pkt )
 
+           # Starts as 255
+           ttl = int( _arp.dst_mac[0:2], 16 ) if _arp.opcode == RFC5494_EXP1 else 0
+
            path = int(_arp.src_mac[0],16)
            phase = int(_arp.src_mac[1],16) + 1
-           ttl = int( _arp.dst_mac[0:2], 16 ) # Starts as 255
-
            m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
            ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
            delta = get_timestamp_us() - ts
            if (delta<0):
-               delta += (1<<40)
+              delta += (1<<40)
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
-           print( f"Ping response from {_ip.src} on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
+           hops = (255-ttl) if ttl!=0 else "?"
+           print( f"ARP response from {_ip.src} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
-                                  'rtt': delta, 'interface': intf } )
+                             'rtt': delta, 'interface': intf } )
            return True
 
     return False
@@ -144,7 +146,6 @@ if SUBNET_SRC:
 
    e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
    a.opcode = 1 # Request
-   a.src_mac = 'da:da:' + ":".join( [ f'{int(b):02x}' for b in src.split('.') ] ) # pick consistent unique value
    a.src_ip = src
 
 for c,i in enumerate(UPLINKS):
@@ -169,9 +170,9 @@ for c,i in enumerate(UPLINKS):
            # Spread across all uplinks
            if c2%len(UPLINKS) == c:
                a.dst_ip = host_ip
-               p.serialize()
-               print( f"Sending ARP to {host_ip} on uplink {i}: {p}" )
-               vxlan_sock.sendall( p.data )
+               pkt = timestamped_packet(path=c2)
+               print( f"Sending ARP request to {host_ip} on uplink {i}: {pkt}" )
+               vxlan_sock.sendall( pkt.data )
                pings_sent += 1
     else:
        for v in VTEP_IPs:
@@ -180,7 +181,7 @@ for c,i in enumerate(UPLINKS):
           for path in range(1,4):
              pkt = timestamped_packet(path)
              logging.debug( f"Sending {pkt}" )
-             print( f"Sending ARP ping packet #{path} to {v} on {i}" )
+             print( f"Sending ARP special ping packet #{path} to {v} on {i}" )
              vxlan_sock.sendall( pkt.data )
              pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
