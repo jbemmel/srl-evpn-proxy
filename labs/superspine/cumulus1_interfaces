@@ -19,8 +19,10 @@ iface e1-2
 
 auto e1-3 # To H1
 iface e1-3
-    # Native VLAN 1 untagged?
-    bridge-access 10 20
+    # Cumulus: "Access ports ignore all tagged traffic"
+    # -> Can only have 1 VLAN mapping
+    # by commenting this out, the port inherits 'bridge-vids' from bridge
+    # bridge-access 10 20
     bridge-l2protocol-tunnel all
 
 # Shared bridge: Underlay untagged to VXLAN traffic on VLAN/VNI 10

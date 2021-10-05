@@ -1,0 +1,14 @@
+auto lo
+iface lo inet loopback
+
+auto eth1
+iface eth1
+    hwaddress ether 00:11:22:33:44:02
+
+auto eth1.10
+iface eth1.10
+    address 10.0.0.102/24
+
+auto eth1.20
+iface eth1.20
+    address 20.0.0.102/24

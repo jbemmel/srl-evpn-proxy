@@ -71,10 +71,10 @@ topology:
       # startup-config: srl2.conf.json
       startup-config: srl-with-evpn-proxy.conf.json
 
-    h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
-    h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }
-    h3: { kind: linux, group: evpn-hosts,   binds: [ ../h3_interfaces:/etc/network/interfaces ] }
-    h4: { kind: linux, group: evpn-hosts,   binds: [ ../h4_interfaces:/etc/network/interfaces ] }
+    h1: { kind: linux, group: static-hosts, binds: [ ./h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ ./h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ ./h3_interfaces:/etc/network/interfaces ] }
+    h4: { kind: linux, group: evpn-hosts,   binds: [ ./h4_interfaces:/etc/network/interfaces ] }
 
   links:
     # SuperSpine double connected to each spine
