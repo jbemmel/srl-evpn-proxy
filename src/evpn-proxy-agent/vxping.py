@@ -53,7 +53,7 @@ p = packet.Packet()
 for h in [e,ip,u,vxl,e2,a]:
    p.add_protocol(h)
 
-def timestamped_packet(path):
+def timestamped_packet(path,set_inner_src=False):
     ts = t = get_timestamp_us()
     ts_mac = ""
     for b in range(0,5): # 40 bit
@@ -63,6 +63,8 @@ def timestamped_packet(path):
     u.src_port = path * (100 if path<=650 else 1)
     u.csum = 0 # Recalculate
     a.src_mac = f'{path:1x}0'+ts_mac
+    if set_inner_src:
+        e2.src = a.src_mac
     p.serialize()
     return p
 
@@ -153,7 +155,7 @@ if SUBNET_SRC:
 
 for c,i in enumerate(UPLINKS):
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-    e.src = e2.src = get_interface_mac(uplink_sock, i)
+    e.src = get_interface_mac(uplink_sock, i)
     e.dst = e2.dst = get_peer_mac(uplink_sock, i)
     uplink_sock.close()
 
@@ -173,11 +175,12 @@ for c,i in enumerate(UPLINKS):
            # Spread across all uplinks
            if c2%len(UPLINKS) == c:
                a.dst_ip = host_ip
-               pkt = timestamped_packet(path=c2)
+               pkt = timestamped_packet(path=c2+1,set_inner_src=True)
                print( f"Sending ARP request to {host_ip} on uplink {i}: {pkt}" )
                vxlan_sock.sendall( pkt.data )
                pings_sent += 1
     else:
+       e2.src = e.src # Set source MAC of inner packet to outer packet
        for v in VTEP_IPs:
           ip.dst = v
           a.dst_ip = v
