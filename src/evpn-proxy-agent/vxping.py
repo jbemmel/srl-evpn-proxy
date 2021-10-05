@@ -60,9 +60,9 @@ def timestamped_packet(path):
        ts_mac = f":{(t%256):02x}" + ts_mac
        t = t // 256
     ip.identification = path
-    u.src_port = path * 1000
+    u.src_port = path * (100 if path<=650 else 1)
     u.csum = 0 # Recalculate
-    a.src_mac = f'{path:1x}1'+ts_mac
+    a.src_mac = f'{path:1x}0'+ts_mac
     p.serialize()
     return p
 
