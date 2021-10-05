@@ -573,7 +573,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         if _ip.src in evpn_vteps:
            if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
                                                 and _arp.opcode==24): # Ignore regular responses
-               SendARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, mac_vrf )
+               ReplyARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, mac_vrf )
            else:
                logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
            continue
@@ -673,15 +673,12 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     # Doesn't happen
     bpf.cleanup()
 
-def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
+def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    """
-   Sends an ARP response packet over VXLAN to another agent, to measure RTT and packet loss
+   Replies to a special ARP probe packet over VXLAN to another agent, to measure RTT and packet loss
    Uses MAC addresses / IPs gleaned from ARP packet on the wire
-
-   ARP request  -> send response with timestamp encoded as MAC (TODO x3 with varying UDP source port)
-   ARP response -> check for magic MAC, if match process/reflect timestamp
    """
-   logging.debug( f"SendARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
+   logging.debug( f"ReplyARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
 
    def get_timestamp_us(): # 40-bit
       now = datetime.now(timezone.utc)
@@ -691,6 +688,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
       # return posix_timestamp_millis
       return int( int(now.timestamp() * 1000000) & 0xffffffffff )
 
+   # Not currently used
    def start_timer():
 
        def on_timer():
@@ -727,51 +725,23 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
 
    # Check for probe request or reflected probe
    RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
-   udp_src_port = 0
-   phase = 0
-   path = 1
-   if opcode==RFC5494_EXP1:
-     _arp = rx_pkt.get_protocol( arp.arp )
-     path = int(_arp.src_mac[0],16)
-     phase = int(_arp.src_mac[1],16) + 1
-     ttl = int( _arp.dst_mac[0:2], 16 ) # Starts as 255
 
-     m = [ int(b,16) for b in _arp.src_mac[3:].split(':') ]
-     ts = (m[0]<<32)+(m[1]<<24)+(m[2]<<16)+(m[3]<<8)+m[4]
-     delta = get_timestamp_us() - ts
-     if (delta<0):
-         delta += (1<<40)
-     logging.info( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={_eths[1]}" )
-     if dest_vtep_ip in mac_vrf['path_probes']:
-         mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = delta
-         uplinks = mac_vrf['path_probes'][ dest_vtep_ip ][ 'interfaces' ]
-         m = _eths[1].src
-         uplinks[ m ] = { 'count': 1 + (uplinks[m]['count'] if m in uplinks else 0), 'hops': 255 - ttl }
-     if phase > 2: # end of 3 phase handshake
-         return
-     else:
-         _udp = rx_pkt.get_protocol( udp.udp )
-         udp_src_port = _udp.src_port # Reflect port
-
-   # Originator (ARP req) or receiver(phase 2): Start reporting timer (1s)
-   if opcode==1 or phase==2:
-     if dest_vtep_ip not in mac_vrf['path_probes']:
-       start_timer()
-     else:
-       logging.info( f"Path probe ongoing, not starting timer for {dest_vtep_ip}" )
-       if opcode==1:
-          logging.info( f"Ignoring ARP broadcast trigger" )
-          return
+   _arp = rx_pkt.get_protocol( arp.arp )
+   phase = int(_arp.src_mac[1],16)
+   if phase!=0:
+       return
+   path = int(_arp.src_mac[0],16)
 
    # Decode received IP header, for identification and TTL
    _ip = rx_pkt.get_protocol( ipv4.ipv4 )
+   _udp = rx_pkt.get_protocol( udp.udp )
 
    e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
    i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,
                  tos=0xc0,identification=_ip.identification,flags=(1<<1)) # Set DF
-   u = udp.udp(src_port=udp_src_port,dst_port=4789) # vary source == timestamp
+   u = udp.udp(src_port=_udp.src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=mac_vrf['vni'])
 
    # src == interface MAC, to measure ECMP spread
@@ -787,7 +757,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    for h in [e,i,u,v,e2,a]:
       p.add_protocol(h)
 
-   def timestamped_packet(path):
+   def timestamped_packet(_path):
        ts = t = get_timestamp_us()
 
        ts_mac = ""
@@ -795,10 +765,7 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
           ts_mac = f":{(t%256):02x}" + ts_mac
           t = t // 256
 
-       a.src_mac = f'{path:1x}{phase:1x}'+ts_mac
-       if udp_src_port==0:
-          u.src_port = 1000 * path # Consistently hash to the same path, could add configurable hash seed
-          u.csum = 0               # Recalculate
+       a.src_mac = f'{_path:1x}1'+ts_mac  # Reply -> use '1'
        p.serialize()
        return p
 
@@ -807,13 +774,6 @@ def SendARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
    pkt = timestamped_packet(path)
    # logging.debug( f"Sending/reflecting ARP probe response: {pkt}" )
    socket.sendall( pkt.data )
-
-   # In response to ARP requests, send multiple packets with varying UDP src ports
-   if opcode==1:
-       for i in range(2,4):
-           pkt = timestamped_packet(i)
-           # logging.debug( f"Sending additional ARP probe {i}: {pkt}" )
-           socket.sendall( pkt.data )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent

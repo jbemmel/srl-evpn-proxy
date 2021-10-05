@@ -132,7 +132,7 @@ def receive_packet(sock, mask):
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
            hops = (255-ttl) if ttl!=0 else "?"
-           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} id={_ip.identification} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
+           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
                              'rtt': delta, 'interface': intf } )
            return True
