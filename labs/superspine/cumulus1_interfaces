@@ -13,30 +13,59 @@ iface e1-1
 # To Spine2
 auto e1-2
 iface e1-2
-    address 192.168.0.13/31
+    address 192.168.127.13/31
     # Static route for all other loopbacks
-    post-up ip route add 0.0.0.0/0 via 192.168.0.12
+    post-up ip route add 0.0.0.0/0 via 192.168.127.12
 
 auto e1-3 # To H1
 iface e1-3
     # Cumulus: "Access ports ignore all tagged traffic"
     # -> Can only have 1 VLAN mapping
     # by commenting this out, the port inherits 'bridge-vids' from bridge
-    # bridge-access 10 20
+    bridge-access 10
     bridge-l2protocol-tunnel all
 
-# Shared bridge: Underlay untagged to VXLAN traffic on VLAN/VNI 10
-auto bridge
-iface bridge
-  # Stop STP from going across VXLAN
-  mstpctl-portbpdufilter e1-3=yes vni-10=yes vni-20=yes
+auto e1-3.20 # To H1
+iface e1-3.20
+    # Cumulus: "Access ports ignore all tagged traffic"
+    # -> Can only have 1 VLAN mapping
+    # by commenting this out, the port inherits 'bridge-vids' from bridge
+    bridge-access 20
+    bridge-l2protocol-tunnel all
+
+# Bridge per VLAN
+auto br-untagged
+iface br-untagged
+  # Stop STP from going across VXLAN?
+  mstpctl-portbpdufilter e1-3=yes vni-10=yes
   bridge-stp off
 
-  bridge-ports e1-3 vni-10 vni-20
-  bridge-vids 1 10 20
+  bridge-ports e1-3 vni-10
+  bridge-vids 1 10
   # Primary VLAN Identifer (PVID), default setting, inherited
   bridge-pvid 1
   bridge-vlan-aware yes
+
+# Bridge per VLAN
+auto br-vlan20
+iface br-vlan20
+  # Stop STP from going across VXLAN?
+  mstpctl-portbpdufilter e1-3.20=yes vni-20=yes
+  bridge-stp off
+
+  bridge-ports e1-3.20 vni-20
+  bridge-vids 1 20
+  # Primary VLAN Identifer (PVID), default setting, inherited
+  bridge-pvid 1
+  bridge-vlan-aware yes
+
+# Alternative: Single VXLAN device, didn't work
+#auto vxlan48
+#iface vxlan48
+#  vxlan-remoteip-map 10=1.1.0.2 10=1.1.0.3 10=1.1.0.4 20=1.1.0.2
+#  bridge-vlan-vni-map 10=10 20=20
+#  bridge-vids 10 20
+#  bridge-l2protocol-tunnel all
 
 # Use VLAN 10 for VXLAN overlay
 auto vni-10
@@ -47,9 +76,8 @@ iface vni-10
     # Enable transparent forwarding of L2 protocols
     # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-41/Network-Virtualization/Bridge-Layer-2-Protocol-Tunneling/
     bridge-l2protocol-tunnel all
-    # 0xaabbcc = 11189196
     vxlan-id 10
-    # vxlan-local-tunnelip 1.1.0.1
+    # vxlan-local-tunnelip 1.1.1.1
     # Cumulus 2
     vxlan-remoteip 1.1.0.2
     # SRL1
@@ -66,9 +94,8 @@ iface vni-20
     # Enable transparent forwarding of L2 protocols
     # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-41/Network-Virtualization/Bridge-Layer-2-Protocol-Tunneling/
     bridge-l2protocol-tunnel all
-    # 0xaabbcc = 11189196
     vxlan-id 20
-    # vxlan-local-tunnelip 1.1.0.1
+    # vxlan-local-tunnelip 1.1.1.1
     # Cumulus 2
     vxlan-remoteip 1.1.0.2
     # SRL1

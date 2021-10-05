@@ -10,28 +10,46 @@ iface e1-1
 
 auto e1-2 # To Spine2
 iface e1-2
-    address 192.168.0.15/31
-    post-up ip route add 0.0.0.0/0 via 192.168.0.14
+    address 192.168.127.15/31
+    post-up ip route add 0.0.0.0/0 via 192.168.127.14
 
 auto e1-3 # To H2
 iface e1-3
     # Cumulus: "Access ports ignore all tagged traffic"
     # -> Can only have 1 VLAN mapping
     # by commenting this out, the port inherits 'bridge-vids' from bridge
-    # bridge-access 10 20
+    bridge-access 10
     bridge-l2protocol-tunnel all
 
-# Shared bridge: Underlay native VLAN 1 untagged for VXLAN traffic
-auto bridge
-iface bridge
-  # Stop STP from going across VXLAN
-  # On Cumulus: /usr/share/ifupdown2/addons/mstpctl.py
-  mstpctl-portbpdufilter e1-3=yes vni-10=yes vni-20=yes
-  bridge-stp off
+auto e1-3.20 # To H2
+iface e1-3.20
+    # Cumulus: "Access ports ignore all tagged traffic"
+    # -> Can only have 1 VLAN mapping
+    # by commenting this out, the port inherits 'bridge-vids' from bridge
+    bridge-access 20
+    bridge-l2protocol-tunnel all
 
-  bridge-ports e1-3 vni-10 vni-20
-  bridge-vids 1 10 20
-  # Primary VLAN Identifer (PVID), default setting, inherited by ports
+# Bridge per VLAN
+auto br-untagged
+iface br-untagged
+  # Stop STP from going across VXLAN?
+  mstpctl-portbpdufilter e1-3=yes vni-10=yes
+  bridge-stp off
+  bridge-ports e1-3 vni-10
+  bridge-vids 1 10
+  # Primary VLAN Identifer (PVID), default setting, inherited
+  bridge-pvid 1
+  bridge-vlan-aware yes
+
+# Bridge per VLAN
+auto br-vlan20
+iface br-vlan20
+  # Stop STP from going across VXLAN?
+  mstpctl-portbpdufilter e1-3.20=yes vni-20=yes
+  bridge-stp off
+  bridge-ports e1-3.20 vni-20
+  bridge-vids 1 20
+  # Primary VLAN Identifer (PVID), default setting, inherited
   bridge-pvid 1
   bridge-vlan-aware yes
 
@@ -41,30 +59,31 @@ iface vni-10
     bridge-access 10
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
+    # Enable transparent forwarding of L2 protocols
+    # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-41/Network-Virtualization/Bridge-Layer-2-Protocol-Tunneling/
     bridge-l2protocol-tunnel all
     vxlan-id 10
-    # vxlan-local-tunnelip 1.1.0.2
-    # Cumulus1
+    # Cumulus 1
     vxlan-remoteip 1.1.0.1
-    # srl1
+    # SRL1
     vxlan-remoteip 1.1.0.3
-    # srl2
+    # SRL2
     vxlan-remoteip 1.1.0.4
     # bridge-learning on # Cumulus complains about conflict with EVPN?
 
-# Use VLAN 20 for VXLAN overlay
 auto vni-20
 iface vni-20
     bridge-access 20
     mstpctl-bpduguard yes
     mstpctl-portbpdufilter yes
+    # Enable transparent forwarding of L2 protocols
+    # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-41/Network-Virtualization/Bridge-Layer-2-Protocol-Tunneling/
     bridge-l2protocol-tunnel all
     vxlan-id 20
-    # vxlan-local-tunnelip 1.1.0.2
-    # Cumulus1
+    # Cumulus 1
     vxlan-remoteip 1.1.0.1
-    # srl1
+    # SRL1
     vxlan-remoteip 1.1.0.3
-    # srl2
+    # SRL2
     vxlan-remoteip 1.1.0.4
     # bridge-learning on # Cumulus complains about conflict with EVPN?

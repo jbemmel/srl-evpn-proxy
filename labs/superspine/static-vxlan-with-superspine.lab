@@ -48,6 +48,7 @@ topology:
       kind: cvx
       group: static-fabric
       binds:
+        # see https://docs.nvidia.com/networking-ethernet-software/cumulus-linux-44/Network-Virtualization/Static-VXLAN-Tunnels/
         - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
