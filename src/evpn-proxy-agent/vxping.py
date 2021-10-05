@@ -140,10 +140,11 @@ if SUBNET_SRC:
    subnet = ipaddress.ip_network(SUBNET_SRC,strict=False)
    src = SUBNET_SRC.split('/')[0]
    hosts = list( map( str, subnet.hosts() ) )
-   hosts.remove( src )
+   hosts.pop( src, None )
 
    e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
    a.opcode = 1 # Request
+   a.src_mac = 'da:da:' + ":".join( [ f'{int(b:02x)}' for b in src.split('.') ] # pick consistent unique value
    a.src_ip = src
 
 for c,i in enumerate(UPLINKS):
@@ -169,7 +170,7 @@ for c,i in enumerate(UPLINKS):
            if c2%len(UPLINKS) == c:
                a.dst_ip = host_ip
                p.serialize()
-               logging.debug( f"Sending ARP to {host_ip} on uplink {i}: {p}" )
+               print( f"Sending ARP to {host_ip} on uplink {i}: {p}" )
                vxlan_sock.sendall( p.data )
                pings_sent += 1
     else:
@@ -197,7 +198,7 @@ while True:
 
     # Regular systems don't have uplinks quiet for a full second
     if events==[] or ((datetime.now().timestamp()-ts_start) >= 1.0):
-        logging.debug( "Stop listening after ~1-2s, ping replies={len(ping_replies)}" )
+        logging.debug( f"Stop listening after ~1-2s, ping replies={len(ping_replies)}" )
         break
     logging.debug( events )
     for key, mask in events:
@@ -207,9 +208,10 @@ while True:
 sel.close()
 logging.debug( ping_replies )
 for i in UPLINKS:
-  rtts = [ r['rtt'] for r in ping_replies if re.search( r['interface'], i) ]
+  rtts = [ r['rtt'] for r in ping_replies if r['interface'] in i ]
   if len(rtts)>0:
-     print( f"Average RTT received on interface {i} over {len(rtts)} packets: {sum(rtts)/len(rtts):.1f} us" )
+     # align right 8, whole division
+     print( f"Average RTT received on interface {i} over {len(rtts)} packets: {sum(rtts)//len(rtts):>8} us" )
   else:
      print( f"No replies received on interface {i}" )
 
