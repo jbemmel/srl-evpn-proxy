@@ -144,7 +144,7 @@ if SUBNET_SRC:
 
    e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
    a.opcode = 1 # Request
-   a.src_mac = 'da:da:' + ":".join( [ f'{int(b:02x)}' for b in src.split('.') ] ) # pick consistent unique value
+   a.src_mac = 'da:da:' + ":".join( [ f'{int(b):02x}' for b in src.split('.') ] ) # pick consistent unique value
    a.src_ip = src
 
 for c,i in enumerate(UPLINKS):
