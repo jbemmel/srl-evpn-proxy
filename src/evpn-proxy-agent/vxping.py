@@ -132,9 +132,9 @@ def receive_packet(sock, mask):
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
            hops = (255-ttl) if ttl!=0 else "?"
-           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
-           ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
-                             'rtt': delta, 'interface': intf } )
+           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]}: RTT={delta:>8} us hops={hops}" )
+           ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
+                                  'rtt': delta, 'interface': intf } )
            return True
 
     return False
@@ -154,7 +154,7 @@ if SUBNET_SRC:
    a.opcode = 1 # Request
    a.src_ip = src
 
-for n in range(1,3): # Repeat 2 times
+for n in range(0,1): # Repeat 1 times
   for c,i in enumerate(UPLINKS):
     uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     e.src = get_interface_mac(uplink_sock, i)
@@ -165,7 +165,7 @@ for n in range(1,3): # Repeat 2 times
 
     # Use BCC bpf_open_raw_sock to create a raw socket attached in srbase netns
     with netns.NetNS(nsname="srbase"):
-       socket_fd = lib.bpf_open_raw_sock(base_intf.encode())
+       socket_fd = lib.bpf_open_raw_sock(base_intf.encode()) # This binds socket
 
     vxlan_sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     # vxlan_sock.setblocking(True)
@@ -217,7 +217,8 @@ while True:
 sel.close()
 logging.debug( ping_replies )
 for i in UPLINKS:
-  rtts = [ r['rtt'] for r in ping_replies if r['interface'] in i ]
+  # Exclude copies of own packets
+  rtts = [ r['rtt'] for r in ping_replies if r['interface'] in i and r['hops']!='?' ]
   if len(rtts)>0:
      # align right 8, whole division
      print( f"Average RTT received on interface {i} over {len(rtts)} packets: {sum(rtts)//len(rtts):>8} us" )

@@ -88,13 +88,18 @@ topology:
     - endpoints: ["spine2:e1-3", "cumulus1:e1-2"]
     - endpoints: ["spine1:e1-4", "cumulus2:e1-1"]
     - endpoints: ["spine2:e1-4", "cumulus2:e1-2"]
+
+    # Each SRL to a different spine x2 +1 backup
     - endpoints: ["spine1:e1-5", "leaf3:e1-1"]
-    - endpoints: ["spine2:e1-5", "leaf3:e1-2"]
-    - endpoints: ["spine1:e1-6", "leaf4:e1-1"]
+    - endpoints: ["spine1:e1-6", "leaf3:e1-2"]
+    # - endpoints: ["spine2:e1-7", "leaf3:e1-3"]
+
+    - endpoints: ["spine2:e1-5", "leaf4:e1-1"]
     - endpoints: ["spine2:e1-6", "leaf4:e1-2"]
+    # - endpoints: ["spine1:e1-7", "leaf4:e1-3"]
 
     # A host connected to each switch on e1-3
     - endpoints: ["cumulus1:e1-3", "h1:eth1"]
     - endpoints: ["cumulus2:e1-3", "h2:eth1"]
-    - endpoints: ["leaf3:e1-3", "h3:eth1"]
-    - endpoints: ["leaf4:e1-3", "h4:eth1"]
+    - endpoints: ["leaf3:e1-4", "h3:eth1"]
+    - endpoints: ["leaf4:e1-4", "h4:eth1"]

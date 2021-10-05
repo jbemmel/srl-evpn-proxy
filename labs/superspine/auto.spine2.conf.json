@@ -1113,6 +1113,10 @@
       "admin-state": "enable"
     },
     {
+      "name": "ethernet-1/7",
+      "admin-state": "enable"
+    },
+    {
       "name": "mgmt0",
       "admin-state": "enable",
       "subinterface": [
@@ -1337,7 +1341,7 @@
     {
       "name": "default",
       "type": "srl_nokia-network-instance:default",
-      "admin-state": "enable",      
+      "admin-state": "enable",
       "srl_nokia-static-routes:static-routes": {
         "route": [
           {

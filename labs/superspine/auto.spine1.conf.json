@@ -1113,6 +1113,10 @@
       "admin-state": "enable"
     },
     {
+      "name": "ethernet-1/7",
+      "admin-state": "enable"
+    },
+    {
       "name": "lo0",
       "admin-state": "enable",
       "subinterface": [
