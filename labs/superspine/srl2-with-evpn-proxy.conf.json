@@ -1370,6 +1370,7 @@
               "group-name": "vxlan-agent",
               "admin-state": "enable",
               "peer-as": 65000,
+              "local-as": [ { "as-number": 65000 } ],
               "ipv4-unicast": {
                 "admin-state": "disable"
               },
