@@ -62,7 +62,7 @@ def timestamped_packet(path,set_inner_src=False):
     ip.identification = path
     u.src_port = path
     u.csum = 0 # Recalculate
-    a.src_mac = f'{path:1x}0'+ts_mac
+    a.src_mac = f'{path%10:1x}0'+ts_mac
     if set_inner_src:
         e2.src = a.src_mac
     p.serialize()
@@ -113,8 +113,9 @@ def receive_packet(sock, mask):
         if len(data)==110:
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
-           # if _arp.opcode != RFC5494_EXP1:
-           #    return
+           if _arp.opcode == 1:
+              logging.debug( "Ignoring ARP request" )
+              return # ignore requests
            _ip = pkt.get_protocol( ipv4.ipv4 )
            logging.debug( pkt )
 
@@ -131,7 +132,7 @@ def receive_packet(sock, mask):
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
            hops = (255-ttl) if ttl!=0 else "?"
-           print( f"ARP response from {_ip.src} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
+           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} id={_ip.identification} on interface {sock.getsockname()[0]}: RTT={delta} us hops={hops}" )
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
                              'rtt': delta, 'interface': intf } )
            return True
