@@ -100,6 +100,7 @@ def get_peer_mac(sock,uplink):
 
 
 sel = selectors.DefaultSelector()
+pings_sent = 0
 ping_replies = []
 def receive_packet(sock, mask):
     data = sock.recv(1000)  # Should be ready
@@ -129,6 +130,9 @@ def receive_packet(sock, mask):
            print( f"Ping response from {_ip.src} on interface {sock.getsockname()[0]}: RTT={delta} us hops={255-ttl}" )
            ping_replies.append( { 'hops': 255-ttl, 'hops-return': 255 - _ip.ttl,
                                   'rtt': delta, 'interface': intf } )
+           return True
+
+    return False
 
 # If a subnet ip/src is provided, perform a ping sweep (receiving on all uplinks)
 if SUBNET_SRC:
@@ -167,6 +171,7 @@ for c,i in enumerate(UPLINKS):
                p.serialize()
                logging.debug( f"Sending ARP to {host_ip} on uplink {i}: {p}" )
                vxlan_sock.sendall( p.data )
+               pings_sent += 1
     else:
        for v in VTEP_IPs:
           ip.dst = v
@@ -176,14 +181,20 @@ for c,i in enumerate(UPLINKS):
              logging.debug( f"Sending {pkt}" )
              print( f"Sending ARP ping packet #{path} to {v} on {i}" )
              vxlan_sock.sendall( pkt.data )
+             pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
              # print( f"Result: {bytes_sent} bytes sent" )
 
     # vxlan_sock.close()
 
 # Listen for packets, with timeout
-while True:
+# Some VTEPs may never respond
+# while pings_sent > len(ping_replies):
+ts_start = datetime.now().timestamp()
+while (datetime.now().timestamp() - ts_start) < 2:
     events = sel.select(timeout=1) # 1 second
+
+    # Regular systems don't have uplinks quiet for a full second
     if events==[]:
         break
     logging.debug( events )

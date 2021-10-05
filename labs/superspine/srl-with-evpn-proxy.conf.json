@@ -1114,7 +1114,7 @@
           "type": "srl_nokia-interfaces:bridged",
           "admin-state": "enable",
           "srl_nokia-interfaces-vlans:vlan": {
-           "encap": { "single-tagged": { "vlan-id": 1 } }
+           "encap": { "single-tagged": { "vlan-id": 20 } }
           }
         }
       ]
