@@ -59,6 +59,7 @@ class Plugin(ToolsPlugin):
            suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/bridge-table/multicast-destinations/destination[vtep=*]') )
 
         syntax.add_named_argument('subnet-src', default="", help="Perform a ping sweep using this source IP. Format: <ip>/prefix, e.g. '10.0.0.254/24'")
+        syntax.add_named_argument('entropy', default="0", help="Provide extra input to ECMP hashing, added to UDP source port")
 
         # TODO add 'count' argument, default 3
         return syntax
@@ -82,6 +83,7 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     vtep = arguments.get('vxlan-service-ping', 'vtep')
     # vni = int( arguments.get('vxlan-service-ping', 'vni') )
     subnet_src = arguments.get('vxlan-service-ping', 'subnet-src')
+    entropy = int( arguments.get('vxlan-service-ping', 'entropy') )
 
     def get_vni(vxlan_intf):
        tun = vxlan_intf.split('.')
@@ -121,6 +123,6 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # open UDP socket and have OS figure out MAC addresses
     # Run a separate, simple Python binary in the default namespace
     # Need sudo
-    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {uplinks} {dest_vteps} {subnet_src}"
+    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {subnet_src}"
     logging.info( f"vxlan-service-ping: {cmd}" )
     exit_code = child_process.run( cmd.split(), output=output )

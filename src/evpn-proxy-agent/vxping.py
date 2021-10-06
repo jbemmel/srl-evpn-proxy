@@ -12,15 +12,16 @@ from ryu.ofproto import ether, inet
 # from bcc import BPF
 from bcc.libbcc import lib
 
-if len(sys.argv) < 5:
-    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source ip/prefix for ping sweep]" )
+if len(sys.argv) < 6:
+    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source ip/prefix for ping sweep]" )
     sys.exit(1)
 
 VNI = int(sys.argv[1])
 LOCAL_VTEP = sys.argv[2]
-UPLINKS = sys.argv[3].split(",")
-VTEP_IPs = sys.argv[4].split(",")
-SUBNET_SRC = sys.argv[5] if len(sys.argv) > 5 else None
+ENTROPY = int(sys.argv[3])
+UPLINKS = sys.argv[4].split(",")
+VTEP_IPs = sys.argv[5].split(",")
+SUBNET_SRC = sys.argv[6] if len(sys.argv) > 6 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
 logging.basicConfig(
@@ -60,7 +61,7 @@ def timestamped_packet(path,set_inner_src=False):
        ts_mac = f":{(t%256):02x}" + ts_mac
        t = t // 256
     ip.identification = path
-    u.src_port = path
+    u.src_port = path + ENTROPY
     u.csum = 0 # Recalculate
     a.src_mac = f'{path%10:1x}0'+ts_mac
     if set_inner_src:
