@@ -11,7 +11,8 @@
         "host-subnet-size": 30,
         "host-enable-ipv6": false
     },
-    "max-spine-ports": 6
+    "max-spine-ports": 6,
+    "evpn-rr": "1.1.2.1/32"
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
