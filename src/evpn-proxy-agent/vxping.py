@@ -154,23 +154,31 @@ if SUBNET_SRC:
    a.opcode = 1 # Request
    a.src_ip = src
 
+# First determine MACs and create listening sockets on all uplinks
+uplink_sockets = {}
+for i in UPLINKS:
+   uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+   src_mac = get_interface_mac(uplink_sock, i)
+   dst_mac = get_peer_mac(uplink_sock, i)
+   uplink_sock.close()
+
+   base_intf = i.split('.')[0] # e1-1.0 -> e1-1 in srbase
+
+   # Use BCC bpf_open_raw_sock to create a raw socket attached in srbase netns
+   with netns.NetNS(nsname="srbase"):
+      socket_fd = lib.bpf_open_raw_sock(base_intf.encode()) # This binds socket
+   vxlan_sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+   # vxlan_sock.setblocking(True)
+   vxlan_sock.setblocking(False)
+   sel.register(vxlan_sock, selectors.EVENT_READ, receive_packet)
+   uplink_sockets[i] = { 'sock': vxlan_sock, 'src_mac': src_mac, 'dst_mac': dst_mac }
+
+# Then send packets
 for n in range(0,1): # Repeat 1 times
   for c,i in enumerate(UPLINKS):
-    uplink_sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-    e.src = get_interface_mac(uplink_sock, i)
-    e.dst = e2.dst = get_peer_mac(uplink_sock, i)
-    uplink_sock.close()
-
-    base_intf = i.split('.')[0] # e1-1.0 -> e1-1 in srbase
-
-    # Use BCC bpf_open_raw_sock to create a raw socket attached in srbase netns
-    with netns.NetNS(nsname="srbase"):
-       socket_fd = lib.bpf_open_raw_sock(base_intf.encode()) # This binds socket
-
-    vxlan_sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
-    # vxlan_sock.setblocking(True)
-    vxlan_sock.setblocking(False)
-    sel.register(vxlan_sock, selectors.EVENT_READ, receive_packet)
+    sock = uplink_sockets[i]
+    e.src = sock['src_mac']
+    e.dst = e2.dst = sock['dst_mac']
 
     if SUBNET_SRC:
        for c2,host_ip in enumerate(hosts):
@@ -179,7 +187,7 @@ for n in range(0,1): # Repeat 1 times
                a.dst_ip = host_ip
                pkt = timestamped_packet(path=100*n+c2+1,set_inner_src=True)
                print( f"Sending ARP request to {host_ip} on uplink {i}: {pkt}" )
-               vxlan_sock.sendall( pkt.data )
+               sock['sock'].sendall( pkt.data )
                pings_sent += 1
     else:
        e2.src = e.src # Set source MAC of inner packet to outer packet
@@ -190,7 +198,7 @@ for n in range(0,1): # Repeat 1 times
              pkt = timestamped_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )
              print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}" )
-             vxlan_sock.sendall( pkt.data )
+             sock['sock'].sendall( pkt.data )
              pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )
              # print( f"Result: {bytes_sent} bytes sent" )
@@ -215,6 +223,9 @@ while True:
         callback(key.fileobj, mask)
 
 sel.close()
+for s in uplink_sockets.values():
+    s['sock'].close()
+
 logging.debug( ping_replies )
 for i in UPLINKS:
   # Exclude copies of own packets
