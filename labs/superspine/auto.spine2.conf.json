@@ -1364,7 +1364,7 @@
             "nexthop": [
               {
                 "index": 0,
-                "ip-address": "192.168.127.13",
+                "ip-address": "192.168.127.17",
                 "admin-state": "enable"
               }
             ]
@@ -1374,7 +1374,7 @@
             "nexthop": [
               {
                 "index": 0,
-                "ip-address": "192.168.127.15",
+                "ip-address": "192.168.127.19",
                 "admin-state": "enable"
               }
             ]
