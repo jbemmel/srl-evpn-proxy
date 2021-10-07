@@ -727,8 +727,8 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
    RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
 
    _arp = rx_pkt.get_protocol( arp.arp )
-   phase = int(_arp.src_mac[1],16)
-   if phase!=0:
+   phase = int(_arp.src_mac[1],16) # vxping sends MAC with '2'
+   if phase!=2:
        return
    path = int(_arp.src_mac[0],16)
 

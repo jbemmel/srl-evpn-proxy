@@ -13,7 +13,7 @@ from ryu.ofproto import ether, inet
 from bcc.libbcc import lib
 
 if len(sys.argv) < 6:
-    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source ip/prefix for ping sweep]" )
+    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source MAC and ip/prefix for ping sweep]" )
     sys.exit(1)
 
 VNI = int(sys.argv[1])
@@ -21,7 +21,9 @@ LOCAL_VTEP = sys.argv[2]
 ENTROPY = int(sys.argv[3])
 UPLINKS = sys.argv[4].split(",")
 VTEP_IPs = sys.argv[5].split(",")
-SUBNET_SRC = sys.argv[6] if len(sys.argv) > 6 else None
+
+PING_SRC_MAC = sys.argv[6] if len(sys.argv) > 6 else None
+PING_DST = sys.argv[7] if len(sys.argv) > 7 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
 logging.basicConfig(
@@ -55,18 +57,20 @@ p = packet.Packet()
 for h in [e,ip,u,vxl,e2,a]:
    p.add_protocol(h)
 
-def timestamped_packet(path,set_inner_src=False):
-    ts = t = get_timestamp_us()
-    ts_mac = ""
-    for b in range(0,5): # 40 bit
-       ts_mac = f":{(t%256):02x}" + ts_mac
-       t = t // 256
+def prepare_packet(path,timestamp=True):
+    if timestamp:
+       ts = t = get_timestamp_us()
+       ts_mac = ""
+       for b in range(0,5): # 40 bit
+          ts_mac = f":{(t%256):02x}" + ts_mac
+          t = t // 256
+       a.src_mac = f'{path%10:1x}2'+ts_mac  # 2 == Locally administered, unicast
+       #if set_inner_src:
+       #   e2.src = a.src_mac
+
     ip.identification = path
     u.src_port = path + ENTROPY
     u.csum = 0 # Recalculate
-    a.src_mac = f'{path%10:1x}0'+ts_mac
-    if set_inner_src:
-        e2.src = a.src_mac
     p.serialize()
     return p
 
@@ -111,8 +115,8 @@ def receive_packet(sock, mask):
     if data:
         intf = sock.getsockname()[0]
         logging.debug( f'Received {len(data)} bytes on {intf}' )
-        # Our ARP-in-VXLAN packets are 98 bytes
-        if len(data)==98:
+        # Our ARP-in-VXLAN packets are 92 bytes
+        if len(data)==92:
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
            if not _arp or _arp.opcode == 1:
@@ -136,26 +140,36 @@ def receive_packet(sock, mask):
            _ip = pkt.get_protocol( ipv4.ipv4 )
            _eths = pkt.get_protocols( ethernet.ethernet )
 
-           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]} remote uplink MAC {_eths[1].src}: RTT={delta:>8} us hops={hops}" )
-           ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
-                                  'rtt': delta, 'interface': intf } )
+           if _arp.opcode==24:
+             print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]} remote uplink MAC {_eths[1].src}: RTT={delta:>8} us hops={hops}" )
+             ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
+                                    'rtt': delta, 'interface': intf } )
+           else:
+             print( f"ARP reply from VTEP={_ip.src} to {_ip.dst} on interface {sock.getsockname()[0]} resolved MAC: {_arp.src_ip}={_eths[1].src}" )
            return True
 
     return False
 
 # If a subnet ip/src is provided, perform a ping sweep (receiving on all uplinks)
-if SUBNET_SRC:
-   print( f"Performing subnet ARP sweep from IP={SUBNET_SRC}...")
-   subnet = ipaddress.ip_network(SUBNET_SRC,strict=False)
-   src = SUBNET_SRC.split('/')[0]
-   hosts = list( map( str, subnet.hosts() ) )
-   if src in hosts:
-       hosts.remove( src )
+if PING_DST:
+   print( f"Performing ping (/sweep) using ARP from/to IP={PING_DST}...")
+   if '/' in PING_DST:
+      subnet = ipaddress.ip_network(PING_DST,strict=False)
+      src = PING_DST.split('/')[0]
+      hosts = list( map( str, subnet.hosts() ) )
+      if src in hosts:
+          hosts.remove( src )
+      else:
+          print( f"WARNING: Source IP {src} is not a valid host address, YMMV" )
    else:
-       print( f"WARNING: Source IP {src} is not a valid host address, YMMV" )
+      # ARP with dst=src does not work
+      src = str( ipaddress.ip_address( PING_DST ) - 1 )
+      hosts = [ PING_DST ]
 
-   e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
+   e2.src = PING_SRC_MAC
+   e2.dst = 'ff:ff:ff:ff:ff:ff'
    a.opcode = arp.ARP_REQUEST # Request
+   a.src_mac = PING_SRC_MAC
    a.src_ip = src
 
 # First determine MACs and create listening sockets on all uplinks
@@ -182,17 +196,17 @@ for n in range(0,1): # Repeat 1 times
   for c,i in enumerate(UPLINKS):
     sock = uplink_sockets[i]
     e.src = sock['src_mac']
-    e.dst = e2.dst = sock['dst_mac']
+    e.dst = sock['dst_mac']
 
-    if SUBNET_SRC:
+    if PING_DST:
       for v in VTEP_IPs:
        ip.dst = v
        for c2,host_ip in enumerate(hosts):
            # Spread across all uplinks
-           if c2%len(UPLINKS) == c:
+           if c2%len(UPLINKS) == c or len(hosts)==1:
                a.dst_ip = host_ip
-               pkt = timestamped_packet(path=100*n+c2+1,set_inner_src=True)
-               print( f"Sending ARP request to {host_ip} on uplink {i}: {pkt}" )
+               pkt = prepare_packet(path=100*n+c2+1,timestamp=False)
+               print( f"Sending ARP request for {host_ip} to VTEP {v} on uplink {i}" ) # {pkt}
                sock['sock'].sendall( pkt.data )
                pings_sent += 1
     else:
@@ -201,7 +215,7 @@ for n in range(0,1): # Repeat 1 times
           ip.dst = v
           a.dst_ip = v
           for path in range(1,4):
-             pkt = timestamped_packet(c*100 + 10*n + path)
+             pkt = prepare_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )
              print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}: {pkt}" )
              sock['sock'].sendall( pkt.data )
@@ -233,13 +247,14 @@ for s in uplink_sockets.values():
     s['sock'].close()
 
 logging.debug( ping_replies )
-for i in UPLINKS:
+if len(ping_replies)>0:
+ for i in UPLINKS:
   # Exclude copies of own packets
   rtts = [ r['rtt'] for r in ping_replies if r['interface'] in i and r['hops']!='?' ]
   if len(rtts)>0:
      # align right 8, whole division
      print( f"Average RTT received on interface {i} over {len(rtts)} packets: {sum(rtts)//len(rtts):>8} us" )
   else:
-     print( f"No replies received on interface {i}" )
+     print( f"No RTT replies received on interface {i}" )
 
 sys.exit(0)
