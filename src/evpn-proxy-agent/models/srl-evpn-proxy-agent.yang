@@ -74,7 +74,7 @@ module srl-evpn-proxy-agent {
               type uint32 {
                 range "1..4294967295";
               }
-              default 65000;
+              default 65535;
               description "Local AS to use in BGP EVPN peering";
             }
 
@@ -82,7 +82,7 @@ module srl-evpn-proxy-agent {
               type uint32 {
                 range "1..4294967295";
               }
-              default 65000;
+              default 65535;
               description "Peer AS to use in BGP EVPN peering";
             }
 

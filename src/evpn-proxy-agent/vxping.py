@@ -46,6 +46,7 @@ ip = ipv4.ipv4(dst=VTEP_IPs[0],src=LOCAL_VTEP,proto=inet.IPPROTO_UDP,
 u = udp.udp(src_port=0,dst_port=4789) # vary source == timestamp
 vxl = vxlan.vxlan(vni=VNI)
 e2 = ethernet.ethernet(dst=ZERO,src=ZERO,ethertype=ether.ETH_TYPE_ARP)
+e2._MIN_PAYLOAD_LEN = 0 # Avoid padding
 a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
             src_mac=ZERO, src_ip=LOCAL_VTEP,
             dst_mac=ZERO, dst_ip="0.0.0.0" )
@@ -110,14 +111,13 @@ def receive_packet(sock, mask):
     if data:
         intf = sock.getsockname()[0]
         logging.debug( f'Received {len(data)} bytes on {intf}' )
-        # Our ARP packets are 110 bytes
-        if len(data)==110:
+        # Our ARP-in-VXLAN packets are 98 bytes
+        if len(data)==98:
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
            if not _arp or _arp.opcode == 1:
               logging.debug( "Ignoring ARP request or non-ARP packet" )
               return # ignore requests
-           _ip = pkt.get_protocol( ipv4.ipv4 )
            logging.debug( pkt )
 
            # Starts as 255
@@ -133,7 +133,10 @@ def receive_packet(sock, mask):
            logging.debug( f"Received reflected ARP probe (TS={ts} delta={delta} path={path} phase={phase}), ARP={_arp} intf={intf}" )
 
            hops = (255-ttl) if ttl!=0 else "?"
-           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]}: RTT={delta:>8} us hops={hops}" )
+           _ip = pkt.get_protocol( ipv4.ipv4 )
+           _eths = pkt.get_protocols( ethernet.ethernet )
+
+           print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]} remote uplink MAC {_eths[1].src}: RTT={delta:>8} us hops={hops}" )
            ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
                                   'rtt': delta, 'interface': intf } )
            return True
@@ -152,7 +155,7 @@ if SUBNET_SRC:
        print( f"WARNING: Source IP {src} is not a valid host address, YMMV" )
 
    e2.dst_mac = 'ff:ff:ff:ff:ff:ff'
-   a.opcode = 1 # Request
+   a.opcode = arp.ARP_REQUEST # Request
    a.src_ip = src
 
 # First determine MACs and create listening sockets on all uplinks
@@ -182,6 +185,8 @@ for n in range(0,1): # Repeat 1 times
     e.dst = e2.dst = sock['dst_mac']
 
     if SUBNET_SRC:
+      for v in VTEP_IPs:
+       ip.dst = v
        for c2,host_ip in enumerate(hosts):
            # Spread across all uplinks
            if c2%len(UPLINKS) == c:
@@ -198,7 +203,7 @@ for n in range(0,1): # Repeat 1 times
           for path in range(1,4):
              pkt = timestamped_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )
-             print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}" )
+             print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}: {pkt}" )
              sock['sock'].sendall( pkt.data )
              pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )

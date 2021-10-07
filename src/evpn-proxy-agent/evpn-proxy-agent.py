@@ -746,6 +746,7 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
 
    # src == interface MAC, to measure ECMP spread
    e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
+   e2._MIN_PAYLOAD_LEN = 0 # Avoid padding
 
    # Reflect timestamp for ARP replies, include IP TTL
    dst_mac = f'{_ip.ttl:02x}:{_eths[1].src[3:]}'

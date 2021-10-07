@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "igp": "ospf",
+    "igp": "bgp",
     "evpn": "symmetric-irb",
     "base-as": 65000,
     "host-as": 65123,
@@ -1380,15 +1380,15 @@
       "protocols": {
         "srl_nokia-bgp:bgp": {
           "admin-state": "enable",
-          "autonomous-system": 65000,
+          "autonomous-system": 65535,
           "export-policy": "accept-all",
           "router-id": "1.1.0.255",
           "group": [
             {
               "group-name": "vxlan-agent",
               "admin-state": "enable",
-              "peer-as": 65000,
-              "local-as": [ { "as-number": 65000 } ],
+              "peer-as": 65535,
+              "local-as": [ { "as-number": 65535 } ],
               "ipv4-unicast": {
                 "admin-state": "disable"
               },
@@ -1401,7 +1401,8 @@
               "route-reflector": {
                 "client": true,
                 "cluster-id": "1.1.0.255"
-              }
+              },
+              "transport": { "passive-mode": true }
             }
           ],
           "neighbor": [
@@ -1428,8 +1429,8 @@
         "srl-evpn-proxy-agent:vxlan-agent": {
           "admin-state": "enable",
           "source-address": "1.1.0.255",
-          "local-as": 65000,
-          "peer-as": 65000,
+          "local-as": 65535,
+          "peer-as": 65535,
           "proof-of-concept": {
             "vxlan-arp-learning-interfaces": [ "e1-1","e1-2" ],
             "include-ip": true,
