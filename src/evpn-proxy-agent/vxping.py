@@ -55,17 +55,15 @@ e2._MIN_PAYLOAD_LEN = 0 # Avoid padding
 a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
             src_mac=ZERO, src_ip=LOCAL_VTEP,
             dst_mac=ZERO, dst_ip="0.0.0.0" )
+ip2 = ipv4.ipv4(proto=inet.IPPROTO_ICMP,tos=0xc0,identification=0)
 payload = [a]
 if PROTO=="icmp":
   e2.ethertype = ether.ETH_TYPE_IP
-  ip2 = ipv4.ipv4(proto=inet.IPPROTO_ICMP,tos=0xc0,identification=0)
   ping = icmp.icmp( data=icmp.echo(id_=1,seq=0x1234) ) # TODO data=timestamp
   payload = [ip2,ping]
-else:
-  ip2 = {}
 
 p = packet.Packet()
-for h in [e,ip,u,vxl,e2].append(payload):
+for h in [e,ip,u,vxl,e2]+payload:
    p.add_protocol(h)
 
 def prepare_packet(path,timestamp=True):
@@ -218,7 +216,7 @@ for n in range(0,1): # Repeat 1 times
            if c2%len(UPLINKS) == c or len(hosts)==1:
                a.dst_ip = ip2.dst = host_ip
                pkt = prepare_packet(path=100*n+c2+1,timestamp=False)
-               print( f"Sending ARP request for {host_ip} to VTEP {v} on uplink {i}" ) # {pkt}
+               print( f"Sending {PROTO} request for {host_ip} to VTEP {v} on uplink {i}" ) # {pkt}
                sock['sock'].sendall( pkt.data )
                pings_sent += 1
     else:
@@ -229,7 +227,7 @@ for n in range(0,1): # Repeat 1 times
           for path in range(1,4):
              pkt = prepare_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )
-             print( f"Sending ARP special ping packet #{n}.{path} to {v} on {i}: {pkt}" )
+             print( f"Sending {PROTO} special ping packet #{n}.{path} to {v} on {i}: {pkt}" )
              sock['sock'].sendall( pkt.data )
              pings_sent += 1
              # bytes_sent = vxlan_sock.sendto( pkt.data, (v,0) )

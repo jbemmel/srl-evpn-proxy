@@ -60,14 +60,15 @@ class Plugin(ToolsPlugin):
            # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
            suggestions=KeyCompleter(path='/tunnel-interface[name=*]/vxlan-interface[index=*]/bridge-table/multicast-destinations/destination[vtep=*]') )
 
-        syntax.add_unnamed_argument('target-ip', default="", help="Perform a ping to this destination IP(/subnet). Format: <ip>[/prefix], e.g. '10.0.0.254' or 10.0.0.254/24'")
+        syntax.add_unnamed_argument('target-ip', default="", help="Perform a ping to this destination IP(/subnet). Format: <ip>[/prefix]\n"+
+                                                                  "e.g. '10.0.0.254' or '10.0.0.254/24' (latter uses .254 as source)" )
 
         def _get_learnt_macs_in_vrf(arguments):
            mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
            # logging.info( f"_get_learnt_macs_in_vrf args={arguments} mac_vrf={mac_vrf}" )
            return build_path(f'/network-instance[name={mac_vrf}]/bridge-table/mac-learning/learnt-entries/mac[address=*]')
 
-        syntax.add_named_argument('ping-src-mac', help="Source MAC to use, auto-completed based on locally learnt MAC addresses",
+        syntax.add_named_argument('ping-src-mac', default="", help="Source MAC to use, auto-completed based on locally learnt MAC addresses",
            suggestions=KeyCompleter(path=_get_learnt_macs_in_vrf) )
            # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
            # suggestions=KeyCompleter(path='/network-instance[name=*]/bridge-table/mac-learning/learnt-entries[mac=*]') )
@@ -105,7 +106,9 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     icmp = arguments.get('vxlan-service-ping', 'icmp')
 
     if bool(ping_src_mac) ^ bool(ping_ip):
-        raise ExecuteError( "Both ping-src-mac and ping-ip must be provided" )
+        raise ExecuteError( "ping-src-mac and destination ip must be provided together" )
+    if icmp and not bool(ping_ip):
+        raise ExecuteError( "Destination ip must be provided for ICMP" )
 
     def get_vni(vxlan_intf):
        tun = vxlan_intf.split('.')
