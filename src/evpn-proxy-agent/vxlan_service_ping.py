@@ -75,6 +75,7 @@ class Plugin(ToolsPlugin):
         syntax.add_named_argument('entropy', default="0", help="Provide extra input to ECMP hashing, added to UDP source port")
 
         syntax.add_boolean_argument('debug', help="Enable additional debug output")
+        syntax.add_boolean_argument('icmp', help="Use ICMP instead of ARP")
 
         # TODO add 'count' argument, default 3
         return syntax
@@ -101,6 +102,7 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     ping_src_mac = arguments.get('vxlan-service-ping', 'ping-src-mac')
     entropy = int( arguments.get('vxlan-service-ping', 'entropy') )
     debug = arguments.get('vxlan-service-ping', 'debug')
+    icmp = arguments.get('vxlan-service-ping', 'icmp')
 
     if bool(ping_src_mac) ^ bool(ping_ip):
         raise ExecuteError( "Both ping-src-mac and ping-ip must be provided" )
@@ -143,6 +145,7 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # open UDP socket and have OS figure out MAC addresses
     # Run a separate, simple Python binary in the default namespace
     # Need sudo
-    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {ping_src_mac} {ping_ip}"
+    proto = "icmp" if icmp else "arp"
+    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {proto} {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {ping_src_mac} {ping_ip}"
     logging.info( f"vxlan-service-ping: {cmd}" )
     exit_code = child_process.run( cmd.split(), output=output )

@@ -12,18 +12,19 @@ from ryu.ofproto import ether, inet
 # from bcc import BPF
 from bcc.libbcc import lib
 
-if len(sys.argv) < 6:
-    print( f"Usage: {sys.argv[0]} <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source MAC and ip/prefix for ping sweep]" )
+if len(sys.argv) < 7:
+    print( f"Usage: {sys.argv[0]} <proto> <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source MAC and ip/prefix for ping sweep]" )
     sys.exit(1)
 
-VNI = int(sys.argv[1])
-LOCAL_VTEP = sys.argv[2]
-ENTROPY = int(sys.argv[3])
-UPLINKS = sys.argv[4].split(",")
-VTEP_IPs = sys.argv[5].split(",")
+PROTO = sys.argv[1] # arp or icmp or icmpv6
+VNI = int(sys.argv[2])
+LOCAL_VTEP = sys.argv[3]
+ENTROPY = int(sys.argv[4])
+UPLINKS = sys.argv[5].split(",")
+VTEP_IPs = sys.argv[6].split(",")
 
-PING_SRC_MAC = sys.argv[6] if len(sys.argv) > 6 else None
-PING_DST = sys.argv[7] if len(sys.argv) > 7 else None
+PING_SRC_MAC = sys.argv[7] if len(sys.argv) > 7 else None
+PING_DST = sys.argv[8] if len(sys.argv) > 8 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
 logging.basicConfig(
@@ -31,6 +32,8 @@ logging.basicConfig(
   format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
   datefmt='%H:%M:%S',
   level=logging.DEBUG if DEBUG else logging.INFO)
+
+logging.info( f"Command: {sys.argv}" )
 
 def get_timestamp_us(): # 40-bit
    now = datetime.now(timezone.utc)
@@ -52,13 +55,17 @@ e2._MIN_PAYLOAD_LEN = 0 # Avoid padding
 a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
             src_mac=ZERO, src_ip=LOCAL_VTEP,
             dst_mac=ZERO, dst_ip="0.0.0.0" )
-
-ip2 = ipv4.ipv4(proto=inet.IPPROTO_ICMP,tos=0xc0,identification=0,flags=(1<<1))
-ping = icmp.icmp( data=icmp.echo(id_=1,seq=0x1234) ) # TODO data=timestamp
+payload = [a]
+if PROTO=="icmp":
+  e2.ethertype = ether.ETH_TYPE_IP
+  ip2 = ipv4.ipv4(proto=inet.IPPROTO_ICMP,tos=0xc0,identification=0)
+  ping = icmp.icmp( data=icmp.echo(id_=1,seq=0x1234) ) # TODO data=timestamp
+  payload = [ip2,ping]
+else:
+  ip2 = {}
 
 p = packet.Packet()
-# for h in [e,ip,u,vxl,e2,a]:
-for h in [e,ip,u,vxl,e2,ip2,ping]:
+for h in [e,ip,u,vxl,e2].append(payload):
    p.add_protocol(h)
 
 def prepare_packet(path,timestamp=True):
@@ -149,7 +156,7 @@ def receive_packet(sock, mask):
              ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
                                     'rtt': delta, 'interface': intf } )
            else:
-             print( f"ARP reply from VTEP={_ip.src} to {_ip.dst} on interface {sock.getsockname()[0]} resolved MAC: {_arp.src_ip}={_eths[1].src}" )
+             print( f"ARP reply from VTEP={_ip.src} to {_ip.dst} for {_arp.dst_ip} on interface {sock.getsockname()[0]} resolved MAC: {_arp.src_ip}={_eths[1].src}" )
            return True
 
     return False
@@ -171,11 +178,10 @@ if PING_DST:
       hosts = [ PING_DST ]
 
    e2.src = PING_SRC_MAC
-   e2.dst = 'ff:ff:ff:ff:ff:ff'
+   e2.dst = 'ff:ff:ff:ff:ff:ff' # Ping to broadcast MAC works too!
    a.opcode = arp.ARP_REQUEST # Request
    a.src_mac = PING_SRC_MAC
    a.src_ip = src
-
    ip2.src = src
 
 # First determine MACs and create listening sockets on all uplinks
