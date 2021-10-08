@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "igp": "bgp",
+    "igp": "ospf",
     "evpn": "symmetric-irb",
     "base-as": 65000,
     "host-as": 65123,
@@ -1131,7 +1131,7 @@
       "admin-state": "enable",
       "subinterface": [
         {
-          "index": 0,
+          "index": 1,
           "admin-state": "enable",
           "ipv4": {
             "address": [
@@ -1374,7 +1374,7 @@
       "admin-state": "enable",
       "interface": [
         {
-          "name": "lo0.0"
+          "name": "lo0.1"
         }
       ],
       "protocols": {
@@ -1475,11 +1475,7 @@
           ]
         },
         "srl_nokia-bgp-vpn:bgp-vpn": {
-          "bgp-instance": [
-            {
-              "id": 1
-            }
-          ]
+          "srl_nokia-bgp-evpn:bgp-instance": [ { "id": 1 } ]
         }
       }
     },

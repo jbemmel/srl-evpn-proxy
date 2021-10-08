@@ -6,7 +6,7 @@
 
 import socket, sys, re, os, netns, selectors, logging, ipaddress
 from datetime import datetime, timezone
-from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
+from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp, icmp, icmpv6
 from ryu.ofproto import ether, inet
 
 # from bcc import BPF
@@ -53,8 +53,12 @@ a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
             src_mac=ZERO, src_ip=LOCAL_VTEP,
             dst_mac=ZERO, dst_ip="0.0.0.0" )
 
+ip2 = ipv4.ipv4(proto=inet.IPPROTO_ICMP,tos=0xc0,identification=0,flags=(1<<1))
+ping = icmp.icmp( data=icmp.echo(id_=1,seq=0x1234) ) # TODO data=timestamp
+
 p = packet.Packet()
-for h in [e,ip,u,vxl,e2,a]:
+# for h in [e,ip,u,vxl,e2,a]:
+for h in [e,ip,u,vxl,e2,ip2,ping]:
    p.add_protocol(h)
 
 def prepare_packet(path,timestamp=True):
@@ -172,6 +176,8 @@ if PING_DST:
    a.src_mac = PING_SRC_MAC
    a.src_ip = src
 
+   ip2.src = src
+
 # First determine MACs and create listening sockets on all uplinks
 uplink_sockets = {}
 for i in UPLINKS:
@@ -204,7 +210,7 @@ for n in range(0,1): # Repeat 1 times
        for c2,host_ip in enumerate(hosts):
            # Spread across all uplinks
            if c2%len(UPLINKS) == c or len(hosts)==1:
-               a.dst_ip = host_ip
+               a.dst_ip = ip2.dst = host_ip
                pkt = prepare_packet(path=100*n+c2+1,timestamp=False)
                print( f"Sending ARP request for {host_ip} to VTEP {v} on uplink {i}" ) # {pkt}
                sock['sock'].sendall( pkt.data )
@@ -213,7 +219,7 @@ for n in range(0,1): # Repeat 1 times
        e2.src = e.src # Set source MAC of inner packet to outer packet
        for v in VTEP_IPs:
           ip.dst = v
-          a.dst_ip = v
+          a.dst_ip = ip2.dst = v
           for path in range(1,4):
              pkt = prepare_packet(c*100 + 10*n + path)
              logging.debug( f"Sending {pkt}" )

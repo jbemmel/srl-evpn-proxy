@@ -1,6 +1,6 @@
 {
   "auto_config_agent:auto-config-agent": {
-    "igp": "bgp",
+    "igp": "ospf",
     "evpn": "symmetric-irb",
     "base-as": 65000,
     "host-as": 65123,
