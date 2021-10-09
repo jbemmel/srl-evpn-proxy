@@ -570,6 +570,13 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
             continue;
         mac_vrf = state.mac_vrfs[ vni ]
 
+        # To compensate for lack of VXLAN flow hashing, we vary the src IP
+        # Correct it by removing the added entropy (IP ID) in 2nd octet
+        if _arp.opcode == 24:
+           digits = [ int(i) for i in _ip.src.split('.') ]
+           digits[1] ^= _ip.identification % 256
+           _ip.src = ".".join( map(str,digits) )
+
         if _ip.src in evpn_vteps:
            if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
                                                 and _arp.opcode==24): # Ignore regular responses
@@ -740,13 +747,12 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
                          src=_eths[0].dst, # source interface MAC, per uplink
                          ethertype=ether.ETH_TYPE_IP)
 
-   # To compensate for lack of VXLAN flow hashing, we vary the src IP
-   # Correct it by removing the added entropy (UDP source port) in 2nd octet
-   digits = [ int(i) for i in dest_vtep_ip.split('.') ]
-   digits[1] ^= _udp.src_port % 256
-   dest_vtep_ip = ".".join( map(str,digits) )
+   # Add entropy to source IP for hashing of return flow
+   digits = [ int(i) for i in local_vtep_ip.split('.') ]
+   digits[1] ^= _ip.identification % 256
+   local_vtep_ip_hashed = ".".join( map(str,digits) )
 
-   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip,proto=inet.IPPROTO_UDP,
+   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip_hashed,proto=inet.IPPROTO_UDP,
                  tos=0xc0,identification=_ip.identification,flags=(1<<1)) # Set DF
    u = udp.udp(src_port=_udp.src_port,dst_port=4789) # vary source == timestamp
    v = vxlan.vxlan(vni=mac_vrf['vni'])

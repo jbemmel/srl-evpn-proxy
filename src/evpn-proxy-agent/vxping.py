@@ -78,12 +78,12 @@ def prepare_packet(path,timestamp=True):
        #   e2.src = a.src_mac
 
     # For containerized SRL, hashing only considers the src/dst IP address
-    # Include entropy in src IP 2nd octet, and correct it (based on UDP port) in reply
+    # Include entropy in src IP 2nd octet, and correct it (based on ID) in reply
     digits = [ int(i) for i in LOCAL_VTEP.split('.') ]
     digits[1] ^= (path + ENTROPY) % 256
     ip.src = ".".join( map(str,digits) )
 
-    ip.identification = path
+    ip.identification = path + ENTROPY
     u.src_port = path + ENTROPY
     u.csum = 0 # Recalculate
     p.serialize()
