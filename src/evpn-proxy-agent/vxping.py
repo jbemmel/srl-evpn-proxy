@@ -77,6 +77,12 @@ def prepare_packet(path,timestamp=True):
        #if set_inner_src:
        #   e2.src = a.src_mac
 
+    # For containerized SRL, hashing only considers the src/dst IP address
+    # Include entropy in src IP 2nd octet, and correct it (based on UDP port) in reply
+    digits = [ int(i) for i in LOCAL_VTEP.split('.') ]
+    digits[1] ^= (path + ENTROPY) % 256
+    ip.src = ".".join( map(str,digits) )
+
     ip.identification = path
     u.src_port = path + ENTROPY
     u.csum = 0 # Recalculate
@@ -123,13 +129,13 @@ def receive_packet(sock, mask):
     data = sock.recv(1000)  # Should be ready
     if data:
         intf = sock.getsockname()[0]
-        logging.debug( f'Received {len(data)} bytes on {intf}' )
+        print( f'Received {len(data)} bytes on {intf}' )
         # Our ARP-in-VXLAN packets are 92 bytes
-        if len(data)==92:
+        if len(data)==92 or PROTO=="icmp":
            pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
            if not _arp or _arp.opcode == 1:
-              logging.debug( "Ignoring ARP request or non-ARP packet" )
+              print( f"Ignoring ARP request or non-ARP packet: {pkt}" )
               return # ignore requests
            logging.debug( pkt )
 
