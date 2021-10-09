@@ -30,10 +30,13 @@ class Plugin(ToolsPlugin):
     # Define where this command exists in the command hierarchy in sr_cli
     def on_tools_load(self, state):
         # Could also add it under /tools network-instance
-        root = state.command_tree.tools_mode.root
-        root.add_command(self._get_syntax(state), update_location=False, callback=do_service_ping)
+        if state.system_features.vxlan:
+           root = state.command_tree.tools_mode.root
+           root.add_command(self._get_syntax(state), update_location=False, callback=do_service_ping)
         # system = state.command_tree.tools_mode.root.get_command('system')
         # system.add_command(self._get_syntax(), update_location=False, callback=do_service_ping)
+        else:
+            logging.warning( "VXLAN feature not enabled for this system" )
 
     # Helper function to get arguments and help strings for this plugin command
     def _get_syntax(self,state):
@@ -47,10 +50,13 @@ class Plugin(ToolsPlugin):
 
         # Lookup vxlan interface for given mac-vrf - seems to deadlock
         def _get_vteps_in_vrf(arguments):
-          mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
+          mac_vrf = arguments.get_or('mac-vrf','*')
           # logging.info( f"_get_path args={arguments} mac_vrf={mac_vrf}" )
-          vxlan_intf = get_vxlan_interface(state,mac_vrf)
-          tun = vxlan_intf.split('.')
+          if mac_vrf!='*':
+             vxlan_intf = get_vxlan_interface(state,mac_vrf)
+             tun = vxlan_intf.split('.')
+          else:
+             tun = ['*','*']
           # Could lookup VNI here too
           return build_path(f'/tunnel-interface[name={tun[0]}]/vxlan-interface[index={tun[1]}]/bridge-table/multicast-destinations/destination[vtep=*][vni=*]')
 
@@ -154,5 +160,5 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # Need sudo
     proto = "icmp" if icmp else "arp"
     cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {proto} {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {ping_ip} {ping_src_mac} {ping_src_ip}"
-    logging.info( f"vxlan-service-ping: {cmd}" )
+    logging.info( f"vxlan-service-ping: bash {cmd}" )
     exit_code = child_process.run( cmd.split(), output=output )

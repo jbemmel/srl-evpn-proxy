@@ -87,7 +87,7 @@ def prepare_packet(path,timestamp=True):
        #if set_inner_src:
        #   e2.src = a.src_mac
 
-    ip.src = ip_with_entropy( LOCAL_VTEP, path + ENTROPY )
+    ip.src = ip_with_entropy( LOCAL_VTEP, path + ENTROPY ) if PROTO=="arp" else LOCAL_VTEP
 
     ip.identification = path + ENTROPY
     u.src_port = path + ENTROPY
@@ -147,11 +147,23 @@ def receive_packet(sock, mask):
             print( f"Ignoring VXLAN packet with different VNI than {VNI}: {_vxlan.vni}" )
             return
 
+        if PROTO=="icmp":
+           _icmp = pkt.get_protocol( icmp.icmp )
+           if not _icmp:
+               print( f"Ignoring non-ICMPv4 packet on {intf}: {pkt}" )
+               return
+           _ip = pkt.get_protocols( ipv4.ipv4 )
+           logging.debug( f"Received ICMP reply (intf={intf})" )
+           print( f"ICMP reply from IP {_ip[1].src} VTEP={_ip[0].src} to IP {_ip[1].dst} VTEP={_ip[0].dst} on interface {intf}" )
+
         # Our ARP-in-VXLAN packets are 92 bytes
-        if len(data)==92 or PROTO=="icmp":
+        elif len(data)==92:
            _arp = pkt.get_protocol( arp.arp )
-           if not _arp or _arp.opcode == 1:
-              print( f"Ignoring ARP request or non-ARP packet: {pkt}" )
+           if not _arp:
+              print( f"Ignoring non-ARP packet: {pkt}" )
+              return # ignore requests
+           elif _arp.opcode == 1:
+              print( f"Ignoring ARP request: {pkt}" )
               return # ignore requests
            logging.debug( pkt )
 
@@ -239,7 +251,7 @@ for n in range(0,1): # Repeat 1 times
            if c2%len(UPLINKS) == c or len(hosts)==1:
                a.dst_ip = ip2.dst = host_ip
                pkt = prepare_packet(path=100*n+c2+1,timestamp=False)
-               print( f"Sending {PROTO} request for {host_ip} to VTEP {v} on uplink {i}" ) # {pkt}
+               print( f"Sending {PROTO} request for {host_ip} to VTEP {v} on uplink {i}: {pkt}" ) # {pkt}
                sock['sock'].sendall( pkt.data )
                pings_sent += 1
     else:
