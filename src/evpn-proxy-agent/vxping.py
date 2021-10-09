@@ -90,8 +90,8 @@ def prepare_packet(path,timestamp=True):
     ip.src = ip_with_entropy( LOCAL_VTEP, path + ENTROPY ) if PROTO=="arp" else LOCAL_VTEP
 
     ip.identification = path + ENTROPY
-    u.src_port = path + ENTROPY
-    u.csum = 0 # Recalculate
+    u.src_port = 49152 + (path + ENTROPY) % (65536-49152) # RFC6335 suggested range 49152-65535
+    u.csum = 0 # Recalculate, should be 0 (disabled) for VXLAN
     p.serialize()
     return p
 
@@ -153,8 +153,9 @@ def receive_packet(sock, mask):
                print( f"Ignoring non-ICMPv4 packet on {intf}: {pkt}" )
                return
            _ip = pkt.get_protocols( ipv4.ipv4 )
-           logging.debug( f"Received ICMP reply (intf={intf})" )
-           print( f"ICMP reply from IP {_ip[1].src} VTEP={_ip[0].src} to IP {_ip[1].dst} VTEP={_ip[0].dst} on interface {intf}" )
+           _udp = pkt.get_protocol( udp.udp )
+           logging.debug( f"Received ICMP reply on intf={intf}: {pkt}" )
+           print( f"ICMP reply from IP {_ip[1].src} VTEP={_ip[0].src} to IP {_ip[1].dst} VTEP={_ip[0].dst} on interface {intf} (UDP src={_udp.src_port}): {pkt}" )
 
         # Our ARP-in-VXLAN packets are 92 bytes
         elif len(data)==92:
