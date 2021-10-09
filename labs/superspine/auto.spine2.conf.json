@@ -1347,11 +1347,6 @@
       "srl_nokia-static-routes:static-routes": {
         "route": [
           {
-            "prefix": "1.1.0.1/32",
-            "admin-state": "enable",
-            "next-hop-group": "cumulus1"
-          },
-          {
             "prefix": "1.1.0.2/32",
             "admin-state": "enable",
             "next-hop-group": "cumulus2"
@@ -1361,20 +1356,15 @@
       "srl_nokia-next-hop-groups:next-hop-groups": {
         "group": [
           {
-            "name": "cumulus1",
+            "name": "cumulus2",
             "nexthop": [
               {
                 "index": 0,
                 "ip-address": "192.168.127.17",
                 "admin-state": "enable"
-              }
-            ]
-          },
-          {
-            "name": "cumulus2",
-            "nexthop": [
+              },
               {
-                "index": 0,
+                "index": 1,
                 "ip-address": "192.168.127.19",
                 "admin-state": "enable"
               }

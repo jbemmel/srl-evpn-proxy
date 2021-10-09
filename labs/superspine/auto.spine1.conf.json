@@ -1365,11 +1365,6 @@
             "prefix": "1.1.0.1/32",
             "admin-state": "enable",
             "next-hop-group": "cumulus1"
-          },
-          {
-            "prefix": "1.1.0.2/32",
-            "admin-state": "enable",
-            "next-hop-group": "cumulus2"
           }
         ]
       },
@@ -1382,14 +1377,9 @@
                 "index": 0,
                 "ip-address": "192.168.127.5",
                 "admin-state": "enable"
-              }
-            ]
-          },
-          {
-            "name": "cumulus2",
-            "nexthop": [
+              },
               {
-                "index": 0,
+                "index": 1,
                 "ip-address": "192.168.127.7",
                 "admin-state": "enable"
               }

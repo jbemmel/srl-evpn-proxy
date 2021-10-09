@@ -84,9 +84,10 @@ topology:
     - endpoints: ["superspine1:e1-3", "spine2:e1-1"]
     - endpoints: ["superspine1:e1-4", "spine2:e1-2"]
 
+    # Each Cumulus to a different spine
     - endpoints: ["spine1:e1-3", "cumulus1:e1-1"]
-    - endpoints: ["spine2:e1-3", "cumulus1:e1-2"]
-    - endpoints: ["spine1:e1-4", "cumulus2:e1-1"]
+    - endpoints: ["spine1:e1-4", "cumulus1:e1-2"]
+    - endpoints: ["spine2:e1-3", "cumulus2:e1-1"]
     - endpoints: ["spine2:e1-4", "cumulus2:e1-2"]
 
     # Each SRL to a different spine x2 +1 backup
