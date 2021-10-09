@@ -13,7 +13,7 @@ from ryu.ofproto import ether, inet
 from bcc.libbcc import lib
 
 if len(sys.argv) < 7:
-    print( f"Usage: {sys.argv[0]} <proto> <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional source MAC and ip/prefix for ping sweep]" )
+    print( f"Usage: {sys.argv[0]} <proto> <VNI> <local VTEP IP> <entropy> <list of uplink devices separated by ','> <list of VTEP IPs separated by ','> [optional dest IP and source MAC/IP for ping]" )
     sys.exit(1)
 
 PROTO = sys.argv[1] # arp or icmp or icmpv6
@@ -23,8 +23,9 @@ ENTROPY = int(sys.argv[4])
 UPLINKS = sys.argv[5].split(",")
 VTEP_IPs = sys.argv[6].split(",")
 
-PING_SRC_MAC = sys.argv[7] if len(sys.argv) > 7 else None
-PING_DST = sys.argv[8] if len(sys.argv) > 8 else None
+PING_DST = sys.argv[7] if len(sys.argv) > 7 else None
+PING_SRC_MAC = sys.argv[8] if len(sys.argv) > 8 else None
+PING_SRC_IP = sys.argv[9] if len(sys.argv) > 9 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
 SRL_C = os.path.exists('/.dockerenv')
@@ -194,7 +195,7 @@ if PING_DST:
           print( f"WARNING: Source IP {src} is not a valid host address, YMMV" )
    else:
       # ARP with dst=src does not work
-      src = str( ipaddress.ip_address( PING_DST ) - 1 )
+      src = PING_SRC_IP if PING_SRC_IP else str( ipaddress.ip_address( PING_DST ) - 1 )
       hosts = [ PING_DST ]
 
    e2.src = PING_SRC_MAC

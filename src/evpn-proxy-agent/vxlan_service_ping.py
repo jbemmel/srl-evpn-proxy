@@ -62,13 +62,14 @@ class Plugin(ToolsPlugin):
 
         syntax.add_unnamed_argument('target-ip', default="", help="Perform a ping to this destination IP(/subnet). Format: <ip>[/prefix]\n"+
                                                                   "e.g. '10.0.0.254' or '10.0.0.254/24' (latter uses .254 as source)" )
+        syntax.add_named_argument('src-ip', default="", help="Perform a ping from this source IP" )
 
         def _get_learnt_macs_in_vrf(arguments):
            mac_vrf = arguments.get('vxlan-service-ping', 'mac-vrf')
            # logging.info( f"_get_learnt_macs_in_vrf args={arguments} mac_vrf={mac_vrf}" )
            return build_path(f'/network-instance[name={mac_vrf}]/bridge-table/mac-learning/learnt-entries/mac[address=*]')
 
-        syntax.add_named_argument('ping-src-mac', default="", help="Source MAC to use, auto-completed based on locally learnt MAC addresses",
+        syntax.add_named_argument('src-mac', default="", help="Source MAC to use, auto-completed based on locally learnt MAC addresses",
            suggestions=KeyCompleter(path=_get_learnt_macs_in_vrf) )
            # suggestions=KeyCompleter(path='/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/bridge-table/multicast-destinations/destination[vtep=*]') )
            # suggestions=KeyCompleter(path='/network-instance[name=*]/bridge-table/mac-learning/learnt-entries[mac=*]') )
@@ -100,7 +101,8 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     vtep = arguments.get('vxlan-service-ping', 'vtep')
     # vni = int( arguments.get('vxlan-service-ping', 'vni') )
     ping_ip = arguments.get('vxlan-service-ping', 'target-ip')
-    ping_src_mac = arguments.get('vxlan-service-ping', 'ping-src-mac')
+    ping_src_ip = arguments.get('vxlan-service-ping', 'src-ip')
+    ping_src_mac = arguments.get('vxlan-service-ping', 'src-mac')
     entropy = int( arguments.get('vxlan-service-ping', 'entropy') )
     debug = arguments.get('vxlan-service-ping', 'debug')
     icmp = arguments.get('vxlan-service-ping', 'icmp')
@@ -109,6 +111,8 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
         raise ExecuteError( "ping-src-mac and destination ip must be provided together" )
     if icmp and not bool(ping_ip):
         raise ExecuteError( "Destination ip must be provided for ICMP" )
+    if ping_ip and not '/' in ping_ip and not ping_src_ip:
+        raise ExecuteError( "Source ip must be provided for single destination IP" )
 
     def get_vni(vxlan_intf):
        tun = vxlan_intf.split('.')
@@ -149,6 +153,6 @@ def do_service_ping(state, input, output, arguments, **_kwargs):
     # Run a separate, simple Python binary in the default namespace
     # Need sudo
     proto = "icmp" if icmp else "arp"
-    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {proto} {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {ping_src_mac} {ping_ip}"
+    cmd = f"ip netns exec srbase-default /usr/bin/sudo -E /usr/bin/python3 /opt/demo-agents/evpn-proxy-agent/vxping.py {proto} {vni} {local_vtep} {entropy} {uplinks} {dest_vteps} {ping_ip} {ping_src_mac} {ping_src_ip}"
     logging.info( f"vxlan-service-ping: {cmd}" )
     exit_code = child_process.run( cmd.split(), output=output )
