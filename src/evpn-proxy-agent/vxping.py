@@ -27,6 +27,7 @@ PING_SRC_MAC = sys.argv[7] if len(sys.argv) > 7 else None
 PING_DST = sys.argv[8] if len(sys.argv) > 8 else None
 
 DEBUG = 'DEBUG' in os.environ and bool( os.environ['DEBUG'] )
+SRL_C = os.path.exists('/.dockerenv')
 logging.basicConfig(
   filename='/var/log/srlinux/stdout/vxping.log',
   format='%(asctime)s,%(msecs)03d %(name)s %(levelname)s %(message)s',
@@ -34,6 +35,7 @@ logging.basicConfig(
   level=logging.DEBUG if DEBUG else logging.INFO)
 
 logging.info( f"Command: {sys.argv}" )
+print( f"Containerized SRL:{SRL_C}" )
 
 def get_timestamp_us(): # 40-bit
    now = datetime.now(timezone.utc)
@@ -66,6 +68,13 @@ p = packet.Packet()
 for h in [e,ip,u,vxl,e2]+payload:
    p.add_protocol(h)
 
+# For containerized SRL, hashing only considers the src IP address
+# Include entropy in src IP 2nd octet, and correct it (based on ID) in reply
+def ip_with_entropy(ip,entropy):
+    digits = [ int(i) for i in ip.split('.') ]
+    digits[1] ^= (entropy) % 256
+    return ".".join( map(str,digits) )
+
 def prepare_packet(path,timestamp=True):
     if timestamp:
        ts = t = get_timestamp_us()
@@ -77,11 +86,7 @@ def prepare_packet(path,timestamp=True):
        #if set_inner_src:
        #   e2.src = a.src_mac
 
-    # For containerized SRL, hashing only considers the src/dst IP address
-    # Include entropy in src IP 2nd octet, and correct it (based on ID) in reply
-    digits = [ int(i) for i in LOCAL_VTEP.split('.') ]
-    digits[1] ^= (path + ENTROPY) % 256
-    ip.src = ".".join( map(str,digits) )
+    ip.src = ip_with_entropy( LOCAL_VTEP, path + ENTROPY )
 
     ip.identification = path + ENTROPY
     u.src_port = path + ENTROPY
@@ -129,10 +134,20 @@ def receive_packet(sock, mask):
     data = sock.recv(1000)  # Should be ready
     if data:
         intf = sock.getsockname()[0]
-        print( f'Received {len(data)} bytes on {intf}' )
+        # print( f'Received {len(data)} bytes on {intf}' )
+        pkt = packet.Packet( bytearray(data) )
+
+        # Filter for VXLAN in current VNI
+        _vxlan = pkt.get_protocol( vxlan.vxlan )
+        if not _vxlan:
+            print( f"Ignoring non-VXLAN packet len={len(data)} bytes" )
+            return
+        elif _vxlan.vni != VNI:
+            print( f"Ignoring VXLAN packet with different VNI than {VNI}: {_vxlan.vni}" )
+            return
+
         # Our ARP-in-VXLAN packets are 92 bytes
         if len(data)==92 or PROTO=="icmp":
-           pkt = packet.Packet( bytearray(data) )
            _arp = pkt.get_protocol( arp.arp )
            if not _arp or _arp.opcode == 1:
               print( f"Ignoring ARP request or non-ARP packet: {pkt}" )
@@ -156,7 +171,8 @@ def receive_packet(sock, mask):
            _eths = pkt.get_protocols( ethernet.ethernet )
 
            if _arp.opcode==24:
-             print( f"ARP(opcode={_arp.opcode}) from {_ip.src} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]} remote uplink MAC {_eths[1].src}: RTT={delta:>8} us hops={hops}" )
+             src_ip = ip_with_entropy( _ip.src, _ip.identification )
+             print( f"ARP(opcode={_arp.opcode}) from {src_ip} to {_ip.dst} id={_ip.identification:04d} on interface {sock.getsockname()[0]} remote uplink MAC {_eths[1].src}: RTT={delta:>8} us hops={hops}" )
              ping_replies.append( { 'hops': hops, 'hops-return': 255 - _ip.ttl,
                                     'rtt': delta, 'interface': intf } )
            else:
