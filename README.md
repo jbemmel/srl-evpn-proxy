@@ -124,6 +124,8 @@ vxlan-agent
     auto-discover-static-vteps true
     vxlan-arp-learning-interfaces [ e1-1 ]
   }
+commit stay
+/show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
   vxlan-agent
@@ -133,6 +135,7 @@ vxlan-agent
     static-vtep 1.1.1.1 { }
 
 commit stay
+/show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 ```
 This configures the local SRL node to be a route reflector too, such that it will update other EVPN VTEPs with any proxy routes. If we now retry the ping:
 ```
