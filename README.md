@@ -22,7 +22,7 @@ enter candidate
 commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
-/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
   vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
@@ -49,10 +49,26 @@ monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
 [2021-10-14 16:55:57.232972]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:490
 [2021-10-14 16:55:57.234006]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:490
 ```
-Notice how each SRL1 is sending an equal amount of packets towards all other VTEPs
+Notice how SRL1 is sending an equal amount of packets towards all other VTEPs
 
-# Dynamic learning solution: An EVPN proxy agent
-By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
+# Static MAC route solution
+Flooding of traffic towards these "unknown" MACs can be avoided by configuring them statically:
+```
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
+vxlan-agent
+static-vtep 1.1.1.1 { 
+  mac-addresses [ 00:11:22:33:44:03 ]
+}
+commit stay
+```
+
+This causes the VXLAN agent to announce an EVPN RT2 MAC route, enabling all dynamic VTEPs to identify the correct destination VTEP.
+
+## Flood protection agent
+A separate custom CLI extension can be used to simplify the provisioning of dynamically learnt MAC addresses, and associating them with a static VTEP.
+
+# Dynamic learning solution
+By observing datapath VXLAN traffic from static VTEP nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
 
 This Github repo implements such an approach, using the following components:
 * The [Ryu BGP speaker library](https://ryu.readthedocs.io/en/latest/library_bgp_speaker_ref.html) and [packet parsing classes](https://ryu.readthedocs.io/en/latest/library_packet.html)
