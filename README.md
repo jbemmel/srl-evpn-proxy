@@ -68,9 +68,10 @@ This causes the VXLAN agent to announce an EVPN RT2 MAC route, enabling all dyna
 To simplify the prevention of packet flooding by associating a dynamically learnt MAC address with a static VTEP, a CLI helper extension is included:
 ```
 enter candidate
-/tools vxlan-avoid-flooding <mac-vrf> <VTEP IP> <MAC> 
+/tools vxlan-avoid-flooding <mac-vrf> vtep <VTEP IP> [cumulus_user xyz] [cumulus_password abc] mac <MAC>
+/tools vxlan-avoid-flooding mac-vrf-evi10 vtep 1.1.1.1 mac 00:11:22:33:44:01
 ```
-The extension uses the system YANG model to suggest auto-completion values for the MAC VRF, static VTEP IP (based on the list of VTEPs for the service) and MAC address (based on dynamically learnt)
+The extension uses the system YANG model to suggest auto-completion values for the MAC VRF and static VTEP IP (based on the list of VTEPs for the service), and then reaches out to the REST API of the static VTEP (Cumulus) to get a list of learnt MAC addresses.
 
 # Dynamic learning solution
 By observing datapath VXLAN traffic from static VTEP nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
