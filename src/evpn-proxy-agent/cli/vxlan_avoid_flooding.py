@@ -17,7 +17,7 @@ from srlinux.schema import DataStore
 import sys
 import logging
 import json
-import requests
+import re
 
 #
 # Helper tool to convert dynamically learnt MAC addresses to static config
@@ -98,7 +98,12 @@ class CumulusMACCompleter(object):
           user = arguments.get('cumulus_user')
           pswd = arguments.get('cumulus_password')
           try:
-             self._macs[ vtep ] = cumulus.retrieve_dynamic_MACs( vtep, user, pswd )
+             # Filter out VRRP MACs, if any
+             def is_vrrp_mac(m):
+                return re.match( '^00:00:5[eE]:00:01:.*$', m )
+
+             self._macs[ vtep ] = [ m for m in cumulus.retrieve_dynamic_MACs( vtep, user, pswd )
+                                    if not is_vrrp_mac(m) ]
           except Exception as err:
              self._macs[ vtep ] = [ "< error retrieving MACs - REST API enabled and using correct credentials? >" ]
 
