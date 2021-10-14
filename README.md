@@ -57,7 +57,7 @@ Flooding of traffic towards these "unknown" MACs can be avoided by configuring t
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
 vxlan-agent
 static-vtep 1.1.1.1 { 
-  mac-addresses [ 00:11:22:33:44:03 ]
+  mac-addresses [ 00:11:22:33:44:01 ]
 }
 commit stay
 ```
