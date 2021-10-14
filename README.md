@@ -11,6 +11,41 @@ The internet and most modern large scale data center designs use dynamic control
 By configuring an SRL node to announce type 3 EVPN multicast routes for each L2 service and each remote VTEP, we can send return traffic to static VXLAN endpoints.
 Without dataplane MAC learning, all MACs residing on such endpoints are effectively "unknown" as far as SRL is concerned, hence every packet to such MACs gets flooded to every VTEP in the fabric. This may be acceptible for point-to-point connections, but for point-to-multipoint this quickly becomes inefficient.
 
+Configure SRL1 with a VXLAN agent representing static VTEPs 1.1.1.1 and 1.1.1.2:
+```
+enter candidate
+/network-instance default protocols vxlan-agent
+  admin-state enable
+  source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
+  local-as 65000
+  peer-as 65000
+commit stay
+/show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
+
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
+  vxlan-agent
+    admin-state enable
+    evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
+    vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
+    static-vtep 1.1.1.1 { }
+    static-vtep 1.1.1.2 { }
+
+commit stay
+```
+
+This enables reachability between endpoints behind either static or dynamic EVPN VTEPs. However, packets sent towards MACs behind static VTEPs are flooded to all VTEPs:
+```
+monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
+```
+`
+[2021-10-14 16:55:38.665943]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:469
+[2021-10-14 16:55:38.666652]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:469
+[2021-10-14 16:55:47.213625]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:479
+[2021-10-14 16:55:47.214112]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:479
+[2021-10-14 16:55:57.232972]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:490
+[2021-10-14 16:55:57.234006]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:490
+`
+
 # Dynamic learning solution: An EVPN proxy agent
 By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
 
