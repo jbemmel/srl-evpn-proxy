@@ -64,8 +64,13 @@ commit stay
 
 This causes the VXLAN agent to announce an EVPN RT2 MAC route, enabling all dynamic VTEPs to identify the correct destination VTEP.
 
-## Flood protection agent
-A separate custom CLI extension can be used to simplify the provisioning of dynamically learnt MAC addresses, and associating them with a static VTEP.
+## Flood avoidance CLI helper extension
+To simplify the prevention of packet flooding by associating a dynamically learnt MAC address with a static VTEP, a CLI helper extension is included:
+```
+enter candidate
+/tools vxlan-avoid-flooding <mac-vrf> <VTEP IP> <MAC> 
+```
+The extension uses the system YANG model to suggest auto-completion values for the MAC VRF, static VTEP IP (based on the list of VTEPs for the service) and MAC address (based on dynamically learnt)
 
 # Dynamic learning solution
 By observing datapath VXLAN traffic from static VTEP nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
