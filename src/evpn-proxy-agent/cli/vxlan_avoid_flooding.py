@@ -66,6 +66,7 @@ class Plugin(ToolsPlugin):
         syntax.add_named_argument('mac', help="Dynamic MAC to associate with static VTEP",
            suggestions=CumulusMACCompleter() )
 
+        syntax.add_boolean_argument('refresh', help="Force refresh of API query for MACs")
 
         return syntax
 
@@ -92,7 +93,8 @@ class CumulusMACCompleter(object):
                  partial_word: str, line: str) -> Iterator[str]:
         logging.debug( f"CumulusMACCompleter: partial_word={partial_word} line={line}" )
         vtep = arguments.get('vtep')
-        if vtep not in self._macs:
+        refresh = arguments.get_or('refresh', False)
+        if vtep not in self._macs or refresh:
           user = arguments.get('cumulus_user')
           pswd = arguments.get('cumulus_password')
           try:

@@ -61,9 +61,8 @@ COPY --from=build-grpc-with-eventlet /usr/local/bin/ethping /usr/local/bin/ethtr
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
-# Integrate vxlan service ping CLI command
-COPY src/evpn-proxy-agent/vxlan_service_ping.py src/evpn-proxy-agent/vxlan_avoid_flooding.py \
-  /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
+# Integrate vxlan service ping and flooding avoidance CLI commands
+COPY src/evpn-proxy-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
 RUN sudo sh -c ' echo -e "vxlan_ping = srlinux.mgmt.cli.plugins.vxlan_service_ping:Plugin\nvxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
   >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
 
