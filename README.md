@@ -37,14 +37,14 @@ This enables reachability between endpoints behind either static or dynamic EVPN
 ```
 monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
 ```
-`
+```
 [2021-10-14 16:55:38.665943]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:469
 [2021-10-14 16:55:38.666652]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:469
 [2021-10-14 16:55:47.213625]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:479
 [2021-10-14 16:55:47.214112]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:479
 [2021-10-14 16:55:57.232972]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:490
 [2021-10-14 16:55:57.234006]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:490
-`
+```
 
 # Dynamic learning solution: An EVPN proxy agent
 By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
