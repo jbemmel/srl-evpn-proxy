@@ -43,6 +43,7 @@ topology:
         - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
+        - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
     cumulus2:
       kind: cvx
       group: static-fabric
@@ -50,6 +51,7 @@ topology:
         - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
+        - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
     srl1:
       kind: srl
       group: evpn-fabric

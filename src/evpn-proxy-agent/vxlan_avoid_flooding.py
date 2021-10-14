@@ -12,14 +12,12 @@ from srlinux.mgmt.cli.required_plugin import RequiredPlugin
 from srlinux.mgmt.cli import KeyCompleter
 from srlinux.syntax import Syntax
 from srlinux.location import build_path
-from srlinux.mgmt.cli.plugins.bash_network_command_helper import execute_network_command
-from srlinux.mgmt.cli.plugins.insert import _fetch_existing_leaflist_values
-from srlinux import child_process
 from srlinux.schema import DataStore
 
 import sys
 import logging
 import json
+import requests
 
 #
 # Helper tool to convert dynamically learnt MAC addresses to static config
@@ -56,17 +54,62 @@ class Plugin(ToolsPlugin):
         syntax.add_named_argument('vtep',
            suggestions=KeyCompleter(path=_get_vteps_in_vrf,data_store=DataStore.Running) )
 
-        def _get_learnt_macs_in_vrf(arguments):
-           mac_vrf = arguments.get_or('mac-vrf','*')
+        #def _get_learnt_macs_in_vrf(arguments):
+        #   mac_vrf = arguments.get_or('mac-vrf','*')
            # logging.info( f"_get_learnt_macs_in_vrf args={arguments} mac_vrf={mac_vrf}" )
-           return build_path(f'/network-instance[name={mac_vrf}]/bridge-table/mac-learning/learnt-entries/mac[address=*]')
+        #   return build_path(f'/network-instance[name={mac_vrf}]/bridge-table/mac-learning/learnt-entries/mac[address=*]')
 
+        syntax.add_named_argument('cumulus_user', default="root", help="API user to retrieve MACs from Cumulus")
+        syntax.add_named_argument('cumulus_password', default="root", help="API password to retrieve MACs from Cumulus")
+
+        # ip netns exec srbase-default ssh root@1.1.1.1 'net show bridge macs' | awk '/bridge  e1/ { print $4 }' | uniq
         syntax.add_named_argument('mac', help="Dynamic MAC to associate with static VTEP",
-           suggestions=KeyCompleter(path=_get_learnt_macs_in_vrf) )
+           suggestions=CumulusMACCompleter() )
+
 
         return syntax
 
 # end class VxlanAvoidFlooding
+
+from typing import Iterator, List, Optional
+from srlinux.mgmt.cli.command_node_with_arguments import CommandNodeWithArguments
+from srlinux.syntax.argument import Argument
+import subprocess
+
+class CumulusMACCompleter(object):
+    '''
+        Provides auto-completion options for dynamic MACs retrieved from Cumulus
+        "REST API" (RPC call producing CLI output)
+
+        Requires: sudo systemctl enable restserver && systemctl start restserver (on Cumulus)
+    '''
+
+    def __init__(self, limit: Optional[int] = None):
+        self._limit = limit or 50
+        self._macs = {} # Cache query per VTEP
+
+    def __call__(self, syntax_argument: Argument, state: 'CliState', arguments: CommandNodeWithArguments,
+                 partial_word: str, line: str) -> Iterator[str]:
+        logging.debug( f"CumulusMACCompleter: partial_word={partial_word} line={line}" )
+        vtep = arguments.get('vtep')
+        if vtep not in self._macs:
+          user = arguments.get('cumulus_user')
+          pswd = arguments.get('cumulus_password')
+          cmd = f"/usr/sbin/ip netns exec srbase-default /usr/bin/curl -X POST -k -s -u {user}:{pswd} -H \"Content-Type: application/json\" -d '{{\"cmd\": \"show bridge macs dynamic json\"}}' https://{vtep}:8080/nclu/v1/rpc"
+
+          res = subprocess.run( cmd, shell=True, stdout=subprocess.PIPE, check=True, timeout=3 )
+          # logging.info( res )
+          if res.stdout:
+            try:
+              macs = json.loads( res.stdout )
+              # Take only MACs on Ethernet interfaces, TODO could filter on VLAN
+              self._macs[ vtep ] = [ m['mac'] for m in macs if m['ifname'][0]=='e' ]
+            except Exception as err:
+              logging.debug( f"Query for MACs did not return any results; REST API enabled on VTEP {vtep}? {err}" )
+              self._macs[ vtep ] = [ "< error retrieving MACs - REST API enabled and using correct credentials? >" ]
+
+        result: List[str] = [ m for m in self._macs[vtep] if m.startswith(partial_word) ]
+        return iter(  result[ :self._limit ] )
 
     # Callback that runs when the plugin is run in sr_cli
 def do_flood_protect(state, input, output, arguments, **_kwargs):

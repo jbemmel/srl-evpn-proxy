@@ -871,6 +871,10 @@ def Handle_Notification(obj, state):
 
           # Index by VNI
           if vni:
+            # Support VNI/EVI modifications
+            new_vni = None
+            new_evi = None
+
             if admin_state == "enable":
                if vni not in state.mac_vrfs and mac_vrf_name not in state.mac_vrfs:
                  vrf = { 'name': mac_vrf_name,
@@ -878,8 +882,6 @@ def Handle_Notification(obj, state):
                          'macs': {}, 'ips': {}, 'vxlan_vteps': {}, 'path_probes': {} }
                  state.mac_vrfs[ vni ] = state.mac_vrfs[ mac_vrf_name ] = vrf
                else:
-                 # Support VNI modifications
-                 new_vni = None
                  if vni not in state.mac_vrfs:
                     orig_vrf = state.mac_vrfs[ mac_vrf_name ]
                     new_vni = vni
@@ -887,8 +889,6 @@ def Handle_Notification(obj, state):
                     state.mac_vrfs[ vni ] = orig_vrf
                     state.mac_vrfs.pop( orig_vrf['vni'], None )
 
-                 # Support EVI modifications
-                 new_evi = None
                  if evi != state.mac_vrfs[ vni ][ 'evi' ]:
                     new_evi = evi
                     logging.info( f"EVI modified on {mac_vrf_name}: {state.mac_vrfs[ vni ][ 'evi' ]}->{new_evi}" )

@@ -392,6 +392,24 @@
             }
           },
           {
+            "sequence-id": 225,
+            "description": "Allow outgoing API requests to Cumulus",
+            "action": { "accept": { } },
+            "match": {
+              "protocol": "tcp",
+              "destination-port": { "operator": "eq", "value": 8080 }
+            }
+          },
+          {
+            "sequence-id": 226,
+            "description": "Allow API replies from Cumulus",
+            "action": { "accept": { } },
+            "match": {
+              "protocol": "tcp",
+              "source-port": { "operator": "eq", "value": 8080 }
+            }
+          },
+          {
             "sequence-id": 230,
             "description": "Accept incoming single-hop BFD session messages",
             "action": {
