@@ -61,7 +61,25 @@ static-vtep 1.1.1.1 {
 commit stay
 ```
 
-This causes the VXLAN agent to announce an EVPN RT2 MAC route, enabling all dynamic VTEPs to identify the correct destination VTEP.
+This causes the VXLAN agent to announce an EVPN RT2 MAC route, enabling all dynamic VTEPs to identify the correct destination VTEP:
+```
+A:srl1# /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn                                                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Peer        : 1.1.1.4, remote AS: 65000, local AS: 65000
+Type        : static
+Description : Local EVPN proxy agent for static VXLAN
+Group       : vxlan-agent
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Status codes: u=used, *=valid, >=best, x=stale
+Origin codes: i=IGP, e=EGP, ?=incomplete
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Type 2 MAC-IP Advertisement Routes
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+| Status |     Route-distinguisher      |   Tag-ID   |    MAC-address    |          IP-address          |           Next-Hop           |             MED              | LocPref |             Path             |
++========+==============================+============+===================+==============================+==============================+==============================+=========+==============================+
+| u*>    | 1.1.1.1:57069                | 0          | 00:11:22:33:44:01 | 0.0.0.0                      | 1.1.1.1                      | -                            | 100     |                              |
++--------+------------------------------+------------+-------------------+------------------------------+------------------------------+------------------------------+---------+------------------------------+
+```
 
 ## Flood avoidance CLI helper extension
 To simplify the prevention of packet flooding by associating a dynamically learnt MAC address with a static VTEP, a CLI helper extension is included:
