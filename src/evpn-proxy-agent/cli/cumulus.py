@@ -17,7 +17,7 @@ def retrieve_dynamic_MACs(vtep_ip,cumulus_user="root",cumulus_password="root"):
       raise err
    return []
 
- def send_RPC_command(cmd,vtep_ip,cumulus_user="root",cumulus_password="root"):
+def send_RPC_command(cmd,vtep_ip,cumulus_user="root",cumulus_password="root"):
    # Assumes the VTEP IP is reachable through the default netns, ACLs allow it
    _c = ( "/usr/sbin/ip netns exec srbase-default " +
          f"/usr/bin/curl -X POST -k -s -u {cumulus_user}:{cumulus_password} " +
