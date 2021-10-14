@@ -73,6 +73,11 @@ enter candidate
 ```
 The extension uses the system YANG model to suggest auto-completion values for the MAC VRF and static VTEP IP (based on the list of VTEPs for the service), and then reaches out to the REST API of the static VTEP (Cumulus) to get a list of learnt MAC addresses.
 
+Note: To enable the REST API on Cumulus:
+```
+sshpass -p root ssh root@clab-static-vxlan-spine-lab-cumulus1 'systemctl enable restserver && systemctl start restserver'
+```
+
 # Dynamic learning solution
 By observing datapath VXLAN traffic from static VTEP nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
 
