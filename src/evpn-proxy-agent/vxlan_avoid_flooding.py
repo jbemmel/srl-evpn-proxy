@@ -51,7 +51,7 @@ class Plugin(ToolsPlugin):
           return build_path(f'/network-instance[name={mac_vrf}]/protocols/bgp-evpn/bgp-instance[id=1]/vxlan-agent/static-vtep[vtep-ip=*]')
 
         # Pick from the static VTEPs configured for this mac-vrf
-        syntax.add_named_argument('vtep',
+        syntax.add_named_argument('vtep',help="Target static VTEP where MAC resides",
            suggestions=KeyCompleter(path=_get_vteps_in_vrf,data_store=DataStore.Running) )
 
         #def _get_learnt_macs_in_vrf(arguments):
