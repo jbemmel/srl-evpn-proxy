@@ -33,7 +33,11 @@ commit stay
 commit stay
 ```
 
-This enables reachability between endpoints behind either static or dynamic EVPN VTEPs. However, packets sent towards MACs behind static VTEPs are flooded to all VTEPs:
+This enables reachability between endpoints behind either static or dynamic EVPN VTEPs:
+```
+docker exec -it clab-static-vxlan-spine-lab-h3 ping 10.0.0.101
+```
+However, packets sent towards MACs behind static VTEPs are flooded to all VTEPs:
 ```
 monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
 ```
@@ -45,6 +49,7 @@ monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
 [2021-10-14 16:55:57.232972]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:490
 [2021-10-14 16:55:57.234006]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:490
 ```
+Notice how each SRL1 is sending an equal amount of packets towards all other VTEPs
 
 # Dynamic learning solution: An EVPN proxy agent
 By adding a BGP speaker application to an SR Linux node, we can advertise EVPN routes on behalf of legacy VTEP devices with static configuration. Furthermore, by observing datapath VXLAN traffic from such nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
