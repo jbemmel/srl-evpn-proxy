@@ -75,7 +75,7 @@ class Plugin(ToolsPlugin):
 from typing import Iterator, List, Optional
 from srlinux.mgmt.cli.command_node_with_arguments import CommandNodeWithArguments
 from srlinux.syntax.argument import Argument
-from cumulus import retrieve_dynamic_MACs
+from . import cumulus
 
 class CumulusMACCompleter(object):
     '''
@@ -98,7 +98,7 @@ class CumulusMACCompleter(object):
           user = arguments.get('cumulus_user')
           pswd = arguments.get('cumulus_password')
           try:
-             self._macs[ vtep ] = retrieve_dynamic_MACs( vtep, user, pswd )
+             self._macs[ vtep ] = cumulus.retrieve_dynamic_MACs( vtep, user, pswd )
           except Exception as err:
              self._macs[ vtep ] = [ "< error retrieving MACs - REST API enabled and using correct credentials? >" ]
 
