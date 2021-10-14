@@ -320,6 +320,12 @@ module srl-evpn-proxy-agent {
               // Use custom pattern to exclude broadcast/multicast MACs
               type string {
                 pattern '[0-9a-fA-F][02468aceACE](:[0-9a-fA-F]{2}){5}';
+
+                // Exclude VRRP MACs
+                pattern '00:00:5[eE]:00:01:.*' {
+                  modifier invert-match;
+                  error-message "VRRP MACs should not be defined statically";
+                }
               }
             }
           }

@@ -34,6 +34,13 @@ RUN cd /tmp && yum install -y git python3-devel && \
 #  yum install -y libtool autoconf automake diffutils file make && \
 #  cd Etherate && ./configure.sh && make && make install
 
+# Build IEEE 802.1ag tools
+RUN yum install -y autoconf automake make && \
+    dnf --enablerepo=powertools install -y libpcap-devel && \
+    cd /tmp && \
+    git clone https://github.com/jbemmel/dot1ag-utils.git && \
+    cd dot1ag-utils && ./bootstrap.sh && make && make install
+
 FROM target-image AS final
 
 # Allow provisioning of link-local IPs on interfaces, exclude gateway subnet?
@@ -45,6 +52,11 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 
 # Add custom built etherate tool
 # COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
+
+# Add custom built IEEE 802.1ag tools, requires libpcap libraries
+RUN sudo dnf --enablerepo=powertools install -y libpcap
+COPY --from=build-grpc-with-eventlet /usr/local/bin/ethping /usr/local/bin/ethtrace \
+           /usr/local/bin/dot1ag* /usr/local/bin/
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
