@@ -74,7 +74,7 @@ class Plugin(ToolsPlugin):
 from typing import Iterator, List, Optional
 from srlinux.mgmt.cli.command_node_with_arguments import CommandNodeWithArguments
 from srlinux.syntax.argument import Argument
-import subprocess
+from cumulus import retrieve_dynamic_MACs
 
 class CumulusMACCompleter(object):
     '''
@@ -95,18 +95,10 @@ class CumulusMACCompleter(object):
         if vtep not in self._macs:
           user = arguments.get('cumulus_user')
           pswd = arguments.get('cumulus_password')
-          cmd = f"/usr/sbin/ip netns exec srbase-default /usr/bin/curl -X POST -k -s -u {user}:{pswd} -H \"Content-Type: application/json\" -d '{{\"cmd\": \"show bridge macs dynamic json\"}}' https://{vtep}:8080/nclu/v1/rpc"
-
-          res = subprocess.run( cmd, shell=True, stdout=subprocess.PIPE, check=True, timeout=3 )
-          # logging.info( res )
-          if res.stdout:
-            try:
-              macs = json.loads( res.stdout )
-              # Take only MACs on Ethernet interfaces, TODO could filter on VLAN
-              self._macs[ vtep ] = [ m['mac'] for m in macs if m['ifname'][0]=='e' ]
-            except Exception as err:
-              logging.debug( f"Query for MACs did not return any results; REST API enabled on VTEP {vtep}? {err}" )
-              self._macs[ vtep ] = [ "< error retrieving MACs - REST API enabled and using correct credentials? >" ]
+          try:
+             self._macs[ vtep ] = retrieve_dynamic_MACs( vtep, user, pswd )
+          except Exception as err:
+             self._macs[ vtep ] = [ "< error retrieving MACs - REST API enabled and using correct credentials? >" ]
 
         result: List[str] = [ m for m in self._macs[vtep] if m.startswith(partial_word) ]
         return iter(  result[ :self._limit ] )
