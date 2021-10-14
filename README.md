@@ -31,6 +31,8 @@ commit stay
     static-vtep 1.1.1.2 { }
 
 commit stay
+monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
+
 ```
 
 This enables reachability between endpoints behind either static or dynamic EVPN VTEPs:
@@ -39,9 +41,6 @@ docker exec -it clab-static-vxlan-spine-lab-h3 ping 10.0.0.101
 ```
 However, packets sent towards MACs behind static VTEPs are flooded to all VTEPs:
 ```
-monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
-```
-```
 [2021-10-14 16:55:38.665943]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:469
 [2021-10-14 16:55:38.666652]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:469
 [2021-10-14 16:55:47.213625]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:479
@@ -49,7 +48,7 @@ monitor from state /tunnel vxlan-tunnel vtep 1.1.1.{1,2} statistics out-packets
 [2021-10-14 16:55:57.232972]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.1]/statistics/out-packets:490
 [2021-10-14 16:55:57.234006]: update /tunnel/vxlan-tunnel/vtep[address=1.1.1.2]/statistics/out-packets:490
 ```
-Notice how SRL1 is sending an equal amount of packets towards all other VTEPs
+Notice how SRL1 is sending each ping packet towards all other VTEPs
 
 # Static MAC route solution
 Flooding of traffic towards these "unknown" MACs can be avoided by configuring them statically:
