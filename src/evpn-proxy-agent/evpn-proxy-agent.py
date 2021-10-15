@@ -687,6 +687,12 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
    """
    logging.debug( f"ReplyARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
 
+
+   # TODO Use Linux kernel? https://www.kernel.org/doc/html/latest/networking/timestamping.html
+   # SO_TIMESTAMPNS = 35
+   # s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+   # s.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMPNS, 1)
+   # raw_data, ancdata, flags, address = s.recvmsg(65535, 1024)
    def get_timestamp_us(): # 40-bit
       now = datetime.now(timezone.utc)
       # epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch

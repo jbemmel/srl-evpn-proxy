@@ -1168,27 +1168,6 @@
       ]
     },
     {
-      "name": "irb0",
-      "admin-state": "enable",
-      "subinterface": [
-        {
-          "index": 1,
-          "admin-state": "enable",
-          "ipv4": {
-            "address": [
-              {
-                "ip-prefix": "10.10.10.1/24",
-                "primary": [null]
-              }
-            ]
-          },
-          "ipv6": {
-
-          }
-        }
-      ]
-    },
-    {
       "name": "lo0",
       "description": "Loopback",
       "admin-state": "enable",
