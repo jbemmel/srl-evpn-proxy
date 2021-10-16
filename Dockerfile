@@ -54,9 +54,14 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 # COPY --from=build-grpc-with-eventlet /usr/local/bin/etherate /usr/local/bin/
 
 # Add custom built IEEE 802.1ag tools, requires libpcap libraries
-RUN sudo dnf --enablerepo=powertools install -y libpcap
-COPY --from=build-grpc-with-eventlet /usr/local/bin/ethping /usr/local/bin/ethtrace \
-           /usr/local/bin/dot1ag* /usr/local/bin/
+# RUN sudo dnf --enablerepo=powertools install -y libpcap
+# COPY --from=build-grpc-with-eventlet /usr/local/bin/ethping /usr/local/bin/ethtrace \
+#           /usr/local/bin/dot1ag* /usr/local/bin/
+
+# Add patched traceroute tool, use Go version (single binary)
+COPY --from=insomniacslk/dublin-traceroute-integ \
+  /build/src/github.com/insomniacslk/dublin-traceroute/go/dublintraceroute/cmd/dublin-traceroute/dublin-traceroute \
+  /usr/local/bin/
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
