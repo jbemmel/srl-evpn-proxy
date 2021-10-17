@@ -59,9 +59,9 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 #           /usr/local/bin/dot1ag* /usr/local/bin/
 
 # Add patched traceroute tool, use Go version (single binary)
-COPY --from=insomniacslk/dublin-traceroute-integ \
-  /build/src/github.com/insomniacslk/dublin-traceroute/go/dublintraceroute/cmd/dublin-traceroute/dublin-traceroute \
-  /usr/local/bin/
+#COPY --from=insomniacslk/dublin-traceroute-integ \
+#  /build/src/github.com/insomniacslk/dublin-traceroute/go/dublintraceroute/cmd/dublin-traceroute/dublin-traceroute \
+#  /usr/local/bin/
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
