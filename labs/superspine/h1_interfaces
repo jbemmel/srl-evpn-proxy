@@ -13,3 +13,4 @@ iface eth1
 auto eth1.20
 iface eth1.20
     address 20.0.0.101/24
+    pre-up echo 1 > /proc/sys/net/ipv6/conf/eth1.20/disable_ipv6
