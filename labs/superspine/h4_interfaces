@@ -5,6 +5,7 @@ auto eth1
 iface eth1
     address 10.0.0.104/24
     hwaddress ether 00:11:22:33:44:04
+    pre-up echo 1 > /proc/sys/net/ipv6/conf/eth1/disable_ipv6
 
 auto eth1.20
 iface eth1.20
