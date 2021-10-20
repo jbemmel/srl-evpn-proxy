@@ -13,7 +13,8 @@
         "host-enable-ipv6": false
     },
     "max-spine-ports": 6,
-    "evpn-rr": "1.1.2.1"
+    "evpn-rr": "1.1.2.1",
+    "tweaks": { }
   },
   "srl_nokia-acl:acl": {
     "cpm-filter": {
