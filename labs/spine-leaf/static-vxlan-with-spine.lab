@@ -23,8 +23,8 @@ topology:
         - ../../src/evpn-proxy-agent:/opt/demo-agents/evpn-proxy-agent
         - ../../src/evpn-proxy-agent/cli/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
         - ../../src/evpn-proxy-agent/cli/vxlan_avoid_flooding.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_avoid_flooding.py
-        - ../../../srl-vxlan-oam/src/srl-vxlan-oam:/opt/demo-agents/srl-vxlan-oam
-        - /home/jeroen/.local/lib/python3.8/site-packages/scapy:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/scapy
+        # - ../../../srl-vxlan-oam/src/srl-vxlan-oam:/opt/demo-agents/srl-vxlan-oam
+        # - /home/jeroen/.local/lib/python3.8/site-packages/scapy:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/scapy
 
     cvx:
       image: networkop/cx:4.4.0
