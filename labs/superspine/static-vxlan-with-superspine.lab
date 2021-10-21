@@ -21,6 +21,7 @@ topology:
         # - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
         - ../../src/evpn-proxy-agent:/opt/demo-agents/evpn-proxy-agent
         - ../../src/evpn-proxy-agent/cli/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
+        - ../../../srl-vxlan-oam/src/srl-vxlan-oam/cli/vxlan_traceroute.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_traceroute.py
         - ../../../srl-vxlan-oam/src/srl-vxlan-oam/ecmp-traceroute.py:/opt/demo-agents/srl-vxlan-oam/ecmp-traceroute.py
 
     cvx:
