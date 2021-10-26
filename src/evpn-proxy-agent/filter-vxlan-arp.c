@@ -1,4 +1,6 @@
+#ifndef KBUILD_MODNAME
 #define KBUILD_MODNAME "vxlan_arp_filter"
+#endif
 
 #include <uapi/linux/ptrace.h>
 #include <net/sock.h>

@@ -71,7 +71,8 @@ from bcc import BPF
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp, tcp
 from ryu.ofproto import ether, inet
 
-SO_TIMESTAMPNS = 35
+SO_TIMESTAMP   = 29 # us precision
+SO_TIMESTAMPNS = 35 # Higher ns precision
 
 ############################################################
 ## Agent will start with this name
@@ -526,7 +527,7 @@ def HandleTCPTimestamps( ipHeaders, tcpHeaders, ancdata ):
   if ( len(ancdata)>0 ):
    for i in ancdata:
     logging.info(f'HandleTCPTimestamps ancdata: cmsg_level={i[0]}, cmsg_type={i[1]}, cmsg_data({len(i[2])})={i[2]})');
-    if (i[0]!=socket.SOL_SOCKET or i[1]!=SO_TIMESTAMPNS):
+    if (i[0]!=socket.SOL_SOCKET or i[1]!=SO_TIMESTAMP): # Removed 'NS'
        continue
     tmp = (struct.unpack("iiii",i[2]))
     ts_sec = tmp[0]
@@ -553,7 +554,7 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
-    sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMPNS, 1)
+    sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMP, 1) # Not NS
 
     # To make sendto work?
     # sock.bind((vxlan_intf, 0x0800))
@@ -562,10 +563,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     try:
      while 1:
       # packet_str = os.read(socket_fd,2048)
-      raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
-
-      packet_bytearray = bytearray(raw_data)
       try:
+        raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
+        packet_bytearray = bytearray(raw_data)
         pkt = packet.Packet( packet_bytearray )
         #
         # 6 layers:
@@ -702,9 +702,10 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
         # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
         # print( f'trace_fields: {msg}' )
     except Exception as ex:
-       logging.error( f"Exiting ARP socket while loop: {ex}" )
+       tb_str = ''.join(traceback.format_tb(ex.__traceback__))
+       logging.error( f"Exiting ARP socket while loop: {ex} ~ {tb_str}" )
 
-    # Doesn't happen
+    # Only happens upon exception
     bpf.cleanup()
 
 def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
