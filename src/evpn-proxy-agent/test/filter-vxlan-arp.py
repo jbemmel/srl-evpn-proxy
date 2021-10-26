@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 #Bertrone Matteo - Polytechnic of Turin
 #November 2015
@@ -19,7 +19,7 @@ from sys import argv
 import sys
 import socket
 import os
-import netns
+# import netns
 
 from ryu.lib.packet import packet, vxlan, ethernet, arp
 
@@ -36,7 +36,7 @@ def help():
     print("")
     print("optional arguments:")
     print("   -h                       print this help")
-    print("   -i if_name               select interface if_name. Default is eth0")
+    print("   -i if_name               select interface if_name. Default is enp0s3")
     print("")
     print("examples:")
     print(f"    {argv[0]}              # bind socket to mgmt0.0")
@@ -44,7 +44,7 @@ def help():
     exit()
 
 #arguments
-interface="mgmt0.0"
+interface="enp0s3"
 net_namespace="srbase"
 
 if len(argv) == 2:
@@ -62,30 +62,30 @@ if len(argv) == 3:
 if len(argv) > 3:
   usage()
 
-print ("binding socket to '%s' in netns '%s'" % interface, net_namespace)
+print( f"binding socket to '{interface}' in netns '{net_namespace}'" )
 
 # initialize BPF - load source code from http-parse-simple.c
-bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
+bpf = BPF(src_file = "filter-tcp-rtt.c",debug = 0)
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
 #more info about eBPF program types
 #http://man7.org/linux/man-pages/man2/bpf.2.html
-function_arp_filter = bpf.load_func("udp_filter", BPF.SOCKET_FILTER)
+function_arp_filter = bpf.load_func("tcp_rtt_filter", BPF.SOCKET_FILTER)
 
 #create raw socket, bind it to interface
 #attach bpf program to socket created
-with netns.NetNS(nsname=net_namespace):
-  BPF.attach_raw_socket(function_arp_filter, interface)
+# with netns.NetNS(nsname=net_namespace):
+BPF.attach_raw_socket(function_arp_filter, interface)
 
-  #get file descriptor of the socket previously created inside BPF.attach_raw_socket
-  socket_fd = function_arp_filter.sock
+#get file descriptor of the socket previously created inside BPF.attach_raw_socket
+socket_fd = function_arp_filter.sock
 
-  #create python socket object, from the file descriptor
-  sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
-  #set it as blocking socket
-  sock.setblocking(True)
+#create python socket object, from the file descriptor
+sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+#set it as blocking socket
+sock.setblocking(True)
 
-  while 1:
+while 1:
     #retrieve raw packet from socket
     packet_str = os.read(socket_fd,2048)
 
@@ -99,10 +99,11 @@ with netns.NetNS(nsname=net_namespace):
     try:
       pkt = packet.Packet( packet_bytearray )
       for p in pkt:
-          print( p.protocol_name, p )
-          if p.protocol_name == 'vlan':
+          if hasattr(p,'protocol_name'):
+           print( p.protocol_name, p )
+           if p.protocol_name == 'vlan':
               print( f'vlan id = {p.vid}' )
-          elif p.protocol_name == 'vxlan':
+           elif p.protocol_name == 'vxlan':
               print( f'vni = {p.vni}' )
 
     except AssertionError as e:

@@ -1,0 +1,318 @@
+// #define KBUILD_MODNAME "vxlan_arp_filter"
+
+#include <uapi/linux/ptrace.h>
+#include <net/sock.h>
+#include <bcc/proto.h>
+
+#include <linux/bpf.h>
+// #include <bpf_helpers.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/in.h>
+#include <linux/udp.h>
+#include <linux/tcp.h>
+
+#define DROP 0  // drop the packet
+#define KEEP -1 // keep the packet and send it to userspace returning -1
+
+// Added for tracking BGP RTT to peers using timestamps
+struct data_t {
+    u32 peer_ip;
+    u64 rtt;
+};
+BPF_PERF_OUTPUT(bgp_rtt_events);
+
+// Most recent TCP timestamp, per IP
+BPF_HASH(last_ts, u32, unsigned long);
+
+// From linux/if_arp.h, not used
+/*
+struct arphdr
+{
+	__be16		ar_hrd;		// format of hardware address
+	__be16		ar_pro;		// format of protocol address
+	unsigned char	ar_hln;		// length of hardware address
+	unsigned char	ar_pln;		// length of protocol address
+	__be16		ar_op;		// ARP opcode (command)
+
+	// Ethernet looks like this : This bit is variable sized however...
+	unsigned char		ar_sha[6];	  // sender hardware address
+	__be32 ar_sip;		            // sender IP address
+	unsigned char		ar_tha[6];	  // target hardware address
+	__be32 ar_tip;		            // target IP address
+} __packed;
+*/
+
+#define IP_UDP 	 17
+#define IP_TCP 	 6
+#define ETH_HLEN 14
+
+/*
+ * Parses the TSval and TSecr values from the TCP options field. If successful
+ * the TSval and TSecr values will be stored at tsval and tsecr (in network
+ * byte order).
+ * Returns 0 if sucessful and -1 on failure
+ *
+ * source: https://github.com/jbemmel/bpf-examples/blob/master/pping/pping_kern.c#L77
+ */
+/*
+static int parse_tcp_ts(struct tcp_t *tcph, void *data_end,
+                        u32 *tsval, u32 *tsecr)
+{
+  __u8 len = tcph->offset << 2; // doff original, length in dwords
+	__u8 *opt_end = (__u8 *)tcph + len;
+	__u8 *pos = (__u8 *)(tcph + 1); //Current pos in TCP options
+	__u8 i, opt;
+	volatile __u8
+		opt_size; // Seems to ensure it's always read of from stack as u8
+
+	if ((void*)pos > data_end || len <= sizeof(struct tcp_t))
+		return -1;
+
+  if ((void*)opt_end > data_end)
+    opt_end = (__u8 *) data_end;
+
+  bpf_trace_printk("parse_tcp_ts: len=%u options=%u", len, len-sizeof(*tcph) );
+
+#pragma unroll //temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
+	for (i = 0; i < MAX_TCP_OPTIONS; i++) {
+		if (pos + 1 > opt_end)
+			return -1;
+
+		opt = *pos;
+		if (opt == 0) // Reached end of TCP options
+			return -1;
+
+		if (opt == 1) { // TCP NOP option - advance one byte
+			pos++;
+			continue;
+		}
+
+		// Option > 1, should have option size
+		if (pos + 2 > opt_end)
+			return -1;
+		opt_size = *(pos + 1);
+		if (opt_size < 2) // Stop parsing options if opt_size has an invalid value
+			return -1;
+
+		// Option-kind is TCP timestap (yey!)
+		if (opt == 8 && opt_size == 10) {
+			if (pos + 10 > opt_end)
+				return -1;
+			*tsval = ntohl( *(__be32 *)(pos + 2) );
+			*tsecr = ntohl( *(__be32 *)(pos + 6) );
+			return 0;
+		}
+
+		// Some other TCP option - advance option-length bytes
+		pos += opt_size;
+	}
+	return -1;
+}
+*/
+
+// See https://github.com/gamemann/XDP-TCP-Header-Options/blob/master/src/xdp_prog.c
+/* and https://github.com/xdp-project/bpf-examples/blob/master/pping/pping_kern.c#L95
+static int bgp_rtt_monitor(struct __sk_buff *skb) {
+  u8 *cursor = 0;
+
+	struct ethernet_t *ethernet = cursor_advance(cursor, sizeof(*ethernet));
+	// filter IPv4 packets (ethernet type = 0x0800), TODO support VLANs
+	if (ethernet->type == 0x0800) {
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
+  	// filter TCP packets (ip next protocol)
+  	if (ip->nextp == IP_TCP) {
+      struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
+      if (tcp->dst_port == 179) {
+        bpf_trace_printk("bgp_rtt_monitor: TODO check RTT source=%u\n", tcp->src_port );
+      } else if (tcp->src_port == 179) {
+        bpf_trace_printk("bgp_rtt_monitor: TODO check RTT dest=%u\n", tcp->dst_port );
+      } else return DROP;
+
+      // Look for timestamps
+      __be32 tsval, tsecr;
+      if ( parse_tcp_ts( tcp, (__u8 *)(long)skb->data_end, &tsval, &tsecr ) == 0 ) {
+        bpf_trace_printk("bgp_rtt_monitor: Found TS option in BGP packet val=%u ecr=%u\n",
+          ntohl(tsval), ntohl(tsecr) );
+      }
+    }
+  }
+  return DROP; // Always drop
+}
+*/
+
+/* eBPF program - working VXLAN ARP filter
+
+  return  0 -> DROP the packet
+  return -1 -> KEEP the packet and return it to user space (userspace can read it from the socket_fd )
+
+	TODO VXLAN ARP packets have specific sizes - could filter on that too
+
+  This is a TC / socket filter type program, and as such *does not have access*
+  to some fields like skb->data_end (!)
+*/
+
+/*
+int tcp_rtt_filter(struct __sk_buff *skb) {
+	// Shows up in: cat /sys/kernel/debug/tracing/trace_pipe
+  // Cannot access skb->wire_len directly here. Could use load_word?
+  bpf_trace_printk("tcp_rtt_filter got a packet ingress_ifindex=%u ifindex=%u\n",
+                    skb->ingress_ifindex, skb->ifindex );
+
+  // Drop packets generated by local VTEP
+  // if ( skb->ingress_ifindex == 0 ) {
+  //    bpf_trace_printk("tcp_rtt_filter: Dropping locally generated packet\n");
+  //    return DROP;
+  // }
+
+  // invalid access: ((void *)(long)skb->data_end) - ((void *)(long)skb->data) );
+	// u8 *cursor = 0;
+  u32 hdrlen, var_off, const_off;
+	struct ethernet_t *ethernet; // = cursor_advance(cursor, sizeof(*ethernet));
+  struct ip_t *ip;
+  struct tcp_t *tcp;
+
+  var_off = 0;
+  const_off = 0;
+  ensure_header(skb,var_off,const_off,ethernet);
+
+	// filter IPv4 packets (ethernet type = 0x0800), TODO support VLANs
+	if (ethernet->type != 0x0800) {
+		bpf_trace_printk("tcp_rtt_filter: not IPv4 but %x\n", ethernet->type );
+		return DROP;
+	}
+  const_off = ETH_HLEN;
+  ensure_header(skb,var_off,const_off,ip);
+  hdrlen = ip->hlen << 2;
+  if (hdrlen < sizeof(*ip)) {
+    bpf_trace_printk("tcp_rtt_filter: invalid IP header length %u\n", hdrlen );
+    return DROP;
+  }
+
+  // filter UDP packets (ip next protocol = 0x11) or TCP (0x6)
+  if (ip->nextp != IP_TCP) {
+    bpf_trace_printk("tcp_rtt_filter: not TCP but %u\n", ip->nextp );
+    return DROP;
+  }
+
+  var_off += hdrlen;
+  ensure_header(skb, var_off, const_off, tcp);
+
+  if (tcp->dst_port == 80) {
+    bpf_trace_printk("bgp_rtt_monitor: TODO check RTT source=%u\n", tcp->src_port );
+  } else if (tcp->src_port == 80) {
+    bpf_trace_printk("bgp_rtt_monitor: TODO check RTT dest=%u\n", tcp->dst_port );
+  } else {
+    bpf_trace_printk("bgp_rtt_monitor: TODO check RTT src=%u dest=%u\n",
+                      tcp->src_port, tcp->dst_port );
+  }
+
+  // Look for timestamps
+  u32 tsval, tsecr;
+  int opt_len = tcp->offset << 2; // doff original, length in dwords
+  if ( parse_tcp_ts( tcp, opt_len, &tsval, &tsecr ) == 0 ) {
+    bpf_trace_printk("bgp_rtt_monitor: Found TS option in BGP packet val=%u ecr=%u\n",
+      tsval, tsecr );
+  }
+  return KEEP;
+}
+*/
+
+int tcp_rtt_filter(struct __sk_buff *skb)
+{
+    // TC filter programs don't have access to 'data' and 'data_end'
+    // void *data_end = (void *)(long)skb->data_end;
+    // void *data = (void *)(long)skb->data;
+
+    u8 *cursor = 0;
+    struct ethernet_t *eth = cursor_advance(cursor, sizeof(*eth));
+    void *data = (void*) eth;
+    void *data_end = data + skb->len;
+
+    struct ip_t *ip;
+    struct tcp_t *tcp;
+
+    struct {
+      u32 tsval, tsecr;
+    } timestamps;
+
+    if (data + sizeof(*eth) > data_end)
+       return DROP;
+
+    if (eth->type != 0x0800)
+       return DROP;
+
+    if (data + sizeof(*eth) + sizeof(*ip) > data_end)
+        return DROP;
+
+    ip = data + sizeof(*eth);
+    if (ip->nextp != IP_TCP) {
+        bpf_trace_printk( "tcp_rtt_filter: Not TCP but %u", ip->nextp );
+        return DROP;
+    }
+
+    int ip_hlen = ip->hlen << 2;
+    tcp = (void*) ip + ip_hlen;
+    if ((void*)(tcp+1) > data_end) return DROP;
+
+    int tcp_hlen = tcp->offset << 2;
+    if ( tcp_hlen < sizeof(struct tcp_t)+12 ) {
+      bpf_trace_printk( "tcp_rtt_filter: tcp_hlen too small to have timestamp option %u<%u",
+        tcp_hlen, sizeof(struct tcp_t)+12 );
+      return DROP;
+    }
+
+    __u8 *pos = (__u8 *)(tcp + 1); // Current pos in TCP options
+    __u8 *opt_end = (__u8 *)tcp + tcp_hlen;
+    if ((void*)opt_end > data_end) opt_end = data_end;
+
+    __u8 opt, opt_size; // volatile: ensure it's always read of from stack as u8
+
+    #pragma unroll // temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
+    #define MAX_TCP_OPTIONS 4
+
+    for (int i = 0; i < MAX_TCP_OPTIONS; i++) {
+    		if (pos + 1 > opt_end)
+    			return DROP;
+
+    		// __u8 opt = *pos;
+        bpf_probe_read_kernel( &opt, sizeof(opt), pos );
+    		if (opt == 0) { // Reached end of TCP options
+          bpf_trace_printk( "tcp_rtt_filter: end of TCP options" );
+    			return DROP;
+        }
+
+    		if (opt == 1) { // TCP NOP option - advance one byte
+    			pos++;
+    			continue;
+    		}
+
+    		// Option > 1, should have option size
+    		if (pos + 2 > opt_end)
+    			return DROP;
+
+    		// opt_size = *(pos + 1);
+        bpf_probe_read_kernel( &opt_size, sizeof(opt_size), pos+1 );
+    		if (opt_size < 2) // Stop parsing options if opt_size has an invalid value
+    			return DROP;
+
+    		// Option-kind is TCP timestap (yey!)
+    		if (opt == 8 && opt_size == 10) {
+    			if (pos + 10 > opt_end)
+    				return DROP;
+
+    			// tsval = ntohl( *(__be32 *)(pos + 2) );
+    			// tsecr = ntohl( *(__be32 *)(pos + 6) );
+          bpf_probe_read_kernel( &timestamps, sizeof(timestamps), pos+2 );
+          bpf_trace_printk("bgp_rtt_monitor: Found TS option in BGP packet val=%u ecr=%u\n",
+            ntohl(timestamps.tsval), ntohl(timestamps.tsecr) );
+    			return KEEP;
+    		}
+
+    		// Some other TCP option - advance option-length bytes
+    		pos += opt_size;
+    }
+    return DROP;
+}
+
+// char ____license[] __attribute__((section("license"), used)) = "GPL";
