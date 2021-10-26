@@ -71,6 +71,8 @@ from bcc import BPF
 from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp, tcp
 from ryu.ofproto import ether, inet
 
+SO_TIMESTAMPNS = 35
+
 ############################################################
 ## Agent will start with this name
 ############################################################
@@ -519,7 +521,8 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip, clear_macs=True ):
     return True
 
 def HandleTCPTimestamps( ipHeaders, tcpHeaders, ancdata ):
-  ts_sec = 0, ts_ns = 0
+  ts_sec = 0
+  ts_ns = 0
   if ( len(ancdata)>0 ):
    for i in ancdata:
     logging.info(f'HandleTCPTimestamps ancdata: cmsg_level={i[0]}, cmsg_type={i[1]}, cmsg_data({len(i[2])})={i[2]})');
@@ -550,8 +553,6 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
-
-    SO_TIMESTAMPNS = 35
     sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMPNS, 1)
 
     # To make sendto work?
