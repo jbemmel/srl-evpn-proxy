@@ -218,6 +218,13 @@ int tcp_rtt_filter(struct __sk_buff *skb) {
 }
 */
 
+struct tcp_ts_option {
+  __u8 type;
+  __u8 len;
+  __u32 val;
+  __u32 ecr;
+} __attribute__((packed));
+
 int tcp_rtt_filter(struct __sk_buff *skb)
 {
     // TC filter programs don't have access to 'data' and 'data_end'
@@ -226,34 +233,23 @@ int tcp_rtt_filter(struct __sk_buff *skb)
 
     u8 *cursor = 0;
     struct ethernet_t *eth = cursor_advance(cursor, sizeof(*eth));
-    void *data = (void*) eth;
-    void *data_end = data + skb->len;
-
-    struct ip_t *ip;
-    struct tcp_t *tcp;
-
-    struct {
-      u32 tsval, tsecr;
-    } timestamps;
-
-    if (data + sizeof(*eth) > data_end)
-       return DROP;
 
     if (eth->type != 0x0800)
        return DROP;
 
-    if (data + sizeof(*eth) + sizeof(*ip) > data_end)
-        return DROP;
+    struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
 
-    ip = data + sizeof(*eth);
     if (ip->nextp != IP_TCP) {
         bpf_trace_printk( "tcp_rtt_filter: Not TCP but %u", ip->nextp );
         return DROP;
     }
 
-    int ip_hlen = ip->hlen << 2;
-    tcp = (void*) ip + ip_hlen;
-    if ((void*)(tcp+1) > data_end) return DROP;
+    // XXX does not support variable IP options
+    struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
+
+    // int ip_hlen = ip->hlen << 2;
+    // tcp = (void*) ip + ip_hlen;
+    // if ((void*)(tcp+1) > data_end) return DROP;
 
     int tcp_hlen = tcp->offset << 2;
     if ( tcp_hlen < sizeof(struct tcp_t)+12 ) {
@@ -262,24 +258,30 @@ int tcp_rtt_filter(struct __sk_buff *skb)
       return DROP;
     }
 
-    __u8 *pos = (__u8 *)(tcp + 1); // Current pos in TCP options
-    __u8 *opt_end = (__u8 *)tcp + tcp_hlen;
-    if ((void*)opt_end > data_end) opt_end = data_end;
+    // struct tcp_ts_option *opt = cursor_advance(cursor, sizeof(*opt));
+    // bpf_trace_printk( "tcp_rtt_filter: parsed opt type=%u", opt->type, opt->len );
+/*
+    __u8 *pos = (__u8*)(tcp + 1); // Current pos in TCP options
+    __u8 *opt_end = ((__u8 *)tcp) + tcp_hlen;
+    // if ((void*)opt_end > data_end) opt_end = data_end;
 
-    __u8 opt, opt_size; // volatile: ensure it's always read of from stack as u8
-
-    #pragma unroll // temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
     #define MAX_TCP_OPTIONS 4
-
+    // #pragma unroll // temporary solution until we can identify why the non-unrolled loop gets stuck in an infinite loop
     for (int i = 0; i < MAX_TCP_OPTIONS; i++) {
-    		if (pos + 1 > opt_end)
+    		if (pos + 12 > opt_end) {
+          bpf_trace_printk( "tcp_rtt_filter: reached end of TCP options %p", opt_end );
     			return DROP;
+        }
 
     		// __u8 opt = *pos;
-        bpf_probe_read_kernel( &opt, sizeof(opt), pos );
+        __u8 opt;
+        int err = bpf_probe_read_kernel( &opt, sizeof(opt), pos );
     		if (opt == 0) { // Reached end of TCP options
-          bpf_trace_printk( "tcp_rtt_filter: end of TCP options" );
+          // cannot access skb->tstamp :(
+          bpf_trace_printk( "tcp_rtt_filter: end of TCP options %p err=%d", pos, err );
     			return DROP;
+        } else {
+          bpf_trace_printk( "tcp_rtt_filter: found option %u", opt );
         }
 
     		if (opt == 1) { // TCP NOP option - advance one byte
@@ -287,32 +289,29 @@ int tcp_rtt_filter(struct __sk_buff *skb)
     			continue;
     		}
 
-    		// Option > 1, should have option size
-    		if (pos + 2 > opt_end)
+    		// __u8 opt_size = *(pos + 1);
+        __u8 opt_size;
+        err = bpf_probe_read_kernel( &opt_size, sizeof(opt_size), pos+1 );
+    		if (opt_size < 2) { // Stop parsing options if opt_size has an invalid value
+          bpf_trace_printk( "tcp_rtt_filter: invalid option size: %u", opt_size );
     			return DROP;
-
-    		// opt_size = *(pos + 1);
-        bpf_probe_read_kernel( &opt_size, sizeof(opt_size), pos+1 );
-    		if (opt_size < 2) // Stop parsing options if opt_size has an invalid value
-    			return DROP;
+        }
 
     		// Option-kind is TCP timestap (yey!)
     		if (opt == 8 && opt_size == 10) {
-    			if (pos + 10 > opt_end)
-    				return DROP;
-
-    			// tsval = ntohl( *(__be32 *)(pos + 2) );
-    			// tsecr = ntohl( *(__be32 *)(pos + 6) );
-          bpf_probe_read_kernel( &timestamps, sizeof(timestamps), pos+2 );
+          u32 tsval = ntohl( *(__be32 *)(pos + 2) );
+    			u32 tsecr = ntohl( *(__be32 *)(pos + 6) );
           bpf_trace_printk("bgp_rtt_monitor: Found TS option in BGP packet val=%u ecr=%u\n",
-            ntohl(timestamps.tsval), ntohl(timestamps.tsecr) );
+            tsval, tsecr );
     			return KEEP;
     		}
 
     		// Some other TCP option - advance option-length bytes
     		pos += opt_size;
     }
-    return DROP;
+    */
+    bpf_trace_printk( "tcp_rtt_filter: done processing options" );
+    return KEEP;
 }
 
 // char ____license[] __attribute__((section("license"), used)) = "GPL";

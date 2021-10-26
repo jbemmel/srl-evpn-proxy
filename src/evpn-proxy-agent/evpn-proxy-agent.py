@@ -22,6 +22,7 @@ import logging
 import socket
 import os
 import re
+import struct
 import ipaddress
 import json
 import traceback
@@ -67,7 +68,7 @@ from ryu.lib import hub
 # eBPF ARP filter imports
 #
 from bcc import BPF
-from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp
+from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp, tcp
 from ryu.ofproto import ether, inet
 
 ############################################################
@@ -517,6 +518,20 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip, clear_macs=True ):
     del state.bgp_vrfs[ rd ]
     return True
 
+def HandleTCPTimestamps( ipHeaders, tcpHeaders, ancdata ):
+  ts_sec = 0, ts_ns = 0
+  if ( len(ancdata)>0 ):
+   for i in ancdata:
+    logging.info(f'HandleTCPTimestamps ancdata: cmsg_level={i[0]}, cmsg_type={i[1]}, cmsg_data({len(i[2])})={i[2]})');
+    if (i[0]!=socket.SOL_SOCKET or i[1]!=SO_TIMESTAMPNS):
+       continue
+    tmp = (struct.unpack("iiii",i[2]))
+    ts_sec = tmp[0]
+    ts_ns = tmp[2]
+    break
+  ts = [ (o.ts_val,o.ts_ecr) for o in tcpHeaders.option if o.kind == tcp.TCP_OPTION_KIND_TIMESTAMPS ]
+  logging.info( f"HandleTCPTimestamps: {ts_sec}.{ts_ns}={ts} IP {ipHeaders.src}>{ipHeaders.dst}" )
+
 def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     logging.info( f"Starting ARP listener on interface={vxlan_intf} params {state.params}" )
     # initialize BPF - load source code from filter-vxlan-arp.c
@@ -536,14 +551,19 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
     sock.setblocking(True)
 
+    SO_TIMESTAMPNS = 35
+    sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMPNS, 1)
+
     # To make sendto work?
     # sock.bind((vxlan_intf, 0x0800))
 
     _self['socket'] = sock # Used for close()
     try:
      while 1:
-      packet_str = os.read(socket_fd,2048)
-      packet_bytearray = bytearray(packet_str)
+      # packet_str = os.read(socket_fd,2048)
+      raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
+
+      packet_bytearray = bytearray(raw_data)
       try:
         pkt = packet.Packet( packet_bytearray )
         #
@@ -561,7 +581,13 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
                 logging.debug( f'vlan id = {p.vid}' )
             elif p.protocol_name == 'vxlan':
                 logging.info( f'vni = {p.vni}' )
+
         _ip = pkt.get_protocol( ipv4.ipv4 )
+        _tcp = pkt.get_protocol( tcp.tcp )
+        if _tcp:
+            HandleTCPTimestamps( _ip, _tcp, ancdata )
+            continue
+
         _vxlan = pkt.get_protocol( vxlan.vxlan )
         _arp = pkt.get_protocol( arp.arp )
         vni = _vxlan.vni
