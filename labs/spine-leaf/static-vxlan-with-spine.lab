@@ -47,6 +47,7 @@ topology:
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
         - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
+        - cumulus_enable_restapi.firstboot:/usr/lib/cumulus/firstboot-after-networking
     cumulus2:
       kind: cvx
       group: static-fabric
@@ -55,6 +56,7 @@ topology:
         - /dev/null:/etc/systemd/system/basic.target.wants/mstpd.service
         - cumulus2_interfaces:/etc/network/interfaces.d/host-mounts
         - cumulus_restapi.conf:/etc/nginx/sites-available/nginx-restapi.conf
+        - cumulus_enable_restapi.firstboot:/usr/lib/cumulus/firstboot-after-networking
     srl1:
       kind: srl
       group: evpn-fabric

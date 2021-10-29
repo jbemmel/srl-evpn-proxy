@@ -553,8 +553,9 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
       BPF.attach_raw_socket(function_arp_filter, vxlan_intf)
     socket_fd = function_arp_filter.sock
     sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
+
+    # sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMP, 1) # Not NS
     sock.setblocking(True)
-    sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMP, 1) # Not NS
 
     # To make sendto work?
     # sock.bind((vxlan_intf, 0x0800))
@@ -562,10 +563,12 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
     _self['socket'] = sock # Used for close()
     try:
      while 1:
-      # packet_str = os.read(socket_fd,2048)
+      packet_str = os.read(socket_fd,2048)
+      packet_bytearray = bytearray(packet_str)
       try:
-        raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
-        packet_bytearray = bytearray(raw_data)
+        # or recvmmsg for multiple?
+        # raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
+        # packet_bytearray = bytearray(raw_data)
         pkt = packet.Packet( packet_bytearray )
         #
         # 6 layers:
@@ -584,10 +587,10 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
                 logging.info( f'vni = {p.vni}' )
 
         _ip = pkt.get_protocol( ipv4.ipv4 )
-        _tcp = pkt.get_protocol( tcp.tcp )
-        if _tcp:
-            HandleTCPTimestamps( _ip, _tcp, ancdata )
-            continue
+        #_tcp = pkt.get_protocol( tcp.tcp )
+        #if _tcp:
+        #    HandleTCPTimestamps( _ip, _tcp, ancdata )
+        #    continue
 
         _vxlan = pkt.get_protocol( vxlan.vxlan )
         _arp = pkt.get_protocol( arp.arp )

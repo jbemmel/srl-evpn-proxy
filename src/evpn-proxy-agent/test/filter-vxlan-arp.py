@@ -66,12 +66,14 @@ if len(argv) > 3:
 print( f"binding socket to '{interface}' in netns '{net_namespace}'" )
 
 # initialize BPF - load source code from http-parse-simple.c
-bpf = BPF(src_file = "filter-tcp-rtt.c",debug = 0)
+# bpf = BPF(src_file = "filter-tcp-rtt.c",debug = 0)
+bpf = BPF(src_file = "tc_prog_test.c",debug = 1,cflags=["-I/usr/include"])
 
 #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
 #more info about eBPF program types
 #http://man7.org/linux/man-pages/man2/bpf.2.html
-function_arp_filter = bpf.load_func("tcp_rtt_filter", BPF.SOCKET_FILTER)
+# function_arp_filter = bpf.load_func("tcp_rtt_filter", BPF.SOCKET_FILTER)
+function_arp_filter = bpf.load_func("tc_prog", BPF.SOCKET_FILTER)
 
 #create raw socket, bind it to interface
 #attach bpf program to socket created

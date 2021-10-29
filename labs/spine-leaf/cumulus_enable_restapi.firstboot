@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# To be mapped to /usr/lib/cumulus/firstboot-after-networking (replacing it)
+# The original has errors with the mgmt VRF not existing...
+
+# JvB: enable and start REST API service
+/bin/systemctl enable restserver && /bin/systemctl start restserver
+
+exit 0

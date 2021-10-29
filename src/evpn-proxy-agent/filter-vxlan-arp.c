@@ -142,7 +142,8 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
     // Look for enough room for timestamps
     int opt_len = tcp->offset << 2; // doff original, length in dwords
     if ( opt_len >= sizeof(*tcp)+12 ) {
-      bpf_trace_printk("bgp_rtt_monitor: Found potential TS option in BGP packet opt_len=%u\n", opt_len );
+      bpf_trace_printk("bgp_rtt_monitor: Found potential TS option in BGP packet opt_len=%u ktime=%llu\n",
+        opt_len, bpf_ktime_get_ns() );
       return KEEP;
     }
     return DROP;

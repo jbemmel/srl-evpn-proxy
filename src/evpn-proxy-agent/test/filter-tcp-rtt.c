@@ -310,7 +310,7 @@ int tcp_rtt_filter(struct __sk_buff *skb)
     		pos += opt_size;
     }
     */
-    bpf_trace_printk( "tcp_rtt_filter: done processing options" );
+    bpf_trace_printk( "tcp_rtt_filter: forwarding TCP timestamps, bpf_ktime_get_ns=%llu", bpf_ktime_get_ns() );
     return KEEP;
 }
 
