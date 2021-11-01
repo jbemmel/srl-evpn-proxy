@@ -482,6 +482,8 @@ def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
        logging.info(f"Add_Static_VTEP: Adding VRF...RD={rd} RT={rt}")
        state.speaker.vrf_add(route_dist=rd,import_rts=[rt],export_rts=[rt],route_family=RF_L2_EVPN)
        state.bgp_vrfs[ rd ] = remote_ip
+    else:
+       logging.info(f"Add_Static_VTEP: Assuming VRF for RD={rd} exists...")
 
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
     now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -885,21 +887,22 @@ def Handle_Notification(obj, state):
                del state.arp_threads
 
             # if enabled, start separate thread for BGP EVPN interactions
+            def shutdown_bgp():
+                state.speaker.shutdown()
+                del state.speaker
+                state.bgp_vrfs = {} # Reset
+                # state.mac_vrfs = {} do not clean this
+                hub.kill( state.bgpThread )
+
             if state.params[ "admin_state" ] == "enable":
                # BGPEVPNThread().start()
                if hasattr( state, 'bgpThread' ):
-                   state.speaker.shutdown()
-                   del state.speaker
-                   state.bgp_vrfs = {} # Reset
-                   # state.mac_vrfs = {} do not clean this
-                   hub.kill( state.bgpThread )
+                   shutdown_bgp()
                    logging.info( "old BGP thread shutdown" )
 
                state.bgpThread = hub.spawn( runBGPThread, state )
             elif hasattr( state, 'bgpThread' ):
-               state.speaker.shutdown()
-               del state.speaker
-               hub.kill( state.bgpThread )
+               shutdown_bgp()
                del state.bgpThread
                Remove_Telemetry( [".vxlan_proxy"] ) # Works?
                logging.info( "BGP shutdown" )
