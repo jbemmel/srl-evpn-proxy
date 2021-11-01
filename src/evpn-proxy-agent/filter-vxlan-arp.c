@@ -78,8 +78,8 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
 	struct ip_t *ip = cursor_advance(cursor, sizeof(*ip));
 
 	// filter UDP packets (ip next protocol = 0x11) or TCP (0x6)
-	if (ip->nextp != IP_UDP && ip->nextp != IP_TCP) {
-		bpf_trace_printk("vxlan_arp_filter: not UDP/VXLAN or TCP but %u\n", ip->nextp );
+	if (ip->nextp != IP_UDP /* && ip->nextp != IP_TCP */ ) {
+		bpf_trace_printk("vxlan_arp_filter: not UDP/VXLAN but %u\n", ip->nextp );
     return DROP;
 	}
 
@@ -130,6 +130,8 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
    	                  arp->sha /*,	htonl(arp->spa) */ );
    	return KEEP;
   } else { // else TCP
+
+    /*
     struct tcp_t *tcp = cursor_advance(cursor, sizeof(*tcp));
 
     // Look for BGP packets only
@@ -146,6 +148,7 @@ int vxlan_arp_filter(struct __sk_buff *skb) {
         opt_len, bpf_ktime_get_ns() );
       return KEEP;
     }
+    */
     return DROP;
   }
 }
