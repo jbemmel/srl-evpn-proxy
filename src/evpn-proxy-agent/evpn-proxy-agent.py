@@ -211,12 +211,15 @@ def AnnounceMulticastRoute( state, rd, vtep_ip, vni ):
 )
 
 def WithdrawMulticastRoute( state, rd, vtep_ip ):
-    state.speaker.evpn_prefix_del(
-      route_type=EVPN_MULTICAST_ETAG_ROUTE, # RT3
-      route_dist=rd, # original RD
-      # vni=mac_vrf['vni'], # not used/allowed in withdraw
-      ethernet_tag_id=0
-    )
+    try:
+       state.speaker.evpn_prefix_del(
+         route_type=EVPN_MULTICAST_ETAG_ROUTE, # RT3
+         route_dist=rd, # original RD
+         # vni=mac_vrf['vni'], # not used/allowed in withdraw
+         ethernet_tag_id=0
+       )
+    except Exception as ex:
+       logging.error( ex )
 
 def AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip, mobility_seq ):
    state.speaker.evpn_prefix_add(
@@ -234,14 +237,17 @@ def AnnounceRoute( state, mac_vrf, vtep_ip, mac, ip, mobility_seq ):
    )
 
 def WithdrawRoute( state, mac_vrf, vtep_ip, mac, ip=None ):
-    state.speaker.evpn_prefix_del(
-      route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
-      route_dist=AutoRouteDistinguisher(vtep_ip,mac_vrf), # original RD
-      # vni=mac_vrf['vni'], # not used/allowed in withdraw
-      ethernet_tag_id=0,
-      mac_addr=mac,
-      ip_addr=ip if state.params['include_ip'] else None
-    )
+    try:
+       state.speaker.evpn_prefix_del(
+        route_type=EVPN_MAC_IP_ADV_ROUTE, # RT2
+        route_dist=AutoRouteDistinguisher(vtep_ip,mac_vrf), # original RD
+        # vni=mac_vrf['vni'], # not used/allowed in withdraw
+        ethernet_tag_id=0,
+        mac_addr=mac,
+        ip_addr=ip if state.params['include_ip'] else None
+       )
+    except Exception as ex:
+       logging.error( ex )
 
     # Also remove telemetry
     js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{vtep_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
@@ -883,16 +889,20 @@ def Handle_Notification(obj, state):
                # BGPEVPNThread().start()
                if hasattr( state, 'bgpThread' ):
                    state.speaker.shutdown()
+                   del state.speaker
                    state.bgp_vrfs = {} # Reset
                    # state.mac_vrfs = {} do not clean this
                    hub.kill( state.bgpThread )
+                   logging.info( "old BGP thread shutdown" )
 
                state.bgpThread = hub.spawn( runBGPThread, state )
             elif hasattr( state, 'bgpThread' ):
                state.speaker.shutdown()
+               del state.speaker
                hub.kill( state.bgpThread )
                del state.bgpThread
                Remove_Telemetry( [".vxlan_proxy"] ) # Works?
+               logging.info( "BGP shutdown" )
 
             return True
 
