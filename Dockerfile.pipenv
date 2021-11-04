@@ -1,0 +1,52 @@
+ARG SR_LINUX_RELEASE
+FROM srl/custombase:$SR_LINUX_RELEASE AS base
+
+# Setup env
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONFAULTHANDLER 1
+
+FROM base AS agent-deps
+
+# Install pipenv and compilation dependencies
+RUN sudo python3 -m pip install pipenv
+# RUN apt-get update && apt-get install -y --no-install-recommends gcc
+
+# Install python dependencies in /.venv
+COPY Pipfile .
+COPY Pipfile.lock .
+RUN sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install --deploy --site-packages
+
+# Install build tools
+RUN sudo yum install -y gcc-c++ git python3-devel openssl-devel
+
+# Need to upgrade pip and setuptools
+RUN sudo python3 -m pip install --upgrade pip setuptools
+
+RUN cd /tmp && \
+  git clone https://github.com/jbemmel/grpc.git && \
+  cd grpc && \
+  git submodule update --init && \
+  sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install -r requirements.txt && \
+  sudo VIRTUAL_ENV=/.venv GRPC_PYTHON_BUILD_WITH_CYTHON=1 /.venv/bin/pip3 install .
+# CC=/opt/rh/gcc-toolset-10/root/usr/bin/gcc GRPC_PYTHON_BUILD_WITH_CYTHON=1 GRPC_BUILD_WITH_BORING_SSL_ASM=False pip3 install .
+# GRPC_BUILD_WITH_BORING_SSL_ASM="" GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=true GRPC_PYTHON_BUILD_SYSTEM_ZLIB=true
+# GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1 to see errors
+
+# Patch Ryu to support multiple VTEP endpoints per BGP speaker
+COPY ryu_enhancements/ /.venv/lib/python3.6/site-packages/ryu/services/protocols/bgp/
+
+FROM base AS runtime
+
+# Copy virtual env from agent-deps stage
+COPY --from=agent-deps /.venv /opt/static-vxlan-agent/.venv
+ENV PATH="/.venv/bin:$PATH"
+
+# Create and switch to a new user
+# RUN useradd --create-home appuser
+# WORKDIR /home/appuser
+# USER appuser
+
+# Install application into container
+COPY src /opt/static-vxlan-agent

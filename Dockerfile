@@ -1,9 +1,15 @@
 ARG SR_LINUX_RELEASE
 FROM srl/custombase:$SR_LINUX_RELEASE AS target-image
 
+# Create a Python virtual environment
+ENV VIRTUAL_ENV=/opt/static-vxlan-agent/venv
+RUN sudo python3 -m venv $VIRTUAL_ENV --system-site-packages --without-pip --upgrade
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
 # Install BGP library and eBPF packages
-RUN sudo pip3 install ryu netns # dask tornado distributed
-RUN sudo yum install -y python3-bcc kmod xz
+# RUN sudo bash -c "source $VIRTUAL_ENV/bin/activate && python3 -m pip install ryu netns"
+RUN sudo -E python3 -m pip install ryu netns
+RUN sudo -E yum install -y python3-bcc kmod xz
 
 # Install eBPF perf tools?
 # RUN sudo yum install -y perf bpftool
@@ -18,8 +24,7 @@ RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
 # Need to upgrade pip and setuptools
 RUN pip3 install --upgrade pip setuptools
 
-RUN cd /tmp && yum install -y git python3-devel && \
-  pip3 install --upgrade pip && \
+RUN cd /tmp && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
   git submodule update --init && \
@@ -35,11 +40,11 @@ RUN cd /tmp && yum install -y git python3-devel && \
 #  cd Etherate && ./configure.sh && make && make install
 
 # Build IEEE 802.1ag tools
-RUN yum install -y autoconf automake make && \
-    dnf --enablerepo=powertools install -y libpcap-devel && \
-    cd /tmp && \
-    git clone https://github.com/jbemmel/dot1ag-utils.git && \
-    cd dot1ag-utils && ./bootstrap.sh && make && make install
+# RUN yum install -y autoconf automake make && \
+#     dnf --enablerepo=powertools install -y libpcap-devel && \
+#     cd /tmp && \
+#     git clone https://github.com/jbemmel/dot1ag-utils.git && \
+#     cd dot1ag-utils && ./bootstrap.sh && make && make install
 
 FROM target-image AS final
 
@@ -77,6 +82,9 @@ COPY ./src /opt/demo-agents/
 
 # Add in auto-config agent sources too
 # COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
+
+
+COPY ./build_rpm.sh /
 
 # run pylint to catch any obvious errors
 RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/evpn-proxy-agent

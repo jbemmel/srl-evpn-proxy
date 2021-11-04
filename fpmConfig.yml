@@ -6,7 +6,7 @@ description: Agent to enable integration between static VXLAN VTEPs and EVPN
 vendor: "Nokia"     # optional information about the creator of the package
 license: "Apache 2.0"
 contents:                              # contents to add to the package
-  - src: ./src                         # local path of agent's YANG directory
+  - src: ./rpmbuild
     dst: /opt/static-vxlan-agent/      # destination path (including yang)
 
   - src: ./srl-evpn-proxy-agent.yml    # local path of agent yml
