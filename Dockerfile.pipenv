@@ -43,7 +43,10 @@ FROM base AS runtime
 
 # Copy virtual env from agent-deps stage
 COPY --from=agent-deps /.venv /opt/static-vxlan-agent/.venv
-ENV PATH="/.venv/bin:$PATH"
+
+# Also include generated lock file, for versions (included in .rpm)
+COPY --from=agent-deps /Pipfile.lock /opt/static-vxlan-agent/Pipfile.lock
+ENV PATH="/opt/static-vxlan-agent/.venv/bin:$PATH"
 
 # Create and switch to a new user
 # RUN useradd --create-home appuser
