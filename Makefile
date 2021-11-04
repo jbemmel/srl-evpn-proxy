@@ -28,3 +28,9 @@ grpc_eventlet:
 
 auto_agent: build
 	sudo docker build -f ./Dockerfile.auto_agent -t srl/evpn_proxy_with_auto_agent_v2:latest .
+
+rpm:
+	docker run --rm -v ${PWD}:/tmp -w /tmp goreleaser/nfpm package \
+    --config /tmp/fpmConfig.yml \
+    --target /tmp \
+    --packager rpm

@@ -1,0 +1,13 @@
+name: "static-vxlan-agent"   # name of the rpm package
+arch: "amd64"         # architecture you are using
+version: "v1.0.0"     # version of this rpm package
+maintainer: "Jeroen van Bemmel <jeroen.van_bemmel@nokia.com"
+description: Agent to enable integration between static VXLAN VTEPs and EVPN
+vendor: "Nokia"     # optional information about the creator of the package
+license: "Apache 2.0"
+contents:                              # contents to add to the package
+  - src: ./src                         # local path of agent's YANG directory
+    dst: /opt/static-vxlan-agent/      # destination path (including yang)
+
+  - src: ./srl-evpn-proxy-agent.yml    # local path of agent yml
+    dst: /etc/opt/srlinux/appmgr/      # destination path of agent yml
