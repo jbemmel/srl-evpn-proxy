@@ -610,10 +610,10 @@ def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
 
         # To compensate for lack of VXLAN flow hashing, we vary the src IP
         # Correct it by removing the added entropy (IP ID) in 2nd octet
-        if _arp.opcode == 24:
-           digits = [ int(i) for i in _ip.src.split('.') ]
-           digits[1] ^= _ip.identification % 256
-           _ip.src = ".".join( map(str,digits) )
+        # if _arp.opcode == 24:
+        #    digits = [ int(i) for i in _ip.src.split('.') ]
+        #    digits[1] ^= _ip.identification % 256
+        #    _ip.src = ".".join( map(str,digits) )
 
         if _ip.src in evpn_vteps:
            if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
@@ -837,7 +837,7 @@ def Handle_Notification(obj, state):
         data = json.loads(json_str) if json_str != "" else {}
 
         # net_inst = obj.config.key.keys[0] # always "default"
-        if obj.config.key.js_path == ".network_instance.protocols.vxlan_agent":
+        if obj.config.key.js_path == ".network_instance.protocols.static_vxlan_agent":
             logging.info(f"Got config for agent, now will handle it :: \n{obj.config}\
                             Operation :: {obj.config.op}\nData :: {obj.config.data.json}")
             if obj.config.op == 2:
@@ -912,7 +912,7 @@ def Handle_Notification(obj, state):
         # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
         # Lookup configured EVI using gNMI
 
-        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent":
+    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent":
           mac_vrf_name = obj.config.key.keys[0]
 
           admin_state = data['admin_state'][12:] if 'admin_state' in data else None
@@ -960,7 +960,7 @@ def Handle_Notification(obj, state):
                UpdateMACVRF( state, old_vrf )
                state.mac_vrfs.pop( vni, None )
                state.mac_vrfs.pop( old_vrf['name'], None )
-        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.vxlan_agent.static_vtep":
+    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent.static_vtep":
           mac_vrf_name = obj.config.key.keys[0]
           vtep_ip = obj.config.key.keys[2]
           if mac_vrf_name in state.mac_vrfs:

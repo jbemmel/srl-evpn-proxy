@@ -1,4 +1,4 @@
-module srl-evpn-proxy-agent {
+module static-vxlan-agent {
 
     yang-version "1.1";
 
@@ -43,7 +43,7 @@ module srl-evpn-proxy-agent {
     grouping evpn-proxy-protocol {
         description "Configure EVPN Proxy";
 
-        container vxlan-agent {
+        container static-vxlan-agent {
             if-feature "srl-feat:vxlan and srl-feat:evpn";
 
             presence "Configure BGP EVPN proxy agent for static VXLAN integration";
@@ -133,13 +133,13 @@ module srl-evpn-proxy-agent {
     }
 
     grouping evpn-proxy-state {
-      container vxlan-proxy {
+      container static-vxlan-agent {
         description "Operational state for VXLAN EVPN proxy agent";
 
         // Only supported on SRL platforms that have both VXLAN and EVPN
         if-feature "srl-feat:vxlan and srl-feat:evpn";
 
-        presence "BGP EVPN proxy state";
+        presence "BGP EVPN proxy state for static VXLAN agent";
         config false;
 
         list static-vtep {

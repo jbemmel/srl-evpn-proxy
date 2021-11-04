@@ -16,21 +16,21 @@ _term (){
 function main()
 {
     trap _term SIGTERM
-    local virtual_env="/opt/srlinux/python/virtual-env/bin/activate"
-    local main_module="/opt/demo-agents/evpn-proxy-agent/evpn-proxy-agent.py"
+    local virtual_env="/opt/static-vxlan-agent/.venv/bin/activate"
+    local main_module="/opt/static-vxlan-agent/evpn-proxy-agent.py"
 
     # source the virtual-environment, which is used to ensure the correct python packages are installed,
     # and the correct python version is used
     source "${virtual_env}"
 
     # Include local paths where custom packages are installed
-    P1="/usr/local/lib/python3.6/site-packages"
-    P2="/usr/local/lib64/python3.6/site-packages"
-    P3="/usr/lib/python3.6/site-packages"
-    P4="/usr/lib64/python3.6/site-packages"
+    #P1="/usr/local/lib/python3.6/site-packages"
+    #P2="/usr/local/lib64/python3.6/site-packages"
+    #P3="/usr/lib/python3.6/site-packages"
+    #P4="/usr/lib64/python3.6/site-packages"
     # since 21.6
-    SDK2="/usr/lib/python3.6/site-packages/sdk_protos"
-    export PYTHONPATH="$P1:$P2:$P3:$P4:$SDK2:$PYTHONPATH"
+    SDKPATH="/usr/lib/python3.6/site-packages/sdk_protos"
+    export PYTHONPATH="$SDKPATH:$PYTHONPATH"
 
     # Opening srbase-default namespace requires root
     python3 ${main_module} &

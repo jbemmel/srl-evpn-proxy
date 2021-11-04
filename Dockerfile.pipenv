@@ -15,7 +15,9 @@ RUN sudo python3 -m pip install pipenv
 
 # Install python dependencies in /.venv
 COPY Pipfile .
-COPY Pipfile.lock .
+
+# Lock file is created in a different environment, leave out for now
+# COPY Pipfile.lock .
 RUN sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install --deploy --site-packages
 
 # Install build tools
@@ -49,4 +51,11 @@ ENV PATH="/.venv/bin:$PATH"
 # USER appuser
 
 # Install application into container
-COPY src /opt/static-vxlan-agent
+COPY src /opt
+
+# run pylint to catch any obvious errors (includes .venv?)
+RUN PYTHONPATH=/opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/:$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/static-vxlan-agent
+
+# Using a build arg to set the release tag, set a default for running docker build manually
+ARG SRL_EVPN_PROXY_RELEASE="[custom build]"
+ENV SRL_EVPN_PROXY_RELEASE=$SRL_EVPN_PROXY_RELEASE

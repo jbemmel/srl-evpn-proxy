@@ -83,9 +83,6 @@ COPY ./src /opt/demo-agents/
 # Add in auto-config agent sources too
 # COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 
-
-COPY ./build_rpm.sh /
-
 # run pylint to catch any obvious errors
 RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/evpn-proxy-agent
 
