@@ -14,7 +14,7 @@ Without dataplane MAC learning, all MACs residing on such endpoints are effectiv
 Configure SRL1 with a VXLAN agent representing static VTEPs 1.1.1.1 and 1.1.1.2:
 ```
 enter candidate
-/network-instance default protocols vxlan-agent
+/network-instance default protocols static-vxlan-agent
   admin-state enable
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
@@ -23,7 +23,7 @@ commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
-  vxlan-agent
+  static-vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
@@ -199,7 +199,7 @@ bgp {
      }
   }
 }
-vxlan-agent
+static-vxlan-agent
   admin-state enable
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
@@ -213,7 +213,7 @@ commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
-  vxlan-agent
+  static-vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
@@ -345,7 +345,7 @@ This could be avoided by running the EVPN proxy on every SRL node.
 Instead of dynamic learning via ARP, it is also possible to configure static MAC entries for each VTEP:
 ```
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
-  vxlan-agent
+  static-vxlan-agent
   static-vtep 1.1.1.1 {
     static-macs [ 00:11:22:33:44:55 ]
   }
