@@ -28,6 +28,7 @@ function main()
     #P2="/usr/local/lib64/python3.6/site-packages"
     #P3="/usr/lib/python3.6/site-packages"
     #P4="/usr/lib64/python3.6/site-packages"
+    # SRL_VENV="/opt/srlinux/python/virtual-env/lib/python3.6/site-packages"
     # since 21.6
     SDKPATH="/usr/lib/python3.6/site-packages/sdk_protos"
     export PYTHONPATH="$SDKPATH:$PYTHONPATH"

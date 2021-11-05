@@ -62,7 +62,7 @@ COPY --from=agent-deps /opt/static-vxlan-agent /opt/static-vxlan-agent
 COPY --chown=srlinux:srlinux ./static-vxlan-agent.yml /etc/opt/srlinux/appmgr
 COPY src /opt
 
-# Integrate vxlan service ping and flooding avoidance CLI commands
+# Integrate vxlan flooding avoidance CLI command
 COPY src/static-vxlan-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
 RUN sudo sh -c ' echo -e "vxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
   >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
