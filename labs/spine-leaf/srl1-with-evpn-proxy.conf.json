@@ -1475,16 +1475,11 @@
             ]
           }
         },
-        "srl-evpn-proxy-agent:vxlan-agent": {
+        "static-vxlan-agent:static-vxlan-agent": {
           "admin-state": "enable",
           "source-address": "1.1.1.4",
           "local-as": 65000,
-          "peer-as": 65000,
-          "proof-of-concept": {
-            "vxlan-arp-learning-interfaces": [ "e1-1" ],
-            "include-ip": true,
-            "auto-discover-static-vteps": true
-          }
+          "peer-as": 65000
         }
       },
       "srl_nokia-static-routes:static-routes": {
@@ -1534,7 +1529,7 @@
               "vxlan-interface": "vxlan0.0",
               "evi": 57069,
               "ecmp": 8,
-              "srl-evpn-proxy-agent:vxlan-agent": {
+              "static-vxlan-agent:static-vxlan-agent": {
                 "admin-state": "enable",
                 "evi": 57069,
                 "vni": 11189196,
