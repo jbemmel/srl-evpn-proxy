@@ -13,39 +13,43 @@ FROM base AS agent-deps
 RUN sudo python3 -m pip install pipenv
 # RUN apt-get update && apt-get install -y --no-install-recommends gcc
 
-# Install python dependencies in /.venv
-COPY Pipfile .
+# Install python dependencies in /opt/static-vxlan-agent/.venv
+COPY Pipfile /opt/static-vxlan-agent/
 
 # Lock file is created in a different environment, leave out for now
 # COPY Pipfile.lock .
-RUN sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install --deploy --site-packages
+RUN cd /opt/static-vxlan-agent/ && \
+    sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install --deploy --site-packages
 
-# Install build tools
-RUN sudo yum install -y gcc-c++ git python3-devel openssl-devel
+# Install build tools, also python3-bcc
+RUN sudo yum install -y gcc-c++ git python3-devel openssl-devel python3-bcc
 
 # Need to upgrade pip and setuptools
 RUN sudo python3 -m pip install --upgrade pip setuptools
 
+# Build dependencies only installed locally
 RUN cd /tmp && \
   git clone https://github.com/jbemmel/grpc.git && \
   cd grpc && \
   git submodule update --init && \
-  sudo PIPENV_VENV_IN_PROJECT=1 /usr/local/bin/pipenv install -r requirements.txt && \
-  sudo VIRTUAL_ENV=/.venv GRPC_PYTHON_BUILD_WITH_CYTHON=1 /.venv/bin/pip3 install .
+  sudo python3 -m pip install -r requirements.txt && \
+  sudo VIRTUAL_ENV=/opt/static-vxlan-agent/.venv GRPC_PYTHON_BUILD_WITH_CYTHON=1 /opt/static-vxlan-agent/.venv/bin/pip3 install .
 # CC=/opt/rh/gcc-toolset-10/root/usr/bin/gcc GRPC_PYTHON_BUILD_WITH_CYTHON=1 GRPC_BUILD_WITH_BORING_SSL_ASM=False pip3 install .
 # GRPC_BUILD_WITH_BORING_SSL_ASM="" GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=true GRPC_PYTHON_BUILD_SYSTEM_ZLIB=true
 # GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1 to see errors
 
 # Patch Ryu to support multiple VTEP endpoints per BGP speaker
-COPY ryu_enhancements/ /.venv/lib/python3.6/site-packages/ryu/services/protocols/bgp/
+COPY ryu_enhancements/ /opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
 FROM base AS runtime
 
 # Copy virtual env from agent-deps stage
-COPY --from=agent-deps /.venv /opt/static-vxlan-agent/.venv
+# Also includes generated lock file, for versions (included in .rpm)
+COPY --from=agent-deps /opt/static-vxlan-agent /opt/static-vxlan-agent
 
-# Also include generated lock file, for versions (included in .rpm)
-COPY --from=agent-deps /Pipfile.lock /opt/static-vxlan-agent/Pipfile.lock
+# Copy bcc files separately, Python bcc package is not enough
+COPY --from=agent-deps /usr/lib/python3.6/site-packages/bcc /opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/bcc
+
 ENV PATH="/opt/static-vxlan-agent/.venv/bin:$PATH"
 
 # Create and switch to a new user

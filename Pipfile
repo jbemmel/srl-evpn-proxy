@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 ryu = "*"
 netns = "*"
-bcc = "*"
+# bcc = "*" # Using python3-bcc
 
 [dev-packages]
 
