@@ -8,6 +8,5 @@ license: "Apache 2.0"
 contents:                              # contents to add to the package
   - src: ./rpmbuild
     dst: /opt/     # destination path (including yang)
-
   - src: ./static-vxlan-agent.yml    # local path of agent yml
     dst: /etc/opt/srlinux/appmgr/    # destination path of agent yml

@@ -38,6 +38,15 @@ rpm: pipenv
 	docker cp --follow-link ${CONTAINER_ID}:/opt/static-vxlan-agent/ rpmbuild/
 	docker rm ${CONTAINER_ID}
 	find rpmbuild/ -xtype l -delete # Purge broken symlinks
+
+  # Include only essential grpc files? .so file is 139M, this doesn't help much
+	# mv rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc /tmp
+	# mkdir -p rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc/_cython
+	# mkdir -p rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc/experimental/__pycache__
+	# cp /tmp/grpc/_cython/cygrpc.cpython-36m-x86_64-linux-gnu.so rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc/_cython/
+	# cp /tmp/grpc/experimental/__pycache__/eventlet.cpython-36.pyc rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc/experimental/__pycache__/
+	# cp /tmp/grpc/experimental/eventlet.py rpmbuild/static-vxlan-agent/.venv/lib/python3.6/site-packages/grpc/experimental/
+
 	docker run --rm -v ${PWD}:/tmp -w /tmp goreleaser/nfpm package \
     --config /tmp/fpmConfig.yml \
     --target /tmp \
