@@ -466,7 +466,7 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip, clear_macs=True ):
 ## At present processing config from js_path containing agent_name
 ##################################################################
 def Handle_Notification(obj, state):
-    if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
+    if obj.HasField('config'):
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
         json_str = obj.config.data.json.replace("'", "\"")
@@ -521,10 +521,7 @@ def Handle_Notification(obj, state):
 
             return True
 
-        # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
-        # Lookup configured EVI using gNMI
-
-    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent":
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent":
           mac_vrf_name = obj.config.key.keys[0]
 
           admin_state = data['admin_state'][12:] if 'admin_state' in data else None
@@ -572,7 +569,7 @@ def Handle_Notification(obj, state):
                UpdateMACVRF( state, old_vrf )
                state.mac_vrfs.pop( vni, None )
                state.mac_vrfs.pop( old_vrf['name'], None )
-    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent.static_vtep":
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent.static_vtep":
           mac_vrf_name = obj.config.key.keys[0]
           vtep_ip = obj.config.key.keys[2]
           if mac_vrf_name in state.mac_vrfs:
@@ -589,9 +586,10 @@ def Handle_Notification(obj, state):
               UpdateMACVRF_StaticVTEP( state, mac_vrf, vtep_ip, static_macs )
           else:
               logging.error( f"mac-vrf not found in state: {mac_vrf_name}" )
-
+        else:
+            logging.warning( f"Unmatched config path: {obj.config.key.js_path}" )
     else:
-        logging.info(f"Unexpected notification : {obj}")
+       logging.info(f"Unexpected notification (no config) : {obj}")
 
     return False
 
