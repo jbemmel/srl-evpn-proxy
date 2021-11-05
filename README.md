@@ -14,7 +14,7 @@ Without dataplane MAC learning, all MACs residing on such endpoints are effectiv
 Configure SRL1 with a VXLAN agent representing static VTEPs 1.1.1.1 and 1.1.1.2:
 ```
 enter candidate
-/network-instance default protocols vxlan-agent
+/network-instance default protocols static-vxlan-agent
   admin-state enable
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
@@ -23,7 +23,7 @@ commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
-  vxlan-agent
+  static-vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
@@ -55,7 +55,7 @@ Notice how SRL1 is sending each ping packet towards all other VTEPs
 Flooding of traffic towards these "unknown" MACs can be avoided by configuring them statically:
 ```
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
-vxlan-agent
+static-vxlan-agent
 static-vtep 1.1.1.1 { 
   mac-addresses [ 00:11:22:33:44:01 ]
 }
@@ -95,29 +95,6 @@ Note: To enable the REST API on Cumulus:
 ```
 sshpass -p root ssh root@clab-static-vxlan-spine-lab-cumulus1 'systemctl enable restserver && systemctl start restserver'
 ```
-
-# Dynamic learning solution
-By observing datapath VXLAN traffic from static VTEP nodes, we can dynamically discover MAC addresses and VTEP endpoint IPs.
-
-This Github repo implements such an approach, using the following components:
-* The [Ryu BGP speaker library](https://ryu.readthedocs.io/en/latest/library_bgp_speaker_ref.html) and [packet parsing classes](https://ryu.readthedocs.io/en/latest/library_packet.html)
-* Google gRPC framework, [modified to support eventlet](https://github.com/jbemmel/grpc) (used by Ryu)
-* VXLAN ARP snooping using [Extended Berkeley Packet Filters(eBPF)](https://prototype-kernel.readthedocs.io/en/latest/bpf/) filters
-
-## Step 1: Adding an eBPF based VXLAN packet filter to capture ARP packets
-The idea is to create an eBPF program to filter out VXLAN packets on a given fabric interface inside the srbase network instance (associated with a MAC VRF (L2) or an IP VRF (L3) overlay service). The filter program selects only VXLAN packets (UDP port 4789) containing ARP packets (requests or responses).
-
-```Python
-Rx( packet ) {
-if (packet==VXLAN) && (packet.inner == ARP) {
-  forward to Python userspace program
-}
-```
-
-## Step 2: Send out EVPN routes (multicast, RT2 for each MAC/IP) on behalf of static VTEPs
-The Python userspace program receives filtered VXLAN ARP packets and uses BGP EVPN to advertise a route (type 2 for MAC-VRF, type 5 for IP-VRF[TODO]) to the fabric (locally or towards a route reflector). It participates in the EVPN fabric and only advertises routes for VTEPs that are not sending EVPN routes themselves.
-
-As it was found that Ryu implicitly assumes the sending endpoint is also the tunnel endpoint, [some minor changes](https://github.com/jbemmel/srl-evpn-proxy/tree/main/ryu_enhancements) had to be made to allow for arbitrary tunnel endpoint IPs in multicast routes.
 
 # Lab prototype demo
 Using [Containerlab](https://containerlab.srlinux.dev/), the following topology can be deployed:
@@ -199,21 +176,16 @@ bgp {
      }
   }
 }
-vxlan-agent
+static-vxlan-agent
   admin-state enable
   source-address ${/interface[name=lo0]/subinterface[index=0]/ipv4/address/ip-prefix|_.split('/')[0]}
   local-as 65000
   peer-as 65000
-  proof-of-concept {
-    include-ip true
-    auto-discover-static-vteps true
-    vxlan-arp-learning-interfaces [ e1-1 ]
-  }
 commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
-  vxlan-agent
+  static-vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
     vni ${/tunnel-interface[name=vxlan0]/vxlan-interface[index=0]/ingress/vni}
