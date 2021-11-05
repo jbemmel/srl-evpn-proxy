@@ -64,20 +64,10 @@ from ryu.lib.packet.bgp import (EvpnNLRI, BGPEvpnMacMobilityExtendedCommunity,
 # Ryu has its own threading model
 from ryu.lib import hub
 
-#
-# eBPF ARP filter imports
-#
-from bcc import BPF
-from ryu.lib.packet import packet, ipv4, udp, vxlan, ethernet, arp, tcp
-from ryu.ofproto import ether, inet
-
-SO_TIMESTAMP   = 29 # us precision
-SO_TIMESTAMPNS = 35 # Higher ns precision
-
 ############################################################
 ## Agent will start with this name
 ############################################################
-agent_name='srl_evpn_proxy_agent'
+agent_name='static_vxlan_agent'
 
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
@@ -144,54 +134,6 @@ def Remove_Telemetry(js_paths):
     logging.info(f"Telemetry_Delete_Request :: {telemetry_del_request}")
     telemetry_response = telemetry_stub.TelemetryDelete(request=telemetry_del_request, metadata=metadata)
     return telemetry_response
-
-def Configure_BFD(state,remote_evpn_vtep):
-   logging.info(f"Configure_BFD :: remote_evpn_vtep={remote_evpn_vtep}")
-
-   nh_group_name = f"vtep-{remote_evpn_vtep}"
-   static_route = {
-     "static-routes": {
-      "route": [
-       {
-         "prefix": f"{remote_evpn_vtep}/32",
-         "admin-state": "enable",
-         "next-hop-group": nh_group_name
-       }
-      ]
-     },
-     "next-hop-groups": {
-      "group": [
-       {
-        "name": nh_group_name,
-        "nexthop": [
-          {
-            "index": 0,
-            "ip-address": f"{remote_evpn_vtep}",
-            "admin-state": "enable",
-            "failure-detection": {
-              "enable-bfd": {
-                # XXX Need to specify local VTEP IP in config, TODO read this
-                # using c.get( system0.0 IP )
-                "local-address": f"{state.params[ 'peer_address' ]}"
-              }
-            }
-          }
-        ]
-       }
-      ]
-     }
-   }
-
-   updates = [
-     ('/bfd/subinterface[name=system0.0]', { 'admin-state': 'enable' } ),
-     ('/network-instance[name=default]', static_route)
-   ]
-
-   with gNMIclient(target=('unix:///opt/srlinux/var/run/sr_gnmi_server',57400),
-                   username="admin",password="admin",insecure=True) as c:
-      c.set( encoding='json_ietf', update=updates )
-   #global gnmi
-   #gnmi.set( encoding='json_ietf', update=updates )
 
 def AnnounceMulticastRoute( state, rd, vtep_ip, vni ):
    state.speaker.evpn_prefix_add(
@@ -340,9 +282,6 @@ def runBGPThread( state ):
             if originator_id and originator_id.value != event.nexthop:
                logging.info( f"Detected another EVPN proxy: {originator_id.value}" )
 
-               # TODO if (state.enabled), remove upon withdraw
-               # Fails: timeout
-               # Configure_BFD(state,originator_id.value)
             else:
                logging.info( f"Multicast route from EVPN VTEP: {event.nexthop}" )
                evpn_vteps[ event.nexthop ] = event.remote_as
@@ -405,13 +344,6 @@ def runBGPThread( state ):
 
   def peer_up_handler(router_id, remote_as):
       logging.warning( f'Peer UP: {router_id} {remote_as}' )
-      # Start ARP thread if not already
-      if not hasattr(state,'arp_threads') and state.params['vxlan_interfaces']!=[]:
-         logging.info( "Starting ARP listener thread(s)..." )
-         state.arp_threads = {}
-         for i in state.params['vxlan_interfaces']:
-            state.arp_threads[i] = {}
-            state.arp_threads[i]['thread'] = hub.spawn( ARP_receiver_thread, state, i, evpn_vteps )
 
   def peer_down_handler(router_id, remote_as):
       logging.warning( f'Peer DOWN: {router_id} {remote_as}' )
@@ -485,7 +417,7 @@ def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     else:
        logging.info(f"Add_Static_VTEP: Assuming VRF for RD={rd} exists...")
 
-    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
+    js_path = f'.static_vxlan_agent.static_vtep{{.vtep_ip=="{remote_ip}"}}'
     now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
     data = {
       'last_update' : { "value" : now_ts },
@@ -493,7 +425,7 @@ def Add_Static_VTEP( state, mac_vrf, remote_ip, dynamic=False ):
     if dynamic:
        data['dynamic'] = { "value" : True }
 
-    js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
+    js_path2 = f'.static_vxlan_agent.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
     data2 = { 'evi': { 'value': mac_vrf['evi'] }, 'vni': { 'value': mac_vrf['vni'] } }
     Add_Telemetry( [(js_path, data),(js_path2,data2)] )
 
@@ -520,310 +452,14 @@ def Remove_Static_VTEP( state, mac_vrf, remote_ip, clear_macs=True ):
     state.speaker.vrf_del(route_dist=rd)
 
     # This isn't sufficient
-    js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}'
-    js_path2 = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
+    js_path = f'.static_vxlan_agent.static_vtep{{.vtep_ip=="{remote_ip}"}}'
+    js_path2 = f'.static_vxlan_agent.static_vtep{{.vtep_ip=="{remote_ip}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}'
     Remove_Telemetry( [js_path,js_path2] )
 
     if clear_macs:
        del mac_vrf['vxlan_vteps'][ remote_ip ]
     del state.bgp_vrfs[ rd ]
     return True
-
-def HandleTCPTimestamps( ipHeaders, tcpHeaders, ancdata ):
-  ts_sec = 0
-  ts_ns = 0
-  if ( len(ancdata)>0 ):
-   for i in ancdata:
-    logging.info(f'HandleTCPTimestamps ancdata: cmsg_level={i[0]}, cmsg_type={i[1]}, cmsg_data({len(i[2])})={i[2]})');
-    if (i[0]!=socket.SOL_SOCKET or i[1]!=SO_TIMESTAMP): # Removed 'NS'
-       continue
-    tmp = (struct.unpack("iiii",i[2]))
-    ts_sec = tmp[0]
-    ts_ns = tmp[2]
-    break
-  ts = [ (o.ts_val,o.ts_ecr) for o in tcpHeaders.option if o.kind == tcp.TCP_OPTION_KIND_TIMESTAMPS ]
-  logging.info( f"HandleTCPTimestamps: {ts_sec}.{ts_ns}={ts} IP {ipHeaders.src}>{ipHeaders.dst}" )
-
-def ARP_receiver_thread( state, vxlan_intf, evpn_vteps ):
-    logging.info( f"Starting ARP listener on interface={vxlan_intf} params {state.params}" )
-    # initialize BPF - load source code from filter-vxlan-arp.c
-    _self = state.arp_threads[vxlan_intf]
-    _self['bpf'] = bpf = BPF(src_file = "filter-vxlan-arp.c",debug = 0)
-
-    #load eBPF program http_filter of type SOCKET_FILTER into the kernel eBPF vm
-    #more info about eBPF program types
-    #http://man7.org/linux/man-pages/man2/bpf.2.html
-    function_arp_filter = bpf.load_func("vxlan_arp_filter", BPF.SOCKET_FILTER)
-
-    #create raw socket, bind it to interface
-    #attach bpf program to socket created
-    with netns.NetNS(nsname="srbase"):
-      BPF.attach_raw_socket(function_arp_filter, vxlan_intf)
-    socket_fd = function_arp_filter.sock
-    sock = socket.fromfd(socket_fd,socket.PF_PACKET,socket.SOCK_RAW,socket.IPPROTO_IP)
-
-    # sock.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMP, 1) # Not NS
-    sock.setblocking(True)
-
-    # To make sendto work?
-    # sock.bind((vxlan_intf, 0x0800))
-
-    _self['socket'] = sock # Used for close()
-    try:
-     while 1:
-      packet_str = os.read(socket_fd,2048)
-      packet_bytearray = bytearray(packet_str)
-      try:
-        # or recvmmsg for multiple?
-        # raw_data, ancdata, flags, address = sock.recvmsg(65535, 1024)
-        # packet_bytearray = bytearray(raw_data)
-        pkt = packet.Packet( packet_bytearray )
-        #
-        # 6 layers:
-        # 0: ethernet
-        # 1: IP                  -> VTEP IP (other side, local VTEP)
-        # 2: UDP
-        # 3: VXLAN               -> VNI
-        # 4: ethernet (inner)
-        # 5: ARP                 -> MAC, IP
-        #
-        for p in pkt:
-            logging.debug( f"ARP packet:{p.protocol_name}={p}" )
-            if p.protocol_name == 'vlan':
-                logging.debug( f'vlan id = {p.vid}' )
-            elif p.protocol_name == 'vxlan':
-                logging.info( f'vni = {p.vni}' )
-
-        _ip = pkt.get_protocol( ipv4.ipv4 )
-        #_tcp = pkt.get_protocol( tcp.tcp )
-        #if _tcp:
-        #    HandleTCPTimestamps( _ip, _tcp, ancdata )
-        #    continue
-
-        _vxlan = pkt.get_protocol( vxlan.vxlan )
-        _arp = pkt.get_protocol( arp.arp )
-        vni = _vxlan.vni
-        if vni not in state.mac_vrfs:
-            logging.info( f"VNI not enabled for proxy EVPN: {vni}" )
-            continue;
-        mac_vrf = state.mac_vrfs[ vni ]
-
-        # To compensate for lack of VXLAN flow hashing, we vary the src IP
-        # Correct it by removing the added entropy (IP ID) in 2nd octet
-        # if _arp.opcode == 24:
-        #    digits = [ int(i) for i in _ip.src.split('.') ]
-        #    digits[1] ^= _ip.identification % 256
-        #    _ip.src = ".".join( map(str,digits) )
-
-        if _ip.src in evpn_vteps:
-           if (state.params['ecmp_path_probes'] and _ip.dst in evpn_vteps
-                                                and _arp.opcode==24): # Ignore regular responses
-               ReplyARPProbe( state, sock, pkt, _ip.src, _ip.dst, _arp.opcode, mac_vrf )
-           else:
-               logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from EVPN VTEP {_ip.src} -> ignoring" )
-           continue
-        elif _ip.dst in evpn_vteps: # typically == us, always? not when routing VXLAN to other VTEPs
-           static_vtep = _ip.src
-           mac = _arp.src_mac # Same field in both request and response packets
-           ip = _arp.src_ip
-           logging.info( f"ARP({'req' if _arp.opcode==1 else 'res'}) from static VTEP: {mac} {ip}" )
-        else:
-           logging.info( f"ARP packet:neither src={_ip.src} nor dst={_ip.dst} is EVPN vtep? {evpn_vteps}" )
-           continue;
-
-        # Check that the static VTEP is configured. Could dynamically add VTEPs
-        # upon discovery (but requires ARP snooping)
-        if static_vtep not in mac_vrf['vxlan_vteps']:
-           if not state.params[ "auto_discover_static_vteps" ]:
-             logging.info( f"VTEP {static_vtep} not configured in mac-vrf and auto-discovery disabled" )
-             continue
-           else:
-             logging.info( f"Dynamically adding auto-discovered VTEP {static_vtep}" )
-             Add_Static_VTEP( state, mac_vrf, static_vtep, dynamic=True )
-             mac_vrf['vxlan_vteps'][ static_vtep ] = "dynamic-from-arp"
-
-        # Announce EVPN route(s)
-        mobility_seq = None  # First time: no attribute
-
-        if mac in mac_vrf['macs']:
-            cur = mac_vrf['macs'][ mac ]
-            logging.info( f"MAC {mac} already announced: {cur}, checking for MAC move" )
-            # TODO various cases: different IP, different VTEP, ...
-            if cur['vtep'] == static_vtep:
-               logging.info( f"VNI {vni}: MAC {mac} already announced with VTEP {static_vtep}" )
-
-               # If IP remains the same, do nothing
-               if cur['ip'] == ip:
-                   continue
-
-               # Could also opt to keep both routes: MAC -> [ip],
-               # Spec says: "If there are multiple IP addresses associated with a MAC address,
-               # then multiple MAC/IP Advertisement routes MUST be generated, one for
-               # each IP address.  For instance, this may be the case when there are
-               # both an IPv4 and an IPv6 address associated with the same MAC address
-               # for dual-IP-stack scenarios.  When the IP address is dissociated with
-               # the MAC address, then the MAC/IP Advertisement route with that
-               # particular IP address MUST be withdrawn."
-               #
-               # For the purpose of this EVPN proxy application (L2 reachability)
-               # it is sufficient to keep 1 IP address association
-
-               # Maybe keep track of sequence number per IP, with newer ones having a higher sequence?
-               logging.info( f"IP change detected: {cur['ip']}->{ip}, updating EVPN" )
-
-            # RFC talks about different ESI as reason for mobility seq inc
-            # We have ESI 0 == single homed
-            mobility_seq = cur['seq'] + 1
-
-            #
-            # If this is the last MAC route for this VTEP, could also remove the VRF
-            # and withdraw the multicast route? (for dynamically added VRFs)
-            #
-            if cur['vtep'] != "tbd":
-               logging.info( f"VTEP changed {cur['vtep']}->{static_vtep}, withdrawing my route" )
-               WithdrawRoute( state, mac_vrf, cur['vtep'], mac, cur['ip'] )
-               mac_vrf['ips'].pop( cur['ip'], None ) # Remove any IP mapping too
-            else:
-               logging.info( f"EVPN route for {mac} already withdrawn triggered by other EVPN proxy route" )
-
-            # Could add a timestamp (last seen) + aging
-            logging.info( f"VNI {vni}: MAC {mac} moved to {static_vtep} new mobility_seq={mobility_seq}" )
-            cur.update( { 'vtep' : static_vtep, 'ip': ip, 'seq' : mobility_seq } )
-        else:
-            logging.info( f"VNI {vni}: MAC {mac} never seen before, associating with VTEP {static_vtep}" )
-            mac_vrf['macs'].update( { mac : { 'vtep': static_vtep, 'ip': ip, 'seq': -1 } } )
-
-        js_path = f'.vxlan_proxy.static_vtep{{.vtep_ip=="{static_vtep}"}}.mac_vrf{{.name=="{mac_vrf["name"]}"}}.mac{{.address=="{mac}"}}'
-        now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        data = {
-          'last_update'  : { "value" : now_ts },
-          'ip'           : { "value" : ip },
-          'evpn_mac_mobility' : { "value": mobility_seq } # None -> not shown
-        }
-        Add_Telemetry( [(js_path, data)] )
-
-        logging.info( f"Announcing EVPN MAC route...evpn_vteps={evpn_vteps}" )
-        AnnounceRoute(state, mac_vrf, static_vtep, mac, ip, mobility_seq)
-        if state.params['include_ip']:
-           mac_vrf['ips'].update( { ip: { 'mac' : mac, 'vtep' : static_vtep } } ) # Also track IP mobility
-      except Exception as e:
-        tb_str = ''.join(traceback.format_tb(e.__traceback__))
-        logging.error( f"Error processing ARP: {e} ~ {tb_str}" )
-          # Debug - requires '/sys/kernel/debug/tracing/trace_pipe' to be mounted
-        # (task, pid, cpu, flags, ts, msg) = bpf.trace_fields( nonblocking=True )
-        # print( f'trace_fields: {msg}' )
-    except Exception as ex:
-       tb_str = ''.join(traceback.format_tb(ex.__traceback__))
-       logging.error( f"Exiting ARP socket while loop: {ex} ~ {tb_str}" )
-
-    # Only happens upon exception
-    bpf.cleanup()
-
-def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf):
-   """
-   Replies to a special ARP probe packet over VXLAN to another agent, to measure RTT and packet loss
-   Uses MAC addresses / IPs gleaned from ARP packet on the wire
-   """
-   logging.debug( f"ReplyARPProbe dest_vtep_ip={dest_vtep_ip} local_vtep_ip={local_vtep_ip}" )
-
-
-   # TODO Use Linux kernel? https://www.kernel.org/doc/html/latest/networking/timestamping.html
-   # SO_TIMESTAMPNS = 35
-   # s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
-   # s.setsockopt(socket.SOL_SOCKET, SO_TIMESTAMPNS, 1)
-   # raw_data, ancdata, flags, address = s.recvmsg(65535, 1024)
-   def get_timestamp_us(): # 40-bit
-      now = datetime.now(timezone.utc)
-      # epoch = datetime(1970, 1, 1, tzinfo=timezone.utc) # use POSIX epoch
-      # posix_timestamp_micros = (now - epoch) // timedelta(microseconds=1)
-      # posix_timestamp_millis = posix_timestamp_micros // 1000
-      # return posix_timestamp_millis
-      return int( int(now.timestamp() * 1000000) & 0xffffffffff )
-
-   # Not currently used
-   def start_timer():
-
-       def on_timer():
-           now_ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-           key = f'{{.mac_vrf=="{mac_vrf["name"]}"}}{{.vtep_ip=="{dest_vtep_ip}"}}{{.vni=={mac_vrf["vni"]}}}'
-           js_path = f'.vxlan_proxy.path_probe_to{key}.at{{.timestamp=="{now_ts}"}}'
-           values = list( mac_vrf['path_probes'][ dest_vtep_ip ]['paths'].values() )
-           good = list( [ i for i in values if i!="missing" ] )
-           lost = len(values)-len(good)
-           if len(values)==0:
-               loss = 100.0
-           else:
-               loss = 100.0 * (lost / len(values))
-
-           avg = sum(good) // len(good)
-           data = {
-             'result'  : { "value" : f"Avg rtt latency: {avg} us loss: {loss:.1f}% probes: {mac_vrf['path_probes'][ dest_vtep_ip ]['paths']}" },
-             'latency' : avg,
-             'sent'    : len(values),
-             'lost'    : lost,
-             'probes'  : sorted(good),
-             'peer_uplinks' : [ f"{mac} = {i['count']} probes, {i['hops']} hop(s) away"
-                                for mac,i in mac_vrf['path_probes'][ dest_vtep_ip ]['interfaces'].items() ]
-           }
-           Add_Telemetry( [(js_path, data)] )
-           mac_vrf['path_probes'].pop( dest_vtep_ip, None )
-
-       mac_vrf['path_probes'][ dest_vtep_ip ] = { 'paths': {}, 'interfaces': {} }
-       for path in range(1,4):
-          mac_vrf['path_probes'][ dest_vtep_ip ][ 'paths' ][ path ] = "missing"
-       Timer( 1, on_timer ).start()
-
-   _eths = rx_pkt.get_protocols( ethernet.ethernet ) # outer+inner
-
-   # Check for probe request or reflected probe
-   RFC5494_EXP1 = 24 # See https://datatracker.ietf.org/doc/html/rfc5494
-
-   _arp = rx_pkt.get_protocol( arp.arp )
-   phase = int(_arp.src_mac[1],16) # vxping sends MAC with '2'
-   if phase!=2:
-       return
-   path = int(_arp.src_mac[0],16)
-
-   # Decode received IP header, for identification and TTL
-   _ip = rx_pkt.get_protocol( ipv4.ipv4 )
-   _udp = rx_pkt.get_protocol( udp.udp )
-
-   e = ethernet.ethernet(dst=_eths[0].src, # nexthop MAC, per vxlan_intf
-                         src=_eths[0].dst, # source interface MAC, per uplink
-                         ethertype=ether.ETH_TYPE_IP)
-
-   # Add entropy to source IP for hashing of return flow
-   digits = [ int(i) for i in local_vtep_ip.split('.') ]
-   digits[1] ^= _ip.identification % 256
-   local_vtep_ip_hashed = ".".join( map(str,digits) )
-
-   i = ipv4.ipv4(dst=dest_vtep_ip,src=local_vtep_ip_hashed,proto=inet.IPPROTO_UDP,
-                 tos=0xc0,identification=_ip.identification,flags=(1<<1)) # Set DF
-   u = udp.udp(src_port=_udp.src_port,dst_port=4789) # vary source == timestamp
-   v = vxlan.vxlan(vni=mac_vrf['vni'])
-
-   # src == interface MAC, to measure ECMP spread
-   e2 = ethernet.ethernet(dst=_eths[0].src,src=_eths[0].dst,ethertype=ether.ETH_TYPE_ARP)
-   e2._MIN_PAYLOAD_LEN = 0 # Avoid padding
-
-   # Reflect timestamp for ARP replies, include IP TTL
-   dst_mac = f'{_ip.ttl:02x}:{_eths[1].src[3:]}'
-   ts = get_timestamp_us()
-   ts_mac = ""
-   for b in range(0,5): # 40 bit
-      ts_mac = f":{(ts%256):02x}" + ts_mac
-      ts = ts // 256
-   src_mac = f'{path:1x}1' + ts_mac  # Reply -> use '1'
-   a = arp.arp(hwtype=1, proto=0x0800, hlen=6, plen=4, opcode=RFC5494_EXP1,
-               src_mac=src_mac, src_ip=local_vtep_ip,
-               dst_mac=dst_mac, dst_ip=dest_vtep_ip )
-   p = packet.Packet()
-   for h in [e,i,u,v,e2,a]:
-      p.add_protocol(h)
-
-   p.serialize()
-   # logging.debug( f"Sending/reflecting ARP probe response: {pkt}" )
-   socket.sendall( p.data )
 
 ##################################################################
 ## Proc to process the config Notifications received by auto_config_agent
@@ -862,30 +498,6 @@ def Handle_Notification(obj, state):
                 if 'peer_address' in data:
                     state.params[ "peer_address" ] = data['peer_address']['value']
 
-                state.params[ "vxlan_interfaces" ] = []
-                state.params[ "include_ip" ] = False
-                state.params[ "ecmp_path_probes" ] = False
-                state.params[ "auto_discover_static_vteps" ] = False
-                if 'proof_of_concept' in data:
-                    poc = data['proof_of_concept']
-                    if 'vxlan_arp_learning_interfaces' in poc:
-                       state.params[ "vxlan_interfaces" ] = [ i['value'] for i in poc['vxlan_arp_learning_interfaces'] ]
-                    if 'include_ip' in poc:
-                       state.params[ "include_ip" ] = bool( poc['include_ip']['value'] )
-                    if 'ecmp_path_probes' in poc:
-                       state.params[ "ecmp_path_probes" ] = bool( poc['ecmp_path_probes']['value'] )
-                    if 'auto_discover_static_vteps' in poc:
-                       state.params[ "auto_discover_static_vteps" ] = bool( poc['auto_discover_static_vteps']['value'] )
-
-            # cleanup ARP thread always, use link()?
-            if hasattr( state, 'arp_threads' ):
-               logging.info( f"Cleaning up ARP threads and sockets: {state.arp_threads}" )
-               for t in state.arp_threads.values():
-                  t['socket'].close() # This ends the thread and cleans up bpf? Nope
-                  t['bpf'].cleanup()
-                  t['thread'].kill()
-               del state.arp_threads
-
             # if enabled, start separate thread for BGP EVPN interactions
             def shutdown_bgp():
                 state.speaker.shutdown()
@@ -904,7 +516,7 @@ def Handle_Notification(obj, state):
             elif hasattr( state, 'bgpThread' ):
                shutdown_bgp()
                del state.bgpThread
-               Remove_Telemetry( [".vxlan_proxy"] ) # Works?
+               Remove_Telemetry( [".static_vxlan_agent"] ) # Works?
                logging.info( "BGP shutdown" )
 
             return True
@@ -1061,7 +673,7 @@ def Exit_Gracefully(signum, frame):
 
 ##################################################################################################
 ## Main from where the Agent starts
-## Log file is written to: /var/log/srlinux/stdout/evpn_proxy_agent.log
+## Log file is written to: /var/log/srlinux/stdout/static_vxlan_agent.log
 ## Signals handled for graceful exit: SIGTERM
 ##################################################################################################
 if __name__ == '__main__':

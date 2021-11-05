@@ -72,12 +72,12 @@ COPY --from=build-grpc-with-eventlet /usr/local/lib64/python3.6/site-packages/gr
 COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/protocols/bgp/
 
 # Integrate vxlan service ping and flooding avoidance CLI commands
-COPY src/evpn-proxy-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
+COPY src/static-vxlan-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
 RUN sudo sh -c ' echo -e "vxlan_ping = srlinux.mgmt.cli.plugins.vxlan_service_ping:Plugin\nvxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
   >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
 
 RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/evpn-proxy-agent
-COPY --chown=srlinux:srlinux ./srl-evpn-proxy-agent.yml /etc/opt/srlinux/appmgr
+COPY --chown=srlinux:srlinux ./static-vxlan-agent.yml /etc/opt/srlinux/appmgr
 COPY ./src /opt/demo-agents/
 
 # Add in auto-config agent sources too

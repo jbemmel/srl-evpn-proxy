@@ -48,9 +48,10 @@ FROM base AS runtime
 COPY --from=agent-deps /opt/static-vxlan-agent /opt/static-vxlan-agent
 
 # Copy bcc files separately, Python bcc package is not enough
-COPY --from=agent-deps /usr/lib/python3.6/site-packages/bcc /opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/bcc
+# Not using this in release
+# COPY --from=agent-deps /usr/lib/python3.6/site-packages/bcc /opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/bcc
 
-ENV PATH="/opt/static-vxlan-agent/.venv/bin:$PATH"
+# ENV PATH="/opt/static-vxlan-agent/.venv/bin:$PATH"
 
 # Create and switch to a new user
 # RUN useradd --create-home appuser
@@ -58,7 +59,13 @@ ENV PATH="/opt/static-vxlan-agent/.venv/bin:$PATH"
 # USER appuser
 
 # Install application into container
+COPY --chown=srlinux:srlinux ./static-vxlan-agent.yml /etc/opt/srlinux/appmgr
 COPY src /opt
+
+# Integrate vxlan service ping and flooding avoidance CLI commands
+COPY src/static-vxlan-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
+RUN sudo sh -c ' echo -e "vxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
+  >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
 
 # run pylint to catch any obvious errors (includes .venv?)
 RUN PYTHONPATH=/opt/static-vxlan-agent/.venv/lib/python3.6/site-packages/:$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/static-vxlan-agent

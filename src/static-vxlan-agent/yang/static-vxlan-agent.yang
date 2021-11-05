@@ -92,37 +92,6 @@ module static-vxlan-agent {
               description "Local preference to use for advertising EVPN MAC routes, default 100";
             }
 
-            container proof-of-concept {
-              // if-feature dataplane-learning;
-              srl_nokia-ext:show-importance high; // affects info | as table
-              presence "Configure Proof-of-Concept features";
-              description "Set of features intended as Proof-of-Concept (only)";
-
-              leaf-list vxlan-arp-learning-interfaces {
-                type string;
-                description "Interface(s) to listen on for VXLAN ARP packets, like 'e1-1'.
-                             Leave empty to disable ARP/VTEP learning";
-
-              }
-              leaf include-ip {
-                type boolean;
-                default true;
-                description "Whether to include the IP address in EVPN RT2 MAC routes, default true";
-              }
-
-              leaf auto-discover-static-vteps {
-                type boolean;
-                default true;
-                description "Whether to announce EVPN routes for static VTEPs that are not explicitly configured";
-              }
-
-              leaf ecmp-path-probes {
-                type boolean;
-                default true;
-                description "Enable experimental ARP-in-VXLAN probe packets to measure path diversity and latency";
-              }
-            }
-
             leaf oper-state {
               config false;
               srl_nokia-ext:show-importance "high";
@@ -155,11 +124,6 @@ module static-vxlan-agent {
             type srl_nokia-comm:date-and-time-delta;
             srl_nokia-ext:show-importance "high";
             description "The date and time of the last update of this VTEP";
-          }
-
-          leaf dynamic {
-            type boolean;
-            description "Indicates this VTEP IP was learned from dataplane ARP messages";
           }
 
           list mac-vrf {
@@ -233,29 +197,6 @@ module static-vxlan-agent {
             }
             srl_nokia-ext:show-importance "high";
             description "VNI used for this probe";
-          }
-
-          list at {
-            key timestamp;
-            // ordered-by user;
-
-            leaf timestamp {
-              type srl_nokia-comm:date-and-time-delta;
-              srl_nokia-ext:show-importance "high";
-              description "The date and time of the last update of this mac";
-            }
-
-            leaf result {
-              type string;
-            }
-            leaf latency { type uint32; description "Average RTT in us across all paths"; }
-            leaf sent { type uint8; description "Number of probes sent"; }
-            leaf lost { type uint8; description "Number of probes lost"; }
-            leaf-list probes { type uint32; }
-            leaf-list peer-uplinks {
-              description "Distribution of probes over uplink interfaces";
-              type string;
-            }
           }
         }
       }
