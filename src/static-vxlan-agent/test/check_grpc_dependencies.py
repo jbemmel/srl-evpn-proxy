@@ -3,7 +3,8 @@
 
 # Small test program to check which grpc files are loaded for eventlet support
 # Usage:
-# source /opt/static-vxlan-agent/.venv/bin/activate
+# export VIRTUAL_ENV=/opt/static-vxlan-agent/.venv/
+# export PATH=${VIRTUAL_ENV}/bin:${PATH}
 # PYTHONVERBOSE=2 python3 check_grpc_dependencies.py 2>&1 | grep import
 
 # Google core libraries don't support eventlet; workaround
