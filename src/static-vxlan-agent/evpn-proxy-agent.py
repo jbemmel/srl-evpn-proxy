@@ -595,10 +595,9 @@ def Handle_Notification(obj, state):
 
 class State(object):
     def __init__(self):
-        self.params = {}  # Set through config
+        self.params = { 'include_ip': False }  # Set through config
         self.bgp_vrfs = {}
         self.mac_vrfs = {} # Map of vni -> mac-vrf { vxlan_vteps, evi, learned macs }
-        # self.vni_2_evi = {}  # Mapping of VNI to EVI
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
