@@ -14,15 +14,15 @@ topology:
       # image: srl/custombase:latest
       image: srl/evpn-proxy-agent:latest
       extras:
-        srl-agents: [ ../../srl-evpn-proxy-agent.yml ]
+        srl-agents: [ ../../static-vxlan-agent.yml ]
       binds:
         - /lib/modules:/lib/modules:ro
         - /usr/src:/usr/src
         # Cannot mount to /sys/kernel/debug/tracing
         - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
-        - ../../src/evpn-proxy-agent:/opt/demo-agents/evpn-proxy-agent
-        - ../../src/evpn-proxy-agent/cli/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
-        - ../../src/evpn-proxy-agent/cli/vxlan_avoid_flooding.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_avoid_flooding.py
+        - ../../src/static-vxlan-agent/evpn-proxy-agent.py:/opt/static-vxlan-agent/evpn-proxy-agent.py
+        - ../../src/static-vxlan-agent/cli/vxlan_service_ping.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_service_ping.py
+        - ../../src/static-vxlan-agent/cli/vxlan_avoid_flooding.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_avoid_flooding.py
         # - ../../../srl-vxlan-oam/src/srl-vxlan-oam:/opt/demo-agents/srl-vxlan-oam
         # - /home/jeroen/.local/lib/python3.8/site-packages/scapy:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/scapy
 
@@ -60,13 +60,13 @@ topology:
     srl1:
       kind: srl
       group: evpn-fabric
-      # startup-config: srl1.conf.json
-      startup-config: srl1-with-evpn-proxy.conf.json
+      startup-config: srl1.conf.json
+      # startup-config: srl1-with-evpn-proxy.conf.json
     srl2:
       kind: srl
       group: evpn-fabric
-      # startup-config: srl2.conf.json
-      startup-config: srl2-with-evpn-proxy.conf.json
+      startup-config: srl2.conf.json
+      # startup-config: srl2-with-evpn-proxy.conf.json
 
     h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
     h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }

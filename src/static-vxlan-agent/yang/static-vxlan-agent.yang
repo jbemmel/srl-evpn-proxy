@@ -2,11 +2,11 @@ module static-vxlan-agent {
 
     yang-version "1.1";
 
-    namespace "urn:srl_nokia_demo/evpn-proxy";
+    namespace "urn:srl_nokia_demo/static-vxlan-agent";
     // Put it in the same namespace, so we can read EVI config? Does not work
     // namespace "urn:srl_nokia/network-instance/protocols/bgp-evpn";
 
-    prefix "demo_evpn_proxy";
+    prefix "static_vxlan_agent";
 
     import srl_nokia-common {
         prefix srl_nokia-comm;
@@ -267,7 +267,7 @@ module static-vxlan-agent {
 
     // Need to get the evi value for generating correct auto RD/RT
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols/srl_nokia-netinst:bgp-evpn/srl_nokia-bgp-evpn:bgp-instance" {
-        container vxlan-agent {
+        container static-vxlan-agent {
           if-feature "srl-feat:vxlan and srl-feat:evpn";
           presence "VXLAN agent configuration";
 

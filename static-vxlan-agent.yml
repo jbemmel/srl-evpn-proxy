@@ -1,5 +1,5 @@
 # See example_config.yml for an explanation of all the accepted fields
-srl_evpn_proxy_agent:
+static_vxlan_agent:
    path: /opt/static-vxlan-agent
    launch-command: sudo /opt/static-vxlan-agent/scripts/evpn-proxy-agent.sh
    search-command: python3 /opt/static-vxlan-agent/evpn-proxy-agent.py

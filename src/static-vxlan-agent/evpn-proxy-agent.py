@@ -77,7 +77,7 @@ SO_TIMESTAMPNS = 35 # Higher ns precision
 ############################################################
 ## Agent will start with this name
 ############################################################
-agent_name='srl_evpn_proxy_agent'
+agent_name='static_vxlan_agent'
 
 ############################################################
 ## Open a GRPC channel to connect to sdk_mgr on the dut
@@ -830,7 +830,7 @@ def ReplyARPProbe(state,socket,rx_pkt,dest_vtep_ip,local_vtep_ip,opcode,mac_vrf)
 ## At present processing config from js_path containing agent_name
 ##################################################################
 def Handle_Notification(obj, state):
-    if obj.HasField('config') and obj.config.key.js_path != ".commit.end":
+    if obj.HasField('config'):
         logging.info(f"GOT CONFIG :: {obj.config.key.js_path}")
 
         json_str = obj.config.data.json.replace("'", "\"")
@@ -909,10 +909,7 @@ def Handle_Notification(obj, state):
 
             return True
 
-        # TODO ".network_instance.protocols.bgp_evpn.bgp_instance"
-        # Lookup configured EVI using gNMI
-
-    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent":
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent":
           mac_vrf_name = obj.config.key.keys[0]
 
           admin_state = data['admin_state'][12:] if 'admin_state' in data else None
@@ -960,7 +957,7 @@ def Handle_Notification(obj, state):
                UpdateMACVRF( state, old_vrf )
                state.mac_vrfs.pop( vni, None )
                state.mac_vrfs.pop( old_vrf['name'], None )
-    elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent.static_vtep":
+        elif obj.config.key.js_path == ".network_instance.protocols.bgp_evpn.bgp_instance.static_vxlan_agent.static_vtep":
           mac_vrf_name = obj.config.key.keys[0]
           vtep_ip = obj.config.key.keys[2]
           if mac_vrf_name in state.mac_vrfs:
