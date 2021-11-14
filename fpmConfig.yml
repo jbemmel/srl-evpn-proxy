@@ -10,4 +10,4 @@ contents:                              # contents to add to the package
     dst: /opt/     # destination path (including yang)
 
   - src: ./static-vxlan-agent.yml    # local path of agent yml
-    dst: /etc/opt/srlinux/appmgr/    # destination path of agent yml
+    dst: /etc/opt/srlinux/appmgr/static-vxlan-agent.yml

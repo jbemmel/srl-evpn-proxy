@@ -1,9 +1,9 @@
 ARG SR_LINUX_RELEASE
 FROM srl/custombase:$SR_LINUX_RELEASE AS target-image
 
-# Create a Python virtual environment
+# Create a Python virtual environment, note --upgrade is broken
+RUN sudo python3 -m venv /opt/static-vxlan-agent/.venv --system-site-packages --without-pip
 ENV VIRTUAL_ENV=/opt/static-vxlan-agent/.venv
-RUN sudo python3 -m venv $VIRTUAL_ENV --system-site-packages --without-pip --upgrade
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install BGP library and eBPF packages
