@@ -609,3 +609,16 @@ eBPF ARP filter could reduce packets sent to userspace by implementing a hashmap
 * gRPC and eventlet don't play nicely together, see https://github.com/grpc/grpc/issues/15923 ; 2020 [patch available](https://github.com/Akrog/grpc/blob/eventlet/src/python/grpcio/grpc/experimental/eventlet.py) and [merged with master](https://github.com/jbemmel/grpc)
 * gRPC parallel builds obfuscate compiler errors; [use](https://github.com/jbemmel/srl-evpn-proxy/blob/main/Dockerfile#L30) 'GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS=1' to build serially
 * Network namespaces can be tricky to work with in Python
+
+# Deployment on physical devices
+To deploy the agent onto a physical device, an initial attempt is made to package the agent as an .rpm
+This package can be built as follows:
+```
+git clone --branch release https://github.com/jbemmel/srl-evpn-proxy.git
+cd srl-evpn-proxy
+make rpm
+```
+This should result in a 'static-vxlan-agent-x.y.z.x86_64.rpm' file which can be copied to the device, and installed using
+```
+yum localinstall -y static-vxlan-agent-1.0.0.x86_64.rpm
+```
