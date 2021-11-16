@@ -620,5 +620,5 @@ make rpm
 ```
 This should result in a 'static-vxlan-agent-x.y.z.x86_64.rpm' file which can be copied to the device, and installed using
 ```
-yum localinstall -y static-vxlan-agent-1.0.0.x86_64.rpm
+sudo yum localinstall -y static-vxlan-agent-1.0.0.x86_64.rpm
 ```
