@@ -37,7 +37,9 @@ rpm: pipenv
 	$(SET_CONTAINER_ID)
 	docker cp --follow-link ${CONTAINER_ID}:/opt/static-vxlan-agent/ rpmbuild/
 	docker rm ${CONTAINER_ID}
-	find rpmbuild/ -xtype l -delete # Purge broken symlinks
+	find rpmbuild/ -type l -delete # Purge (broken) symlinks
+	find rpmbuild/ -name test* | xargs rm -rf # Remove test code
+	find rpmbuild/ -name *.so | xargs strip # Strip binaries
 	docker run --rm -v ${PWD}:/tmp -w /tmp goreleaser/nfpm package \
     --config /tmp/fpmConfig.yml \
     --target /tmp \
