@@ -10,7 +10,7 @@ ENV PYTHONFAULTHANDLER 1
 FROM base AS agent-deps
 
 # Install pipenv and compilation dependencies
-RUN sudo python3 -m pip install pipenv
+RUN sudo python3 -m pip install pipenv==2021.11.09
 # RUN apt-get update && apt-get install -y --no-install-recommends gcc
 
 # Install python dependencies in /opt/static-vxlan-agent/.venv
