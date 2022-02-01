@@ -18,6 +18,10 @@ RUN sudo -E yum install -y python3-bcc kmod xz
 # Use separate build image and copy only resulting binaries, else 3.4GB
 FROM centos:8 AS build-grpc-with-eventlet
 
+# Fix missing mirrorlist due to Centos8 EOL
+RUN sed -i 's/^mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-* && \
+    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
+
 # Install build tools
 RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
 
