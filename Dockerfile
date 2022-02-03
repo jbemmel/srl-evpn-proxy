@@ -1,9 +1,9 @@
 ARG SR_LINUX_RELEASE
 FROM srl/custombase:$SR_LINUX_RELEASE AS target-image
 
-# Create a Python virtual environment
+# Create a Python virtual environment, note --upgrade is broken
+RUN sudo python3 -m venv /opt/static-vxlan-agent/.venv --system-site-packages --without-pip
 ENV VIRTUAL_ENV=/opt/static-vxlan-agent/.venv
-RUN sudo python3 -m venv $VIRTUAL_ENV --system-site-packages --without-pip --upgrade
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install BGP library and eBPF packages
@@ -16,7 +16,12 @@ RUN sudo -E yum install -y python3-bcc kmod xz
 
 # Build gRPC with eventlet support
 # Use separate build image and copy only resulting binaries, else 3.4GB
-FROM centos:8 AS build-grpc-with-eventlet
+# FROM centos:8 AS build-grpc-with-eventlet
+FROM quay.io/centos/centos:stream8 AS build-grpc-with-eventlet
+
+# Fix missing mirrorlist due to Centos8 EOL? Now moved to stream
+# RUN sed -i 's/^mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-Linux-* && \
+#     sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Linux-*
 
 # Install build tools
 RUN yum install -y python3-pip gcc-c++ git python3-devel openssl-devel
@@ -76,15 +81,15 @@ COPY src/static-vxlan-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/
 RUN sudo sh -c ' echo -e "vxlan_ping = srlinux.mgmt.cli.plugins.vxlan_service_ping:Plugin\nvxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
   >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
 
-RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/ /opt/demo-agents/evpn-proxy-agent
+RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/
 COPY --chown=srlinux:srlinux ./static-vxlan-agent.yml /etc/opt/srlinux/appmgr
-COPY ./src /opt/demo-agents/
+COPY ./src /opt/
 
 # Add in auto-config agent sources too
 # COPY --from=srl/auto-config-v2:latest /opt/demo-agents/ /opt/demo-agents/
 
 # run pylint to catch any obvious errors
-RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/demo-agents/evpn-proxy-agent
+RUN PYTHONPATH=$AGENT_PYTHONPATH pylint --load-plugins=pylint_protobuf -E /opt/static-vxlan-agent
 
 # Using a build arg to set the release tag, set a default for running docker build manually
 ARG SRL_EVPN_PROXY_RELEASE="[custom build]"
