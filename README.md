@@ -1,3 +1,8 @@
+Note: The agent in this repo is available as a pre-built public Docker image:
+```
+docker pull eccloud/srl-static-vxlan-agent:latest
+```
+
 # Evolving from static VXLAN: Using SR Linux as an EVPN proxy (featuring eBPF based data plane ARP learning)
 Some traditional data center designs lack an EVPN control plane, but we can extend SRL to function as a proxy while transitioning to a fully dynamic EVPN fabric
 ![plot](images/EVPN_Agent2.png)
@@ -56,7 +61,7 @@ Flooding of traffic towards these "unknown" MACs can be avoided by configuring t
 ```
 /network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
 static-vxlan-agent
-static-vtep 1.1.1.1 { 
+static-vtep 1.1.1.1 {
   mac-addresses [ 00:11:22:33:44:01 ]
 }
 commit stay
@@ -143,7 +148,7 @@ The EVPN VTEPs [have been added to the static configuration](https://github.com/
 We can enable the EVPN proxy on SRL1 (or SRL2, or both):
 ```
 enter candidate
-/network-instance default protocols 
+/network-instance default protocols
 bgp {
   group vxlan-agent {
     admin-state enable
@@ -184,7 +189,7 @@ static-vxlan-agent
 commit stay
 /show network-instance default protocols bgp neighbor 1.1.1.4 received-routes evpn
 
-/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
   static-vxlan-agent
     admin-state enable
     evi ${/network-instance[name=mac-vrf-evi10]/protocols/bgp-evpn/bgp-instance[id=1]/evi}
@@ -316,7 +321,7 @@ This could be avoided by running the EVPN proxy on every SRL node.
 ## Static MAC address entries
 Instead of dynamic learning via ARP, it is also possible to configure static MAC entries for each VTEP:
 ```
-/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1 
+/network-instance mac-vrf-evi10 protocols bgp-evpn bgp-instance 1
   vxlan-agent
   static-vtep 1.1.1.1 {
     static-macs [ 00:11:22:33:44:55 ]
@@ -465,7 +470,7 @@ docker exec -it clab-static-vxlan-spine-lab-h2 ip addr flush dev eth1
 docker exec -it clab-static-vxlan-spine-lab-h2 ip addr add 10.0.0.101/24 dev eth1
 docker exec -it clab-static-vxlan-spine-lab-h2 ping 10.0.0.103 -c2
 EOF
-chmod +x ./test_mac_move.sh 
+chmod +x ./test_mac_move.sh
 bash -c ./test_mac_move.sh
 ```
 
@@ -479,7 +484,7 @@ docker exec -it clab-static-vxlan-spine-lab-h1 ip link set address \$MAC2 dev et
 docker exec -it clab-static-vxlan-spine-lab-h4 ip link set address \$MAC1 dev eth1
 docker exec -it clab-static-vxlan-spine-lab-h4 ping 10.0.0.103 -c2
 EOF
-chmod +x ./test_mac_move_2_evpn.sh 
+chmod +x ./test_mac_move_2_evpn.sh
 bash -c ./test_mac_move_2_evpn.sh
 ```
 In the latter case, when the EVPN proxy receives a MAC update for a MAC it has advertised, it withdraws the route if the VTEP and/or IP has changed.
@@ -502,11 +507,11 @@ ${PEER=1.1.1.5}
 ```
 enter candidate                        
 /bfd subinterface system0.0 admin-state enable
-/network-instance default static-routes 
+/network-instance default static-routes
 route ${PEER}/32
 admin-state enable
 next-hop-group peer-vtep-${PEER}
-/network-instance default next-hop-groups group peer-vtep-${PEER} nexthop 0 
+/network-instance default next-hop-groups group peer-vtep-${PEER} nexthop 0
 ip-address ${PEER}
 admin-state enable
 failure-detection enable-bfd local-address ${/interface[name=system0]/subinterface[index=0]/ipv4/address/ip-prefix| _.split('/')[0] }

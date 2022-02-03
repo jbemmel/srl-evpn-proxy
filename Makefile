@@ -4,6 +4,7 @@ TODAY       := $(shell sh -c "date +%Y%m%d_%H%M")
 TAG         := ${TODAY}.${LAST_COMMIT}
 IMG         := ${NAME}:${TAG}
 LATEST      := ${NAME}:latest
+PUBLISH     := eccloud/srl-static-vxlan-agent
 # HTTP_PROXY  := "http://proxy.lbs.alcatel-lucent.com:8000"
 
 ifndef SR_LINUX_RELEASE
@@ -17,6 +18,12 @@ build:
 	                  --build-arg SR_LINUX_RELEASE="${SR_LINUX_RELEASE}" \
 	                  -f ./Dockerfile -t ${IMG} .
 	sudo docker tag ${IMG} ${LATEST}
+
+publish: build
+	docker tag ${IMG} ${PUBLISH}:${TAG}
+	docker tag ${IMG} ${PUBLISH}:latest
+	docker tag ${IMG} ${PUBLISH}:21.11.1
+	docker push ${PUBLISH} --all-tags
 
 build-submodules:
 	make -C srl-baseimage
