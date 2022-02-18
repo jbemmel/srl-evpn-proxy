@@ -15,8 +15,8 @@ from srlinux import child_process
 from srlinux.schema import DataStore
 
 import sys
-sys.path.append('/usr/local/lib/python3.6/site-packages') # for netns
-import logging, socket, netns
+# sys.path.append('/usr/local/lib/python3.6/site-packages') # for netns
+import logging # , socket, netns
 
 #
 # L2 service ping using custom ARP packets

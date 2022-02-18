@@ -23,7 +23,7 @@ ENTROPY = int(sys.argv[4])
 UPLINKS = sys.argv[5].split(",")
 VTEP_IPs = sys.argv[6].split(",")
 
-PING_DST = sys.argv[7] if len(sys.argv) > 7 else None
+PING_DST = sys.argv[7] if len(sys.argv) > 7 else ""
 PING_SRC_MAC = sys.argv[8] if len(sys.argv) > 8 else None
 PING_SRC_IP = sys.argv[9] if len(sys.argv) > 9 else None
 

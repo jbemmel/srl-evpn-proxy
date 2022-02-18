@@ -15,7 +15,7 @@ logger.level = logging.DEBUG # INFO # DEBUG
 stream_handler = logging.StreamHandler(sys.stdout)
 logger.addHandler(stream_handler)
 
-from EVPNProxy import EVPNProxy
+from .EVPNProxy import EVPNProxy
 
 VNI = 1234
 EVI = 57069
