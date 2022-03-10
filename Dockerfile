@@ -78,7 +78,7 @@ COPY ryu_enhancements/ /usr/local/lib/python3.6/site-packages/ryu/services/proto
 
 # Integrate vxlan service ping and flooding avoidance CLI commands
 COPY src/static-vxlan-agent/cli/* /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/
-RUN sudo sh -c ' echo -e "vxlan_ping = srlinux.mgmt.cli.plugins.vxlan_service_ping:Plugin\nvxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
+RUN sudo sh -c ' echo -e "vxlan_flood = srlinux.mgmt.cli.plugins.vxlan_avoid_flooding:Plugin" \
   >> /opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux-0.1-py3.6.egg-info/entry_points.txt'
 
 RUN sudo mkdir --mode=0755 -p /etc/opt/srlinux/appmgr/
