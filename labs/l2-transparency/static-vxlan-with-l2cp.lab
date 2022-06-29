@@ -1,0 +1,56 @@
+#
+# A mix of SRL nodes and Cumulus nodes to test all cases with l2cp
+#
+name: static-vxlan-l2cp-lab
+
+topology:
+  kinds:
+    srl:
+      # Need IXR D2 or D3 for EVPN/VXLAN support
+      type: ixrd2 # See https://www.nokia.com/networks/products/7250-interconnect-router/
+      # image: srl/custombase:latest
+      image: srl/evpn_proxy_with_auto_agent_v2:latest
+      startup-config: delta-auto-config.cmd
+      extras:
+        srl-agents: [ ../../static-vxlan-agent.yml, ../../../srl-self-organizing/auto-config-agent.yml ]
+      binds:
+        - /lib/modules:/lib/modules:ro
+        - /usr/src:/usr/src
+        - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+        - ../../../opergroup-lab/lldp_before_l2cp.py:/etc/opt/srlinux/eventmgr/lldp_before_l2cp.py
+
+    cvx:
+      image: networkop/cx:4.4.0
+      binds:
+        - ../cumulus_bridge.json:/etc/network/ifupdown2/policy.d/bridge.json
+    linux:
+      # image: networkop/host:ifreload
+      image: alpine-with-lldp:latest # Custom built image with lldpad
+      # cmd: 2 # wait for 2 interfaces to be connected: eth0 + eth1
+
+  nodes:
+    cumulus1:
+      kind: cvx
+      group: static-fabric
+      binds:
+        - cumulus1_interfaces:/etc/network/interfaces.d/host-mounts
+    srl1:
+      kind: srl
+      group: evpn-fabric
+    srl2:
+      kind: srl
+      group: evpn-fabric
+
+    h1: { kind: linux, group: static-hosts, binds: [ ../h1_interfaces:/etc/network/interfaces ] }
+    h2: { kind: linux, group: static-hosts, binds: [ ../h2_interfaces:/etc/network/interfaces ] }
+    h3: { kind: linux, group: evpn-hosts,   binds: [ ../h3_interfaces:/etc/network/interfaces ] }
+
+  links:
+    # Direct links between leaves
+    - endpoints: ["srl1:e1-49","srl2:e1-49"]
+    - endpoints: ["srl1:e1-50","cumulus1:e1-2"]
+
+    # A host connected to each switch on e1-1, sending LLDP
+    - endpoints: ["cumulus1:e1-1", "h1:eth1"]
+    - endpoints: ["srl1:e1-1", "h2:eth1"]
+    - endpoints: ["srl2:e1-1", "h3:eth1"]
