@@ -17,6 +17,8 @@ topology:
         - /lib/modules:/lib/modules:ro
         - /usr/src:/usr/src
         - /sys/kernel/debug/tracing:/root/sys_kernel_debug_tracing
+        - ../../src/static-vxlan-agent/evpn-proxy-agent.py:/opt/static-vxlan-agent/evpn-proxy-agent.py # for development
+        - ../../src/static-vxlan-agent/cli/vxlan_avoid_flooding.py:/opt/srlinux/python/virtual-env/lib/python3.6/site-packages/srlinux/mgmt/cli/plugins/vxlan_avoid_flooding.py
         - ../../../opergroup-lab/lldp_before_l2cp.py:/etc/opt/srlinux/eventmgr/lldp_before_l2cp.py
 
     cvx:
