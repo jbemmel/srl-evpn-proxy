@@ -97,6 +97,73 @@ module static-vxlan-agent {
         }
     }
 
+    grouping evpn-static-routes {
+        description "Configure EVPN Static routes";
+
+        container evpn-static-routes {
+            if-feature "srl-feat:vxlan and srl-feat:evpn";
+
+            presence "Configure BGP EVPN static routes";
+            must "../../srl_nokia-netinst:type != 'srl_nokia-netinst:default'" {
+              error-message "EVPN static routes cannot be configured in the default network instance";
+            }
+
+            list static-route {
+              key "next-hop";
+
+              leaf next-hop {
+                type srl_nokia-comm:ip-address;
+                srl_nokia-ext:show-importance "high";
+                description "Destination /32 IP for this EVPN static route";
+              }
+
+              leaf interface {
+               type leafref {
+                path "../../../../srl_nokia-netinst:interface/srl_nokia-netinst:name";
+               }
+              }
+
+              leaf admin-state {
+                  type srl_nokia-comm:admin-state;
+                  default "enable";
+
+                  description "Administratively enable or disable this static EVPN route";
+              }
+
+              leaf resolved-mac {
+                type srl_nokia-comm:mac-address;
+                config false;
+              }
+            }
+        }
+    }
+
+    grouping evpn-static-routes-under-interface {
+        description "Configure EVPN Static routes";
+
+        list evpn-static-route {
+          if-feature "srl-feat:vxlan and srl-feat:evpn";
+          must "../../srl_nokia-netinst:type != 'srl_nokia-netinst:default'" {
+            error-message "EVPN static routes cannot be configured in the default network instance";
+          }
+          key "next-hop";
+          leaf next-hop {
+            type srl_nokia-comm:ip-address;
+            srl_nokia-ext:show-importance "high";
+            description "Destination /32 IP for this EVPN static route";
+          }
+          leaf admin-state {
+              type srl_nokia-comm:admin-state;
+              default "enable";
+              description "Administratively enable or disable this static EVPN route";
+          }
+          leaf resolved-mac {
+            type srl_nokia-comm:mac-address;
+            config false;
+          }
+        }
+    }
+
     grouping evpn-proxy-state {
       container static-vxlan-agent {
         description "Operational state for VXLAN EVPN proxy agent";
@@ -200,6 +267,12 @@ module static-vxlan-agent {
 
     augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:protocols" {
         uses evpn-proxy-protocol;
+        // uses evpn-static-routes;
+    }
+
+    // Better under the interface
+    augment "/srl_nokia-netinst:network-instance/srl_nokia-netinst:interface" { // list
+      uses evpn-static-routes-under-interface;
     }
 
     // Need to get the evi value for generating correct auto RD/RT
