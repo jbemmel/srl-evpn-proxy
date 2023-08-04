@@ -9,7 +9,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Install BGP library and eBPF packages
 # RUN sudo bash -c "source $VIRTUAL_ENV/bin/activate && python3 -m pip install ryu netns"
 RUN sudo -E python3 -m pip install ryu netns
-RUN sudo -E yum install -y python3-bcc kmod xz
+RUN sudo -E yum install -y --allowerasing python3-bcc kmod xz
 
 # Install eBPF perf tools?
 # RUN sudo yum install -y perf bpftool
